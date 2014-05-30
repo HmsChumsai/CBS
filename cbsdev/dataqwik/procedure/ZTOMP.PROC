@@ -1,0 +1,67 @@
+//DO NOT MODIFY  TEST|ZTOMP|||||||1
+ZTOMP
+
+	R !,"CID: ",CID
+
+	W !,"Collate forward"
+
+	type DbSet ds = Db.selectDbSet("HIST","CID=:CID")
+
+	while ds.next() do {
+
+		type RecordHIST hist = ds.getRecord("HIST")
+
+		set SEQ=hist.tseq
+
+		w !,"1: ",hist.tseq
+		type RecordHIST hist2=Db.getRecord("HIST","CID,SEQ")
+
+		W !,"2: ",hist2.tseq
+	}
+
+
+	W !,"Collate backward"
+
+	type DbSet ds = Db.selectDbSet("HIST","CID=:CID","ORDER BY TSEQ DESC")
+
+	while ds.next() do {
+
+		type RecordHIST hist = ds.getRecord("HIST")
+
+		set SEQ=hist.tseq
+
+		w !,"1: ",hist.tseq
+		type RecordHIST hist2=Db.getRecord("HIST","CID,SEQ")
+
+		W !,"2: ",hist2.tseq
+	}
+	quit
+UAVB	
+
+	R !,"CID: ",CID
+	
+	type RecordACN acn=Db.getRecord("ACN","CID")
+
+	type String UAVB()
+	set ER=0
+
+	F ZJD=acn.odt:30:%SystemDate do {
+		
+		type String UAVB()
+		W !,$ZD(ZJD),"-",$ZD(ZJD+29)
+		do INIT^UAVB(acn,CID,ZJD,ZJD+29,1)
+		I ER W !,RM
+		ZWR UAVB
+	}
+	quit
+
+TESTER	//
+	
+	type RecordDEP dep=Db.getRecord("DEP","CID=9999999999999",1)
+
+	w !,dep.getMode()
+
+	set VAR=1
+	if VAR=1 do Runtime.setErrMSG("LN",8744,"TEST") Q:ER
+
+	quit

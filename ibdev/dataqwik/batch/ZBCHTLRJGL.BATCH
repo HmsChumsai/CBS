@@ -1,0 +1,251 @@
+//DO NOT MODIFY  Batch For Report ZTLRJGL|ZTLRJGL||||||TTX|TJD=:XTJD||100|32000||0|||10|10|0||0||1
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	K %TAB,Q,QI,MIN,MAX,OLNTB 
+	set XTJD=%SystemDate-1
+
+	set %TAB("XTJD")="/DES=Report Date/LEN=10/TYP=D"
+	set %TAB("IO")=$$IO^SCATAB S:'$D(IO) IO=$I
+	
+	set %READ="@@%FN,,XTJD/REQ"
+	 	
+	do ^UTLREAD if VFMQ="Q" set %BatchExit=1 quit
+
+	kill ^ZTLRJGL(XTJD)
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	new ZXCC,ZETC,ZITC1,POS,CLS,ZCID,CID,UCLS,ZDI,GLSC
+	new XTSO,UTSO,GLSCTSO,LNFEE,FEEPLAN,ZEXIT,ZCHK
+	type RecordTTX ttx=Db.getRecord("TTX","TJD=:TJD,BRCD=:BRCD,UID=:UID,TSEQ=:TSEQ")
+	set BCHFLG=0
+	set ZCHK=$$ZCHK^ZCHCDI(UID)
+	set CID=ttx.cid
+	set ZITC1=ttx.itc1
+	set TAMT=ttx.tamt
+	set ZXCC=ttx.cc
+	set ZETC=ttx.etc
+	
+	// don't include batch transaction
+	if 'Db.isDefined("SCAU","UID=:UID") quit
+	type RecordSCAU scau=Db.getRecord("SCAU","UID=:UID")
+	set UCLS=scau.%ucls
+	if UCLS="" quit
+	if 'Db.isDefined("SCAU0","UCLS=:UCLS") quit
+	type RecordSCAU0 scau0=Db.getRecord("SCAU0","UCLS=:UCLS")
+	if scau0.zbatch=1,ZCHK=0 quit
+	set BCHFLG=1
+	//if scau0.zbatch=1  quit
+	
+	do {
+	
+	if ZXCC.get()="" do {
+	      if Db.isDefined("TRN","ETC=:ZETC") do {
+	              type RecordTRN trn=Db.getRecord("TRN","ETC=:ZETC")
+	              set ZXCC=trn.dftcc
+	      }
+	}
+	/* 27-06-2011 Khwanchanok.
+	type RecordZTLRJGL tlrjgl=Class.new("RecordZTLRJGL")
+	set tlrjgl.tjd=TJD
+	set tlrjgl.brcd=BRCD
+	set tlrjgl.uid=UID
+	set tlrjgl.tseq=TSEQ
+	
+	set tlrjgl.crcd=ttx.crcd
+	set tlrjgl.etc=ZETC
+	*/
+	// seperate GL transaction
+	if 'Db.isDefined("ACN","CID=:CID") do {
+		// Calculate CC
+        	if ZXCC.get()="" do {
+	                set ZBRCD=ttx.brcd
+	                if 'Db.isDefined("UTBLBRCD","BRCD=:ZBRCD") quit
+	                type RecordUTBLBRCD br=Db.getRecord("UTBLBRCD","BRCD=:ZBRCD")
+	                set ZXCC=br.ccdef
+	        }
+	        // 27-06-2011 Khwanchanok.
+	        type RecordZTLRJGL tlrjgl=Db.getRecord("ZTLRJGL","TJD=:TJD,BRCD=:BRCD,UID=:UID,TSEQ=:TSEQ,GLAC=:CID",1)
+	        set tlrjgl.crcd=ttx.crcd
+		set tlrjgl.etc=ZETC
+		set ZDEBAMT= tlrjgl.debit
+		set ZCREAMT= tlrjgl.credit
+	        //End 
+	        set tlrjgl.cc=ZXCC
+	        
+	        // Calculate G/L Account
+	        set tlrjgl.glac=CID
+	        
+	        // Calculate Debit/Credit
+	        if ZITC1=0 set tlrjgl.debit=ZDEBAMT.get()+TAMT
+	        else  set tlrjgl.credit=ZCREAMT.get()+TAMT
+	        //Modified 27/01/2012
+	        set tlrjgl.BCHFLG=BCHFLG
+	        set tlrjgl.CHKCHNL=ZCHK
+	        
+	        do tlrjgl.bypassSave()
+	}
+	else  do {
+		
+		type RecordACN acn=Db.getRecord("ACN","CID=:CID")
+		set CLS=acn.cls
+		
+		// Calculate CC
+        	if ZXCC.get()="" set ZXCC=acn.cc
+        	//set tlrjgl.cc=ZXCC
+        	
+        	set ZEXIT=0
+        	set XTSO=ttx.tso
+		do OUT^UTSO(.UTSO,XTSO)
+		set GLSCTSO=UTSO("GLSC").get()
+		if GLSCTSO'="" set GLSC=GLSCTSO
+		else  do {
+        		set LNFEE=UTSO("LNFEE").get()
+        		if LNFEE="" set GLSC=acn.glsc
+        		else  do {
+        			// get GLAC from Fee Plan
+        			set FEEPLAN=LNFEE.piece(":",1)
+        			if 'Db.isDefined("LNFEEP","FEETYP=:FEEPLAN") set GLSC=acn.glsc quit
+        			type RecordLNFEEP lnfeep=Db.getRecord("LNFEEP","FEETYP=:FEEPLAN")
+        			set GLSC=lnfeep.glfr
+        			if GLSC="" set GLSC=acn.glsc quit
+        			
+        			// 02-06-2011
+	        		type RecordZTLRJGL tlrjgl=Db.getRecord("ZTLRJGL","TJD=:TJD,BRCD=:BRCD,UID=:UID,TSEQ=:TSEQ,GLAC=:GLSC",1)
+	        		set tlrjgl.crcd=ttx.crcd
+				set tlrjgl.etc=ZETC
+				set tlrjgl.cc=ZXCC
+				set ZDEBAMT= tlrjgl.debit
+				set ZCREAMT= tlrjgl.credit
+	        		//End 
+	        		
+        			set tlrjgl.glac=GLSC
+        			
+        			// Calculate Debit/Credit
+	        		if ZITC1=0 set tlrjgl.debit=ZDEBAMT.get()+TAMT
+	        		else  set tlrjgl.credit=ZCREAMT.get()+TAMT
+	        	
+	        		set tlrjgl.BCHFLG=BCHFLG
+	        		set tlrjgl.CHKCHNL=ZCHK
+	        		
+	        		do tlrjgl.bypassSave()
+	        		
+        			set ZEXIT=1
+        		}
+		}
+        	
+        	if ZEXIT=1 quit
+        	
+        	// Calculate Each G/L Movement
+        	set CNT=$L(TAMT,"#")
+        	if CNT=1 do {
+        		// Calculate G/L Account
+        		set ZDI=""
+        		set POS=2
+	        	if CLS="D" do {
+	        		if 'Db.isDefined("STBLGLDESCD","KEY=:POS") quit
+	        		type RecordSTBLGLDESCD gld=Db.getRecord("STBLGLDESCD","KEY=:POS")
+	        		set ZDI=gld.gldi
+	        	}
+	        	if CLS="L" do {
+	        		if 'Db.isDefined("STBLGLDESCL","KEY=:POS") quit
+	        		type RecordSTBLGLDESCL gll=Db.getRecord("STBLGLDESCL","KEY=:POS")
+	        		set ZDI=gll.gldi
+	        	}
+	        	if ZDI="" quit
+
+		        type ResultSet rs=Db.select(ZDI,"UTBLGLSC","GLSC=:GLSC")
+		        if 'rs.isEmpty() while rs.next() do {
+		                //set tlrjgl.glac=rs.getCol(1)
+		                set ZGLAC=rs.getCol(1)
+		        }
+	        	//if tlrjgl.glac="" quit
+	        	if ZGLAC="" quit
+	        	// 27-06-2011 Khwanchanok.
+	        	type RecordZTLRJGL tlrjgl=Db.getRecord("ZTLRJGL","TJD=:TJD,BRCD=:BRCD,UID=:UID,TSEQ=:TSEQ,GLAC=:ZGLAC",1)
+	        	set tlrjgl.crcd=ttx.crcd
+			set tlrjgl.etc=ZETC
+			set tlrjgl.cc=ZXCC
+			set ZDEBAMT= tlrjgl.debit
+			set ZCREAMT= tlrjgl.credit
+	        	//End
+	        	
+	        	
+	        	// Calculate Debit/Credit
+	        	if ZITC1=0 set tlrjgl.debit=ZDEBAMT.get()+TAMT
+	        	else  set tlrjgl.credit=ZCREAMT.get()+TAMT
+	        	
+	        	set tlrjgl.BCHFLG=BCHFLG
+	        	set tlrjgl.CHKCHNL=ZCHK
+	        	
+	        	do tlrjgl.bypassSave()
+        	}
+        	else  do {
+	        	for POS=2:1:CNT do {
+	        		set ZDI=""
+	        		//if TAMT.piece("#",POS)="" quit
+	        		if +TAMT.piece("#",POS)=0 quit
+	        		
+	        		// clear data
+	        		//set tlrjgl.debit=0
+	        		//set tlrjgl.credit=0
+	        		
+		        	// Calculate G/L Account
+		        	if CLS="D" do {
+	        			if 'Db.isDefined("STBLGLDESCD","KEY=:POS") quit
+		        		type RecordSTBLGLDESCD gld=Db.getRecord("STBLGLDESCD","KEY=:POS")
+		        		set ZDI=gld.gldi
+		        	}
+		        	if CLS="L" do {
+		        		if 'Db.isDefined("STBLGLDESCL","KEY=:POS") quit
+		        		type RecordSTBLGLDESCL gll=Db.getRecord("STBLGLDESCL","KEY=:POS")
+		        		set ZDI=gll.gldi
+		        	}
+		        	if ZDI="" quit
+	
+			        type ResultSet rs=Db.select(ZDI,"UTBLGLSC","GLSC=:GLSC")
+			        if 'rs.isEmpty() while rs.next() do {
+			                //set tlrjgl.glac=rs.getCol(1)
+			                set ZGLAC=rs.getCol(1)
+			        }
+		        	//if tlrjgl.glac="" quit
+		        	if ZGLAC="" quit
+		        	// 27-06-2011
+	        		type RecordZTLRJGL tlrjgl=Db.getRecord("ZTLRJGL","TJD=:TJD,BRCD=:BRCD,UID=:UID,TSEQ=:TSEQ,GLAC=:ZGLAC",1)
+	        		set tlrjgl.crcd=ttx.crcd
+				set tlrjgl.etc=ZETC
+				set tlrjgl.cc=ZXCC
+				set ZDEBAMT= tlrjgl.debit
+				set ZCREAMT= tlrjgl.credit
+	        		//End
+		        	
+		        	// Calculate Debit/Credit
+		        	if $$DC^RGLSUM(CLS,ttx.itc,POS,CID)=0 set tlrjgl.debit=ZDEBAMT.get()+TAMT.piece("#",POS)
+		        	else  set tlrjgl.credit=ZCREAMT.get()+TAMT.piece("#",POS)
+		        	
+		        	set tlrjgl.BCHFLG=BCHFLG
+	        		set tlrjgl.CHKCHNL=ZCHK
+		        	
+		        	do tlrjgl.bypassSave()
+	        	}
+        	}
+  	}
+	
+	}	
+	quit
+
+---------- THREXIT ------ Section marker

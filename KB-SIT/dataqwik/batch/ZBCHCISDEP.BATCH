@@ -1,0 +1,78 @@
+//DO NOT MODIFY  Extract full account for CIS|ZBCISDEP||||||DEP|||100|32000|ZTJD|0|10000|10000|10|10|||0||
+---------- REVHIST ------ Section marker
+
+	/*
+	 ORIG: Anchalee Ch.		21/04/2014
+	 DESC: Extract full account files for CIS
+
+	---- Comments --------------------------------------------------------
+
+	---- Revision History ------------------------------------------------
+	Nattapon Tu. 20/05/2014
+	-Add logic to check 3rd friday of month
+
+	*/
+
+---------- OPEN    ------ Section marker
+
+	type public Date ZTJD
+	
+	if ZTJD.get().isNull() set ZTJD=%SystemDate-1
+
+	kill ^ZBASD
+	kill ^ZBAFD
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	//Start 20/05/2014
+	set ZQUIT=1
+	
+	set ZXDAY=$$DOW^SCADAT(ZTJD)
+	set ZXDATE=$$DAY^SCADAT(ZTJD)
+	
+	if (ZXDAY="Friday") do {
+		if ((ZXDATE'<15) & (ZXDATE'>21)) set ZQUIT=0
+	}
+	if ZQUIT.get() quit
+	//End 20/05/2014
+
+	type public Boolean ZFULL = 1
+
+	do EXTRACT^ZBCHBASD
+	do EXTRACT^ZBCHBAFD
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	//Start 20/05/2014
+	set ZQUIT=1
+	
+	set ZXDAY=$$DOW^SCADAT(ZTJD)
+	set ZXDATE=$$DAY^SCADAT(ZTJD)
+	
+	if (ZXDAY="Friday") do {
+		if ((ZXDATE'<15) & (ZXDATE'>21)) set ZQUIT=0
+	}
+	if ZQUIT.get() quit
+	//End 20/05/2014
+	
+	do Runtime.rollback()
+	
+	type RecordDEP dep=Db.getRecord("DEP","CID=:CID",1)
+	if 'dep.getMode() quit
+	
+	if dep.grp="CD" do PROC^ZBCHBAFD(CID)
+	do PROC^ZBCHBASD(CID)
+	
+
+
+---------- THREXIT ------ Section marker

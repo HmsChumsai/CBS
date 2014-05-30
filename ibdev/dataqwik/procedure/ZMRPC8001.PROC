@@ -1,0 +1,59 @@
+//DO NOT MODIFY  Loan Calculation Method|ZRPC8001|||||||1
+ZRPC8001(String return,	// value of allocated numbers      
+         Number versn,	// version number 
+         String INPUT)	
+
+	/*
+		 
+	 ORIG: 1 - 01/01/2008
+	 DESC: This functions returns the next of avaiable
+               Sequence number from ZUTBLZNCID	
+
+
+	 ---- Revision History ------------------------------------------------
+	
+	 28/01/2009 - Thanakorn Pitichuwong
+	 	      Calcution Method for LOAN
+	 	      
+	 25/02/2009 - Rachod Intraha
+	              Fix Translate for INPUT
+	
+	 ****** Consider using setAuditFlag for all objects in this procedure
+	   example :do dep.setAuditFlag(1)
+	
+	*/
+	
+	new TJD,ZGRP,ZTYPE,ZSUBT,ZPCM,ZFLAT,ZAMTREQ,ZFRE,ZTRM,ZDFP,ZIRN,ZINDEX,ZINTSPR,ZINTMAT,ZRELDCID
+	new ZIRNDIFF,ZIACM,ZNBDC,ZODT
+	
+	type RecordCUVAR cuvar=Db.getRecord("CUVAR")
+	set TJD=cuvar.tjd //%SystemDate
+	
+	set INPUT = INPUT.translate("""","")
+	
+	set ZGRP=$P(INPUT,",",1)
+	set ZTYPE=$P(INPUT,",",2)
+	set ZSUBT=$P(INPUT,",",3)
+	set ZPCM=$P(INPUT,",",4)
+	set ZFLAT=$P(INPUT,",",5)
+	set ZAMTREQ=$P(INPUT,",",6)
+	set ZFRE=$P(INPUT,",",7)
+	set ZTRM=$P(INPUT,",",8)
+	set ZDFP=$P(INPUT,",",9)
+	set ZIRN=$P(INPUT,",",10)
+	set ZINDEX=$P(INPUT,",",11)
+	set ZINTSPR=$P(INPUT,",",12)
+	set ZINTMAT=$P(INPUT,",",13)
+	set ZZRELDCID=$P(INPUT,",",14)
+	set ZZIRNDIFF=$P(INPUT,",",15)
+	set ZIACM=$P(INPUT,",",16)
+	set ZNBDC=$P(INPUT,",",17)
+	set ZODT=$P(INPUT,",",18)
+
+	
+	
+	set return=$$CALC^ZPMTAMT(ZGRP,ZTYPE,ZSUBT,ZPCM,ZFLAT,ZAMTREQ,ZFRE,ZTRM,ZDFP,ZIRN,ZINDEX,ZINTSPR,ZINTMAT,ZZRELDCID,ZZIRNDIFF,ZIACM,ZNBDC,ZODT)
+	
+	
+	quit ""
+	

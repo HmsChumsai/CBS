@@ -1,0 +1,8 @@
+//DO NOT MODIFY  ZCTRCTACN Before DELETE|0|0|1|0|0|0||||
+
+	//ORG: 15/12/2005 - Oracha	
+	//Check Overide
+	//do Runtime.setErrXBAD("ZCTRCTACN","ZCTRCTACN") quit:ER
+	
+	quit
+	

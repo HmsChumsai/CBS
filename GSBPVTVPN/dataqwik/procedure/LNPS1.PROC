@@ -1,0 +1,366 @@
+//DO NOT MODIFY  After Insert & Before Update for LNPS1|PROCLNPS||||||LNPS1,LN,LNBIL1|1
+	/*
+	---------- Revision History ------------------------------------------
+	
+	11/18/09 - Rachod Intraha
+		   Modified LNPIUD to correct TP-Timeout issue.
+
+	12/24/08 - Anchalee Ch. (24Dec08) (Profile Upgrade)
+		   Added custom code as the following
+		   o 11/30/04 by VARAKRIT - Modified several sections to 
+		     correctly adjust LN data based on new payment schedule
+		   o 12/23/04 by VARAKRIT - Modified several sections to 
+		     remove codes that prevent changing away from irregular 
+		     frequency
+		   o 12/28/04 by VARAKRIT - Not changed next scheduled 
+		     payment and next billing date incase current date is 
+		     over payment schedule
+	
+	02/04/08 - TAOC - CR 31691
+		   Added a new section PIPSED to perform the edit checks,
+		   required for P&I Payment Schedule Loans.
+		   Modified INSERT section to handle the offset period bill
+		   creation. corrected multiple logic flaws
+		   and to conform to current PSL standards.  Removed pre-2006
+		   revision history.  These changes were based CR 28890 and 
+		   CR 32261 in Profile04.
+		   Modified the INSERT section so that it doesn't generate any
+		   bill records (i.e., bill generation should be handled by 
+		   normal dayend processing or by UANTICLN).  This ensures that 
+		   data items related to scheduled/due dates and sequences are 
+		   bumped properly rather than trying to do it here.  Also 
+		   modified PROC not to allow the creation of a LNPS1 record if 
+		   the due date is the same as the current system date date (i.e., 
+		   don't allow zero day offset periods for bills).  Also modified 
+		   the LNPIUD section to fix a problem with the calculation of 
+		   DIST1ND and SCHND (DIST1ND should change before SCHND) and 
+		   also modified it to bump SCHLD when SCHND changes.
+		   
+
+	05/09/06 - Dhanalakshmi R - 21105
+		   Modified the section INSERT to use Db.getRecord with getmode 
+		   instead of Db.insert for DAYENDLNNOT.       	
+
+	*/
+	
+	quit
+
+public INSERT(Date XPDD,RecordLNPS1 lnps1)
+
+	type public Boolean ER
+	type public Cache %CACHE()	
+	type Number BLOFF
+
+	
+
+	// Loan must exist prior to proceeding further
+	type RecordLN ln = Db.getRecord("LN","CID=:lnps1.cid",1)
+	if 'ln.getMode() quit	
+	set BLOFF = ln.bloff
+
+	// Edit checks for Loan and P&I Payment Schedules
+	do PIPSED(.ln, .lnps1) quit:ER
+
+	// Indicate elements to collect for payment dated MM/DD/YY
+	if ('ln.pips),'(lnps1.d2f!lnps1.d3f!lnps1.d4f) do Runtime.setErrMSG("LNPS1",1352,XPDD.toString()) quit:ER 
+
+	// Perform the following only during inserts, not in verify mode
+	if %ProcessMode=2 quit
+	
+	// Automatically extend the loan's maturity date if the payment 
+	// being created occurs after the existing maturity date
+	if lnps1.pdd > ln.mdt set ln.mdt = lnps1.pdd
+	
+	// Handle creation of a payment schedule record when TJD is in the billing offset period
+	if (lnps1.pdd '< %SystemDate), ((lnps1.pdd - ln.bloff) < %SystemDate) do { quit:ER
+
+		type RecordPRODCTL prodctl = %CACHE("PRODCTL").getRecord("PRODCTL", "TYPE = :ln.type")
+
+
+		if 'prodctl.opb quit
+
+		/*
+		 If a backdated account was opened today and has not been brought 
+		 current yet (next bill date is in the past), then UANTICLN will 
+		 handle the generation of the bill.
+		 
+		 If a current-dated account was opened today w/ an offset period bill 
+		 (next bill date is equal to today), then LNBI has already set up the
+		 OPBNOBIL integ and the bill will be generated during the next dayend. 
+		*/
+		if (ln.odt = %SystemDate),(ln.bndt '> %SystemDate) quit
+
+		/*
+		 Otherwise, this is account maintenance.  Reset BNDT to TJD as long as
+		 the due date isn't equal to today; the bill will be generated during 
+		 the next dayend.
+		*/
+		
+		// Next due date cannot equal system date
+ 		if lnps1.pdd = %SystemDate do Runtime.setErrMSG("LN","6966") quit:ER		
+
+
+		set ln.bndt = %SystemDate
+		set BLOFF = lnps1.pdd - ln.bndt
+
+		
+		// Internal bill will be created without regular offset period
+		do Runtime.setErrXBAD("LN", "OPBNOBIL") quit:ER
+		}
+
+	if XPDD '> ln.lbdd do { quit:ER 
+
+		type Boolean MATCH = 0
+
+		type ResultSet rs = Db.select("CDPD","LNBIL1","CID=:ln.cid AND CDPD=:XPDD")
+		if rs.next() set MATCH = 1
+	
+		// Interim payment schedule date ~p1 has no corresponding payment record
+		if 'MATCH do Runtime.setErrMSG("LNPS1",1261,XPDD.toString()) quit:ER 
+		}
+
+	//12/24/2008 - Added custom code by Anchalee Ch. (24Dec08) (Profile Upgrade)
+	//12/23/04 Varakrit removed
+	//set ln.ambas = ln.ambas + 1
+	//set ln.onp = ln.onp + 1
+	//End of 12/24/2008
+	
+	if (ln.genprjrep),(ln.odt < %SystemDate) do { 
+               	type RecordDAYENDLNNOT lnnot = Db.getRecord("DAYENDLNNOT","DT=:%SystemDate,CID=:ln.cid,ID=4",1)
+                if 'lnnot.getMode() do lnnot.bypassSave()
+		}
+	
+	// Update loan record
+	do LNPIUD(.ln)
+
+	quit 
+	
+public DELETE(Date XPDD, RecordLNPS1 lnps1)
+	
+	type public Boolean ER
+	type Number BLOFF
+	
+
+	type RecordLN ln = Db.getRecord("LN","CID=:lnps1.cid",1)
+	if 'ln.getMode() quit
+	
+	set BLOFF = ln.bloff
+	
+	/* 
+	 Return error if attempting to delete payment schedule date which is less
+	 than the last date in the payment file (LNBIL1) and that date exists in
+	 the payment file.
+	*/
+	if XPDD '> ln.lbdd do { quit:ER 
+
+		type Boolean MATCH = 0
+
+		type ResultSet rs = Db.select("CDPD","LNBIL1","CID=:ln.cid AND CDPD=:XPDD")
+		if rs.next() set MATCH = 1
+	
+		//12/24/2008 - Added custom code by Anchalee Ch. (24Dec08) (Profile Upgrade)
+		//12/23/04 Varakrit removed
+		// Interim payment schedule date ~p1 has no corresponding payment record
+		//if MATCH do Runtime.setErrMSG("LNPS1",1262,XPDD.toString()) quit:ER 
+		//End of 12/24/2008
+		}
+
+	//12/24/2008 - Added custom code by Anchalee Ch. (24Dec08) (Profile Upgrade)
+	//12/23/04 Varakrit removed
+	set ln.ambas = ln.ambas - 1
+	set ln.onp = ln.onp - 1
+	//End of 12/24/2008
+	
+	// Update loan record	
+	do LNPIUD(.ln)
+
+	quit 
+	
+LNPIUD(RecordLN ln)	// Update LN table due to payment schedule changes
+	
+	// Called when inserting or deleting payment schedule record
+
+	type public Boolean ER
+	type public Number BLOFF
+	set BLOFF = ln.bloff
+	
+	type Date d2f(), d3f(), d4f(), pdd(), JD, STDT, NEWBNDT, NEWDFP, NEWSCHND
+
+	type ResultSet rs=Db.select("PDD,D2F,D3F,D4F","LNPS1","CID=:ln.cid")
+	while rs.next() do { 
+		set JD = rs.getCol("PDD")
+		set pdd(JD)=""
+		if rs.getCol("D2F") set d2f(JD) = ""
+		if rs.getCol("D3F") set d3f(JD) = ""
+		if rs.getCol("D4F") set d4f(JD) = ""
+		}
+	
+	//12/24/2008 - Added custom code by Anchalee Ch. (24Dec08) (Profile Upgrade)
+	//11/30/04 Varakrit removed
+	//if ln.bseq do {
+		// LN.SCHND should be first payment schedule entry after TJD
+		set NEWSCHND = pdd(%SystemDate).order()
+
+		if NEWSCHND.isNull() do {
+			//12/24/2008 - Added custom code by Anchalee Ch. (24Dec08) (Profile Upgrade)
+			//12/28/04 Varakrit replaced
+			//set NEWSCHND = pdd("").order(-1)
+			//for  set NEWSCHND = NEWSCHND.nextFreqDate(ln.dist1fre) quit:((NEWSCHND > %SystemDate)!(ER.get())) 
+			set NEWSCHND=ln.schnd
+			//End of 12/24/2008
+			}
+
+		if NEWSCHND '= ln.schnd set ln.schnd = NEWSCHND
+	
+		/* 
+		 LN.DIST1ND should be equal to new scheduled date, if
+		 equal to old scheduled date and later than last due date
+		 in payment file.
+		*/
+		if (ln.dist1nd = ln.schnd),(NEWSCHND '= ln.schnd) set ln.dist1nd = NEWSCHND
+		
+		/*
+		 Bump the scheduled next and last dates if the newly calculated scheduled
+		 next date has changed as a result of this LNPS1 record's creation.
+		*/
+		if NEWSCHND '= ln.schnd do {
+			set ln.schnd = NEWSCHND
+			set ln.schld = pdd(NEWSCHND).order(-1)
+			}
+		
+
+		// Make sure LN.BNDT is earliest date where date >= today + LN.BLOFF
+		set NEWBNDT = pdd((%SystemDate + BLOFF - 1)).order() - BLOFF
+
+		//12/24/2008 - Added custom code by Anchalee Ch. (24Dec08) (Profile Upgrade)
+		//12/28/04 Varakrit replaced
+		//if NEWBNDT '> 0 set NEWBNDT = ""
+		if NEWBNDT'>0 set NEWBNDT=ln.bndt
+		//End of 12/24/2008
+
+		if NEWBNDT '= ln.bndt set ln.bndt = NEWBNDT
+	//	}
+
+	//else  do {
+	if 'ln.bseq do {
+		set NEWDFP = pdd("").order()	// Oldest date for LN.DFP
+		if ln.dfp '= NEWDFP set ln.dfp = NEWDFP
+		//12/24/2008 - Added custom code by Anchalee Ch. (24Dec08) (Profile Upgrade)
+		//12/23/04 Varakrit removed
+		//if ln.schnd' = NEWDFP set ln.schnd = NEWDFP
+		//if ln.dist1nd '= NEWDFP set ln.dist1nd = NEWDFP
+		//End of 12/24/2008
+		}
+
+	// Handle secondary frequencies
+	if ln.bseq set STDT = %SystemDate + BLOFF - 1
+	else  set STDT = ""
+
+	do LNPS1B(.ln,2,ln.dist2fre,ln.dist2nd,.d2f())
+	do LNPS1B(.ln,3,ln.dist3fre,ln.dist3nd,.d3f())
+	do LNPS1B(.ln,4,ln.dist4fre,ln.dist4nd,.d4f())
+	
+	//12/24/2008 - Added custom code by Anchalee Ch. (24Dec08) (Profile Upgrade)
+	//12/23/04 Varakrit added
+	if ln.dist1fre'="*" quit
+	//End of 12/24/2008
+	
+	do ln.save("/NOJOURNAL")
+	
+	quit 
+	
+
+LNPS1B(RecordLN ln, Number DISTNO, String FRE, Date ND, Date ARRAY())
+
+	type public Date STDT
+
+	type Date NEWDND
+	type String COLFRE, COLND, NEWDFRE
+
+	if 'ARRAY.data() set (NEWDFRE,NEWDND) = ""
+	else  do {
+		set NEWDND = ARRAY(STDT).order()                	// Get next date
+		if NEWDND.isNull() set NEWDND = ARRAY(STDT+1).order(-1)	// Or last if no next
+		set NEWDFRE = "*"
+		}
+
+	if NEWDFRE '= FRE do {
+		//12/24/2008 - Added custom code by Anchalee Ch. (24Dec08) (Profile Upgrade)
+		//11/30/04 Varakrit replaced
+		//set COLFRE = "DIST"_DISTNO_"FRE"
+		//set ln.@COLFRE = NEWDFRE
+		
+		if DISTNO=2 set ln.dist2fre=NEWDFRE
+		if DISTNO=3 set ln.dist3fre=NEWDFRE
+		if DISTNO=4 set ln.dist4fre=NEWDFRE
+		//End of 12/24/2008
+		
+		//12/24/2008 - Added custom code by Anchalee Ch. (24Dec08) (Profile Upgrade)
+		//12/23/04 Varakrit removed
+		//if NEWDFRE.isNull() do LNPS1BIL(.ln,DISTNO)
+		//End of 12/24/2008
+		}
+
+	//12/24/2008 - Added custom code by Anchalee Ch. (24Dec08) (Profile Upgrade)
+	//11/30/04 Varakrit replaced
+	//if NEWDND '= ND do {
+	//	set COLND = "DIST"_DISTNO_"ND"
+	//	set ln.@COLND = NEWDND
+	//	}
+	
+	if NEWDND'=ND,DISTNO=2 set ln.dist2nd=NEWDND
+        if NEWDND'=ND,DISTNO=3 set ln.dist3nd=NEWDND
+        if NEWDND'=ND,DISTNO=4 set ln.dist4nd=NEWDND
+	//End of 12/24/2008
+
+	quit 
+
+
+LNPS1BIL(RecordLN ln, Number DISTNO)
+
+	type RecordLNBIL0 lnbil0 = Db.getRecord("LNBIL0","CID=:ln.cid")	
+
+	if lnbil0.pe01pf = DISTNO set lnbil0.pe01pf = ""
+	if lnbil0.pe02pf = DISTNO set lnbil0.pe02pf = ""
+	if lnbil0.pe03pf = DISTNO set lnbil0.pe03pf = ""
+	if lnbil0.pe04pf = DISTNO set lnbil0.pe04pf = ""
+	if lnbil0.pe05pf = DISTNO set lnbil0.pe05pf = ""
+	if lnbil0.pe06pf = DISTNO set lnbil0.pe06pf = ""
+	if lnbil0.pe07pf = DISTNO set lnbil0.pe07pf = ""
+	if lnbil0.pe08pf = DISTNO set lnbil0.pe08pf = ""
+	if lnbil0.pe09pf = DISTNO set lnbil0.pe09pf = ""
+	if lnbil0.pe10pf = DISTNO set lnbil0.pe10pf = ""
+	if lnbil0.pe11pf = DISTNO set lnbil0.pe11pf = ""
+	if lnbil0.pe12pf = DISTNO set lnbil0.pe12pf = ""
+	if lnbil0.pe13pf = DISTNO set lnbil0.pe13pf = ""
+	if lnbil0.pe14pf = DISTNO set lnbil0.pe14pf = ""
+	if lnbil0.pe15pf = DISTNO set lnbil0.pe15pf = ""
+	if lnbil0.pe16pf = DISTNO set lnbil0.pe16pf = ""
+	if lnbil0.pe17pf = DISTNO set lnbil0.pe17pf = ""
+	if lnbil0.pe18pf = DISTNO set lnbil0.pe18pf = ""
+	if lnbil0.pe19pf = DISTNO set lnbil0.pe19pf = ""
+	if lnbil0.pe20pf = DISTNO set lnbil0.pe20pf = ""
+
+	do lnbil0.bypassSave()
+
+	quit
+	
+PIPSED(RecordLN ln,			// Loan object
+       RecordLNPS1 lnps1)		// Loan Account Payment Schedule object
+
+	// This section will perform the necessary edit checks
+	// on P&I loans with payment schedules
+
+	type public Boolean ER
+
+	// P&I amount may only be defined on payment schedules for P&I payment schedule loans
+	if (lnps1.pmtpi),('ln.pips) do Runtime.setErrMSG("LN", 6984) quit:ER
+
+	// P&I amount must be defined on payment schedule
+	if (ln.pips),('lnps1.pmtext),('lnps1.pmtpi) do Runtime.setErrMSG("LN", 6985) quit:ER
+
+	// P&I amount on loan differs from payment schedule for ~p1
+	if (%ProcessMode = 2),(lnps1.pmtpi),(lnps1.pmtpi '= ln.pmtpi) do Runtime.setErrXBAD("LN", "PIPSPMT", lnps1.pdd) quit:ER
+
+	quit
+	

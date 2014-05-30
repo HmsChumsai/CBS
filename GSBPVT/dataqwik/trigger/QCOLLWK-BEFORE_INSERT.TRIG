@@ -1,0 +1,50 @@
+//DO NOT MODIFY  Before Insert Collection Work File|1|0|0|0|0|0||||
+	/*
+	   ---- Revision History--------------------------------------------------------
+	
+	   11/10/05 - SATYANAS - 18007
+	 	      Converted to PSL Standards. 
+	   
+	   09/15/99 - CHOK - 31126
+		      Converted to PSL.
+
+	   07/02/99 - ROYTENBERGG 33873
+	              Changed references from PRODTYPE File to PRODCTL File.
+	
+	   06/04/99 - ROYTENBERGG 33064
+	              Changed data item definition TIME to CTIME
+		
+	   Set the promise set date if promise set date is null and promise mail
+	   date contains a date.
+	*/
+
+	// Getting Product type according account number
+
+	type public Boolean ER
+			
+	if 'qcollwk.prommd.isNull() do { quit:ER
+		// Setting promsd to systemdate if promise date contains a value
+		set qcollwk.promsd=%SystemDate
+	
+		// Getting promise duration date from PRODCTL File
+		type RecordACN acn=Db.getRecord("ACN","CID=:qcollwk.cid",1)
+		if acn.getMode() do {
+			type RecordPRODCTL prodctl=Db.getRecord("PRODCTL","TYPE=acn.type",1)
+			if prodctl.getMode() do {
+				if prodctl.promdd.isNull() quit 
+			
+				/* Set promise break date based on promise mail date if mail date
+		   		mail date is not greater than set date.  Set date is the system
+		   		date when a promise mail date is entered.  */
+		   		
+				if qcollwk.prommd'>%SystemDate set qcollwk.prombrd=$$EXT^UMDT(prodctl.promdd,qcollwk.prommd) quit:ER 
+				else  set qcollwk.prombrd=$$EXT^UMDT(prodctl.promdd,qcollwk.promsd) quit:ER 
+				}
+			}	
+		}
+	
+	set qcollwk.tjd=%SystemDate
+	set qcollwk.ctime=%CurrentTime
+	set qcollwk.uid=%UserID
+	quit
+	

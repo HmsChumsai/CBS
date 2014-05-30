@@ -1,0 +1,842 @@
+//DO NOT MODIFY  XDTJ Extract for Statement Engine|ZXDTJSE||||||XDTJ|TJD=:ZTJD||100|32000|ZTJD,ZRND,ZSEPATH,ZEDWPATH,ZCJD,ZOPPID|0|||10|10|0||0|CID|0
+---------- REVHIST ------ Section marker
+
+	7 May 2014      Wiphak
+			- Add CON record for SFX, FX
+
+	30 Apr 2014	Wiphak
+			- SE Transaction for SA,CA for swapping transaction for od link sweep
+			- SFX, FX files fixed for one account exists in both file
+
+	03 Apr 2014	Pheraphat Nu.
+			- Add LPM (Daily Payment)Extract Section
+
+
+
+---------- OPEN    ------ Section marker
+
+	do SYSVAR^SCADRV0()
+	set ZTJD=%SystemDate-1
+	set ZCJD=%SystemDate
+	set ZRND=$$DAT^%ZM(ZTJD,"YEARMMDD")
+	set ZOPPID=%ProcessID
+	
+	//Statement Engine Path
+	set ZSEPATH=$$EXTPATH^ZSTMEG("SE",ZRND)
+	//EDW Path
+	set ZEDWPATH=$$EXTPATH^ZSTMEG("EDW",ZRND)
+	
+	new Z,INVFIL
+	set (Z,INVFIL)=""
+	
+	//check junk files
+	set INVFIL=$$SYS^%ZFUNC("ls "_ZSEPATH_"/STMEP.CBS.SA1D11*"_" 2>/dev/null")
+	if INVFIL=0 do {
+		//Remove STMEP.CBS.SA1D11 file
+		set Z=$$SYS^%ZFUNC("rm "_ZSEPATH_"/STMEP.CBS.SA1D11*")
+		//if Z'=0 set ER=1,RM="Error Remove file: "_ZSEPATH_"/STMEP.CBS.CA1T36_*" do EXC
+	}
+	
+	set INVFIL=$$SYS^%ZFUNC("ls "_ZSEPATH_"/STMEP.CBS.CA1D11*"_" 2>/dev/null")
+	if INVFIL=0 do {
+		//Remove STMEP.CBS.SA1D11 file
+		set Z=$$SYS^%ZFUNC("rm "_ZSEPATH_"/STMEP.CBS.CA1D11*")
+		//if Z'=0 set ER=1,RM="Error Remove file: "_ZSEPATH_"/STMEP.CBS.CA1T36_*" do EXC
+	}
+	
+	set INVFIL=$$SYS^%ZFUNC("ls "_ZSEPATH_"/STMEP.CBS.FX1D11*"_" 2>/dev/null")
+	if INVFIL=0 do {
+		//Remove STMEP.CBS.FX1D11 file
+		set Z=$$SYS^%ZFUNC("rm "_ZSEPATH_"/STMEP.CBS.FX1D11*")
+		//if Z'=0 set ER=1,RM="Error Remove file: "_ZSEPATH_"/STMEP.CBS.CA1T36_*" do EXC
+	}
+	
+	set INVFIL=$$SYS^%ZFUNC("ls "_ZSEPATH_"/STMEP.CBS.SF1D11*"_" 2>/dev/null")
+	if INVFIL=0 do {
+		//Remove STMEP.CBS.SF1D11 file
+		set Z=$$SYS^%ZFUNC("rm "_ZSEPATH_"/STMEP.CBS.SF1D11*")
+		//if Z'=0 set ER=1,RM="Error Remove file: "_ZSEPATH_"/STMEP.CBS.CA1T36_*" do EXC
+	}
+	
+	new IOTYP
+	
+	//Statement Engine
+	type IO io1,io2,io3,io4
+	
+	do OPENIO^ZSTMEG(ZSEPATH,"NEWV/WRITE","STMEP.CBS.SA1D11",.io1)
+	
+	do OPENIO^ZSTMEG(ZSEPATH,"NEWV/WRITE","STMEP.CBS.CA1D11",.io2)
+	
+	do OPENIO^ZSTMEG(ZSEPATH,"NEWV/WRITE","STMEP.CBS.FX1D11",.io3)
+	
+	do OPENIO^ZSTMEG(ZSEPATH,"NEWV/WRITE","STMEP.CBS.SF1D11",.io4)
+        
+        //write Header for Statement Engine
+	do SEHEAD^ZSTMEG("CASATran",.io1,413)
+	do SEHEAD^ZSTMEG("CASATran",.io2,413)
+	do SEHEAD^ZSTMEG("TermTran",.io3,363)
+	do SEHEAD^ZSTMEG("TermTran",.io4,362)
+        
+	set IOTYP="RMS"
+	do io1.close()
+	do io2.close()
+	do io3.close()
+	do io4.close()
+	
+	M ^ZSENA(ZTJD)=^DTJNA(ZTJD)
+	M ^ZSECL(ZTJD)=^DTJCL(ZTJD)
+	
+	kill ^ZSECNT1
+	kill ^ZSECNT2
+	kill ^ZSECNT3
+	kill ^ZSECNT4
+	
+	//EDW Non-Financial Transaction
+	kill ^TMP("EDWNONFIN")
+	
+	//EDW - Electronic Fund Transfer Transaction create file 0
+	type IO io5
+	set ZFNAME="src_pf_txn_mis_eft_dly.txt"
+	do OPENIO^ZSTMEG(ZEDWPATH,"NEWV/WRITE",ZFNAME,.io5)
+	
+	set IOTYP="RMS"
+	do io5.close()
+	
+	
+	//---- LPM  (Pheraphat Nu.) 3 Apr 2014 --------
+	#if $$VALID^%ZRTNS("ZLPMEXT")=1
+	do ZPMTOPEN^ZLPMEXT(ZTJD)
+	#endif
+	//----------------------------------------------
+	
+	
+	
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	
+	//CAT file Statement Engine
+	new CHK
+	new PATH
+	set PATH=ZSEPATH
+	type public Cache %CACHE()
+	
+	//Cat STMEP.CBS.SA1D11 file
+	set CHK=$$SYS^%ZFUNC("cat "_PATH_"/STMEP.CBS.SA1D11_* >> "_PATH_"/STMEP.CBS.SA1D11")
+	if CHK=0 set Z=$$SYS^%ZFUNC("rm "_PATH_"/STMEP.CBS.SA1D11_*")
+	else  set ER=1,RM="Error Merging file: "_PATH_"/STMEP.CBS.SA1D11_*" do EXC quit
+	
+	//Cat STMEP.CBS.SA1D11 file
+	set CHK=$$SYS^%ZFUNC("cat "_PATH_"/STMEP.CBS.CA1D11_* >> "_PATH_"/STMEP.CBS.CA1D11")
+	if CHK=0 set Z=$$SYS^%ZFUNC("rm "_PATH_"/STMEP.CBS.CA1D11_*")
+	else  set ER=1,RM="Error Merging file: "_PATH_"/STMEP.CBS.CA1D11_*" do EXC quit
+	
+	//Cat STMEP.CBS.FX1D11 file
+	set CHK=$$SYS^%ZFUNC("cat "_PATH_"/STMEP.CBS.FX1D11_* >> "_PATH_"/STMEP.CBS.FX1D11")
+	if CHK=0 set Z=$$SYS^%ZFUNC("rm "_PATH_"/STMEP.CBS.FX1D11_*")
+	else  set ER=1,RM="Error Merging file: "_PATH_"/STMEP.CBS.FX1D11_*" do EXC quit
+	
+	//Cat STMEP.CBS.SF1D11 file
+	set CHK=$$SYS^%ZFUNC("cat "_PATH_"/STMEP.CBS.SF1D11_* >> "_PATH_"/STMEP.CBS.SF1D11")
+	if CHK=0 set Z=$$SYS^%ZFUNC("rm "_PATH_"/STMEP.CBS.SF1D11_*")
+	else  set ER=1,RM="Error Merging file: "_PATH_"/STMEP.CBS.SF1D11_*" do EXC quit
+	
+	//Statement Engine
+	type IO io1,io2,io3,io4
+	new ZSENAM
+	set ZSENAM=""
+	
+	set ZSENAM="STMEP.CBS.SA1D11"
+	do OPENIO^ZSTMEG(ZSEPATH,"APPEND",ZSENAM,.io1)
+	
+	set ZSENAM="STMEP.CBS.CA1D11"
+	do OPENIO^ZSTMEG(ZSEPATH,"APPEND",ZSENAM,.io2)
+	
+	set ZSENAM="STMEP.CBS.FX1D11"
+	do OPENIO^ZSTMEG(ZSEPATH,"APPEND",ZSENAM,.io3)
+	
+	set ZSENAM="STMEP.CBS.SF1D11"
+	do OPENIO^ZSTMEG(ZSEPATH,"APPEND",ZSENAM,.io4)
+	
+	new ZCLS,ZGRP,ZTYP,ZCID,ZREC,ZSECNT1,ZSECNT2,ZSECNT3,ZSECNT4,ZFIXFLG,ZSFIXFLG	
+	set (ZCLS,ZGRP,ZTYP,ZCID,ZREC)=""
+	set (ZSECNT1,ZSECNT2,ZSECNT3,ZSECNT4,ZFIXFLG,ZSFIXFLG)=0
+	
+	for  set ZCLS=$O(^ZSENA(ZTJD,ZCLS)) quit:ZCLS=""  do {
+		for  set ZGRP=$O(^ZSENA(ZTJD,ZCLS,ZGRP)) quit:ZGRP=""  do {
+			for  set ZTYP=$O(^ZSENA(ZTJD,ZCLS,ZGRP,ZTYP)) quit:ZTYP=""  do {
+				for  set ZCID=$O(^ZSENA(ZTJD,ZCLS,ZGRP,ZTYP,ZCID)) quit:ZCID=""  do {
+					type RecordDEP zdep=Db.getRecord("DEP","CID=:ZCID",1)
+					
+					if zdep.grp="SAV" do {
+						//Open Account SAV
+						do SESDTXOC^ZSTMEG(zdep,zdep.grp,1,.io1)
+						set ZSECNT1=ZSECNT1+1
+						
+						//Close Account SAV
+						if ^ZSECL(ZTJD,ZCLS,ZGRP,ZTYP,ZCID).data() do {
+							do SESDTXOC^ZSTMEG(zdep,zdep.grp,0,.io1)
+							set ZSECNT1=ZSECNT1+1
+						}
+						
+						//SAV Info
+						do SESDINF^ZSTMEG(zdep,zdep.grp,.ZINFREC)
+						set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,ZCID)=ZINFREC
+					}
+						
+					if zdep.grp="DDA" do {
+						//Open Account DDA
+						do SESDTXOC^ZSTMEG(zdep,zdep.grp,1,.io2)
+						set ZSECNT2=ZSECNT2+1
+						
+						//Close Account DDA
+						if ^ZSECL(ZTJD,ZCLS,ZGRP,ZTYP,ZCID).data() do {
+							do SESDTXOC^ZSTMEG(zdep,zdep.grp,0,.io2)
+							set ZSECNT2=ZSECNT2+1
+						}
+						
+						//DDA Info
+						do SESDINF^ZSTMEG(zdep,zdep.grp,.ZINFREC)
+						set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,ZCID)=ZINFREC
+					}
+					
+					if zdep.grp="CD" do {
+						
+						type RecordZUTBLKTBMISC zktbmisc=%CACHE("ZUTBLKTBMISC").getRecord("ZUTBLKTBMISC","INTRFACE='ZSPA'",1)
+						if (zktbmisc.prodtyp)'[(zdep.type) set ZFIXFLG=1
+						if zktbmisc.prodtyp[zdep.type set ZSFIXFLG=1
+						
+						//Fix
+						if ZFIXFLG do {
+							//Fix Open Account
+							do SEFXACTRNOP^ZSTMEG(zdep,1,.io3)
+							set ZSECNT3=ZSECNT3+1
+							
+							//Fix Close Account
+							if ^ZSECL(ZTJD,ZCLS,ZGRP,ZTYP,ZCID).data() do {
+								do SEFXACTRNOP^ZSTMEG(zdep,0,.io3)
+								set ZSECNT3=ZSECNT3+1
+							}
+							
+							//Fix Info
+							do SEFXACINF^ZSTMEG(zdep,.ZINFREC)
+							set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,ZCID)=ZINFREC
+							
+						}
+						//Special Fix
+						if ZSFIXFLG do {
+							//Special Fix Open Account
+							do SESFXTRNOP^ZSTMEG(zdep,1,io4)
+							set ZSECNT4=ZSECNT4+1
+							
+							//Special Fix Close Account
+							if ^ZSECL(ZTJD,ZCLS,ZGRP,ZTYP,ZCID).data() do {
+								do SESFXTRNOP^ZSTMEG(zdep,0,io4)
+								set ZSECNT4=ZSECNT4+1
+							}
+							
+							//Special Fix Info
+							do SEFXACINF^ZSTMEG(zdep,.ZINFREC)
+							set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,ZCID)=ZINFREC
+						}
+						
+					}
+					kill ^ZSENA(ZTJD,ZCLS,ZGRP,ZTYP,ZCID)
+					kill ^ZSECL(ZTJD,ZCLS,ZGRP,ZTYP,ZCID)
+					
+				}
+			}
+		}
+	}
+	
+	
+	set (ZCLS,ZGRP,ZTYP,ZCID,ZREC)=""
+	set (ZFIXFLG,ZSFIXFLG)=0
+	
+	for  set ZCLS=$O(^ZSECL(ZTJD,ZCLS)) quit:ZCLS=""  do {
+		for  set ZGRP=$O(^ZSECL(ZTJD,ZCLS,ZGRP)) quit:ZGRP=""  do {
+			for  set ZTYP=$O(^ZSECL(ZTJD,ZCLS,ZGRP,ZTYP)) quit:ZTYP=""  do {
+				for  set ZCID=$O(^ZSECL(ZTJD,ZCLS,ZGRP,ZTYP,ZCID)) quit:ZCID=""  do {
+					type RecordDEP zdep=Db.getRecord("DEP","CID=:ZCID",1)
+					
+					if zdep.grp="SAV" do {
+						//Open Account SAV
+						do SESDTXOC^ZSTMEG(zdep,zdep.grp,1,.io1)
+						set ZSECNT1=ZSECNT1+1
+						
+						//Close Account SAV
+						do SESDTXOC^ZSTMEG(zdep,zdep.grp,0,.io1)
+						set ZSECNT1=ZSECNT1+1
+						
+						//SAV Info
+						do SESDINF^ZSTMEG(zdep,zdep.grp,.ZINFREC)
+						set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,ZCID)=ZINFREC
+					}
+						
+					if zdep.grp="DDA" do {
+						//Open Account DDA
+						do SESDTXOC^ZSTMEG(zdep,zdep.grp,1,.io2)
+						set ZSECNT2=ZSECNT2+1
+						
+						//Close Account DDA
+						do SESDTXOC^ZSTMEG(zdep,zdep.grp,0,.io2)
+						set ZSECNT2=ZSECNT2+1
+						
+						//DDA Info
+						do SESDINF^ZSTMEG(zdep,zdep.grp,.ZINFREC)
+						set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,ZCID)=ZINFREC
+					}
+					
+					if zdep.grp="CD" do {
+						
+						type RecordZUTBLKTBMISC zktbmisc=%CACHE("ZUTBLKTBMISC").getRecord("ZUTBLKTBMISC","INTRFACE='ZSPA'",1)
+						if (zktbmisc.prodtyp)'[(zdep.type) set ZFIXFLG=1
+						if zktbmisc.prodtyp[zdep.type set ZSFIXFLG=1
+						
+						//Fix
+						if ZFIXFLG do {
+							//Fix Open Account
+							do SEFXACTRNOP^ZSTMEG(zdep,1,.io3)
+							set ZSECNT3=ZSECNT3+1
+							
+							//Fix Close Account
+							do SEFXACTRNOP^ZSTMEG(zdep,0,.io3)
+							set ZSECNT3=ZSECNT3+1
+							
+							//Fix Info
+							do SEFXACINF^ZSTMEG(zdep,.ZINFREC)
+							set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,ZCID)=ZINFREC
+							
+						}
+						//Special Fix
+						if ZSFIXFLG do {
+							//Special Fix Open Account
+							do SESFXTRNOP^ZSTMEG(zdep,1,io4)
+							set ZSECNT4=ZSECNT4+1
+							
+							//Special Fix Close Account
+							do SESFXTRNOP^ZSTMEG(zdep,0,io4)
+							set ZSECNT4=ZSECNT4+1
+							
+							//Special Fix Info
+							do SEFXACINF^ZSTMEG(zdep,.ZINFREC)
+							set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,ZCID)=ZINFREC
+						}
+						
+					}
+					kill ^ZSECL(ZTJD,ZCLS,ZGRP,ZTYP,ZCID)
+					
+				}
+			}
+		}
+	}
+	
+	new ZXPID
+	set ZXPID=""
+	for  set ZXPID=$O(^ZSECNT1(ZXPID)) quit:ZXPID=""  do {
+		set ZSECNT1=ZSECNT1+^ZSECNT1(ZXPID).get()
+		set ZSECNT2=ZSECNT2+^ZSECNT2(ZXPID).get()
+		set ZSECNT3=ZSECNT3+^ZSECNT3(ZXPID).get()
+		set ZSECNT4=ZSECNT4+^ZSECNT4(ZXPID).get()
+		
+	}
+	
+	do SETAILER^ZSTMEG(ZSECNT1,io1,460)
+	do SETAILER^ZSTMEG(ZSECNT2,io2,460)
+	do SETAILER^ZSTMEG(ZSECNT3,io3,410)
+	do SETAILER^ZSTMEG(ZSECNT4,io4,409)
+	
+	set IOTYP="RMS"
+	do io1.close()
+	do io2.close()
+	do io3.close()
+	do io4.close()
+	
+	kill ^ZSECNT1
+	kill ^ZSECNT2
+	kill ^ZSECNT3
+	kill ^ZSECNT4
+	
+	new CHK
+	set CHK=""
+	//EDW SA Transaction
+	set CHK=$$SYS^%ZFUNC("cp "_ZSEPATH_"/"_"STMEP.CBS.SA1D11"_" "_ZEDWPATH_"/"_"src_pf_txn_sa_dly_"_ZRND_".txt")
+	if CHK=1 set ER=1,RM="Error Coppy EDW SA Transaction file"
+	//EDW CA Transaction
+	set CHK=$$SYS^%ZFUNC("cp "_ZSEPATH_"/"_"STMEP.CBS.CA1D11"_" "_ZEDWPATH_"/"_"src_pf_txn_ca_dly_"_ZRND_".txt")
+	if CHK=1 set ER=1,RM="Error Coppy EDW CA Transaction file"
+	
+	
+	//EDW - Electronic Fund Transfer Transaction
+	new IOTYP,ZCOUNT
+	set ZCOUNT=0
+	type IO io5
+	set ZFNAME="src_pf_txn_mis_eft_dly.txt"
+	do OPENIO^ZSTMEG(ZEDWPATH,"NEWV/WRITE",ZFNAME,.io5)
+	
+	do HEADER^ZEDW(io5)
+	
+	do WREFT^ZEDW(io5,ZOPPID,.ZCOUNT)
+	
+	do TAILER^ZEDW(ZCOUNT,io5)
+	
+	set IOTYP="RMS"
+	do io5.close()
+	
+	
+	//---- LPM  (Pheraphat Nu.) 3 Apr 2014 --------
+	#if $$VALID^%ZRTNS("ZLPMEXT")=1
+	do ZPMTEND^ZLPMEXT(ZTJD)
+	#endif
+	//----------------------------------------------
+	
+	
+	
+	quit
+	
+
+---------- THRINIT ------ Section marker
+
+	
+	type public String ZPID
+	new IOTYP,ZSENAM1,ZSENAM2,ZSENAM5,ZSENAM7
+	set (ZSENAM1,ZSENAM2,ZSENAM5,ZSENAM7,ZPID)=""
+	
+	set ZPID=%ProcessID
+	
+	//Statement Engine
+	type public IO io1,io2,io3,io4
+	
+	set ZSENAM1="STMEP.CBS.SA1D11_"_ZPID
+	do OPENIO^ZSTMEG(ZSEPATH,"APPEND",ZSENAM1,.io1)
+	
+	set ZSENAM2="STMEP.CBS.CA1D11_"_ZPID
+	do OPENIO^ZSTMEG(ZSEPATH,"APPEND",ZSENAM2,.io2)
+	
+	set ZSENAM5="STMEP.CBS.FX1D11_"_ZPID
+	do OPENIO^ZSTMEG(ZSEPATH,"APPEND",ZSENAM5,.io3)
+	
+	set ZSENAM7="STMEP.CBS.SF1D11_"_ZPID
+	do OPENIO^ZSTMEG(ZSEPATH,"APPEND",ZSENAM7,.io4)
+	
+	set ^ZSECNT1(ZPID)=0
+	set ^ZSECNT2(ZPID)=0
+	set ^ZSECNT3(ZPID)=0
+	set ^ZSECNT4(ZPID)=0
+	
+	
+	//---- LPM  (Pheraphat Nu.) 3 Apr 2014 --------
+	#if $$VALID^%ZRTNS("ZLPMEXT")=1
+	do ZPMTTHINIT^ZLPMEXT(ZTJD)
+	#endif
+	//----------------------------------------------
+	
+	
+	
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	do Runtime.rollback()
+	type public Cache %CACHE()
+	
+	type RecordDEP zdep=Db.getRecord("DEP","CID=:CID",1)
+	
+	new ZINFREC,ZFIXFLG,ZSFIXFLG
+	set (ZINFREC,ZFIXFLG)=""
+	set (ZFIXFLG,ZSFIXFLG)=0
+	
+	if zdep.grp="CD" do {
+		type RecordZUTBLKTBMISC zktbmisc=%CACHE("ZUTBLKTBMISC").getRecord("ZUTBLKTBMISC","INTRFACE='ZSPA'",1)
+		//if '(zktbmisc.prodtyp[zdep.type) set ZFIXFLG=1
+		if zktbmisc.prodtyp[zdep.type set ZSFIXFLG=1
+		else  set ZFIXFLG=1
+	}
+	
+	//D03 - Open Account
+	if zdep.odt=ZTJD do {
+		
+		if zdep.grp="SAV" do {
+			//Open Account SAV
+			do SESDTXOC^ZSTMEG(zdep,zdep.grp,1,.io1)
+			set ^ZSECNT1(ZPID)=^ZSECNT1(ZPID)+1
+			
+			//SAV Info
+			do SESDINF^ZSTMEG(zdep,zdep.grp,.ZINFREC)
+			set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID)=ZINFREC
+				
+		}
+			
+		if zdep.grp="DDA" do {
+			//Open Account DDA
+			do SESDTXOC^ZSTMEG(zdep,zdep.grp,1,.io2)
+			set ^ZSECNT2(ZPID)=^ZSECNT2(ZPID)+1
+			
+			//DDA Info
+			do SESDINF^ZSTMEG(zdep,zdep.grp,.ZINFREC)
+			set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID)=ZINFREC
+			
+		}
+		
+		if zdep.grp="CD" do {
+			//Fix
+			if ZFIXFLG do {
+				//Fix Open Account
+				do SEFXACTRNOP^ZSTMEG(zdep,1,.io3)
+				set ^ZSECNT3(ZPID)=^ZSECNT3(ZPID)+1
+				
+				//Fix Info
+				do SEFXACINF^ZSTMEG(zdep,.ZINFREC)
+				set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID)=ZINFREC
+					
+			}
+			//Special Fix
+			if ZSFIXFLG do {
+				//Special Fix Open Account
+				do SESFXTRNOP^ZSTMEG(zdep,1,io4)
+				set ^ZSECNT4(ZPID)=^ZSECNT4(ZPID)+1
+				
+				//Special Fix Info
+				do SEFXACINF^ZSTMEG(zdep,.ZINFREC)
+				set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID)=ZINFREC
+					
+			}
+			
+		}
+		kill ^ZSENA(ZTJD,zdep.cls,zdep.grp,zdep.type,CID)
+	}
+	
+	//D01 - Transaction
+	new ZDATTIM,ZTSEQ,ZSWTJD,ZSWDATTIM,ZSWCID,ZSWTSEQ,ZPREVETC,ZSWAP
+	set (ZDATTIM,ZTSEQ)=""
+	set (ZSWTJD,ZSWDATTIM,ZSWCID,ZSWTSEQ,ZPREVETC,ZSWAP)=""
+	type ResultSet rsXDTJ=Db.select("TSEQ,DATETIME","XDTJ","TJD=:ZTJD AND CID=:CID")	
+	while rsXDTJ.next() do {
+		set ZDATTIM=rsXDTJ.getCol("DATETIME")
+		set ZTSEQ=rsXDTJ.getCol("TSEQ")
+		type RecordDTJ zdtj=Db.getRecord("DTJ","TJD=:ZTJD,DATETIME=:ZDATTIM,CID=:CID,TSEQ=:ZTSEQ",1)
+		
+		if zdep.grp="SAV" do {
+			
+			
+			// swap transaction seq for OD Link sweep
+			// if trasaction invokes od sweep, swap OTID/OTIS 
+			/*
+			^HIST(11000290,10)=CWCH
+			^HIST(11000290,11)=OTID
+			^HIST(11000290,12)=OTID
+			^HIST(11000290,13)=OTID
+			swap to 
+			^HIST(11000290,11)=OTID
+			^HIST(11000290,12)=OTID
+			^HIST(11000290,13)=OTID
+			^HIST(11000290,10)=CWCH
+			*/
+			set ZSWAP=0
+			if (zdtj.xhs16).piece("#",5) do {
+				set ZSWTJD=ZTJD
+				set ZSWDATTIM=ZDATTIM
+				set ZSWCID=CID
+				set ZSWTSEQ=ZTSEQ
+				set ZSWAP=1
+			}
+			
+			// last OTIS set in previous record, write main transaction
+			if (zdtj.etc'="OTIS"),(ZPREVETC="OTIS"),(ZSWTSEQ'=""),(zdtj.itc7) do {
+				// store current var
+				new ZKTJD,ZKDATTIM,ZKCID,ZKTSEQ
+				set ZKTJD=ZTJD
+				set ZKDATTIM=ZDATTIM
+				set ZKCID=CID
+				set ZKTSEQ=ZTSEQ
+				
+				set ZTJD=ZSWTJD
+				set ZDATTIM=ZSWDATTIM
+				set CID=ZSWCID
+				set ZTSEQ=ZSWTSEQ
+				
+				type RecordDTJ zdtj1=Db.getRecord("DTJ","TJD=:ZTJD,DATETIME=:ZDATTIM,CID=:CID,TSEQ=:ZTSEQ",1)
+				do SESDTX^ZSTMEG(zdep,zdtj1,zdep.grp,io1)
+				set ^ZSECNT1(ZPID)=^ZSECNT1(ZPID)+1
+				
+				// Restore variable
+				set ZTJD=ZKTJD
+				set ZDATTIM=ZKDATTIM
+				set CID=ZKCID
+				set ZTSEQ=ZKTSEQ
+				
+				set (ZSWTJD,ZSWDATTIM,ZSWCID,ZSWTSEQ)=""
+			}
+			
+			
+			//CBS S/A Transaction File
+			if ZSWAP=0 do {
+				do SESDTX^ZSTMEG(zdep,zdtj,zdep.grp,io1)
+				set ^ZSECNT1(ZPID)=^ZSECNT1(ZPID)+1
+			}
+			set ZPREVETC=zdtj.etc
+			
+			//SAV Info
+			if ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID).data() quit
+			do SESDINF^ZSTMEG(zdep,zdep.grp,.ZINFREC)
+			set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID)=ZINFREC
+		}
+			
+		if zdep.grp="DDA" do {
+			
+			//---- LPM  (Pheraphat Nu.) 3 Apr 2014 --------
+			#if $$VALID^%ZRTNS("ZLPMEXT")=1
+			do ZPMTEXC^ZLPMEXT(zdtj,ZTJD)
+			#endif
+			//----------------------------------------------
+			
+			
+			// swap transaction seq for OD Link sweep
+			// if trasaction invokes od sweep, swap OTID/OTIS 
+			/*
+			^HIST(11000290,10)=CWCH
+			^HIST(11000290,11)=OTID
+			^HIST(11000290,12)=OTID
+			^HIST(11000290,13)=OTID
+			swap to 
+			^HIST(11000290,11)=OTID
+			^HIST(11000290,12)=OTID
+			^HIST(11000290,13)=OTID
+			^HIST(11000290,10)=CWCH
+			*/
+			set ZSWAP=0
+			if (zdtj.xhs16).piece("#",5) do {
+				set ZSWTJD=ZTJD
+				set ZSWDATTIM=ZDATTIM
+				set ZSWCID=CID
+				set ZSWTSEQ=ZTSEQ
+				set ZSWAP=1
+			}
+			
+			// last OTIS set in previous record, write main transaction
+			if (zdtj.etc'="OTID"),(ZPREVETC="OTID"),(ZSWTSEQ'=""),(zdtj.itc7) do {
+				// store current var
+				new ZKTJD,ZKDATTIM,ZKCID,ZKTSEQ
+				set ZKTJD=ZTJD
+				set ZKDATTIM=ZDATTIM
+				set ZKCID=CID
+				set ZKTSEQ=ZTSEQ
+				
+				set ZTJD=ZSWTJD
+				set ZDATTIM=ZSWDATTIM
+				set CID=ZSWCID
+				set ZTSEQ=ZSWTSEQ
+				
+				type RecordDTJ zdtj1=Db.getRecord("DTJ","TJD=:ZTJD,DATETIME=:ZDATTIM,CID=:CID,TSEQ=:ZTSEQ",1)
+				do SESDTX^ZSTMEG(zdep,zdtj1,zdep.grp,io2)
+				set ^ZSECNT2(ZPID)=^ZSECNT2(ZPID)+1
+				
+				// Restore variable
+				set ZTJD=ZKTJD
+				set ZDATTIM=ZKDATTIM
+				set CID=ZKCID
+				set ZTSEQ=ZKTSEQ
+				
+				set (ZSWTJD,ZSWDATTIM,ZSWCID,ZSWTSEQ)=""
+			}
+			
+			
+			
+			//CBS C/A Transaction File
+			if ZSWAP=0 do {
+				do SESDTX^ZSTMEG(zdep,zdtj,zdep.grp,io2)
+				set ^ZSECNT2(ZPID)=^ZSECNT2(ZPID)+1
+			}
+			set ZPREVETC=zdtj.etc
+			
+			
+			//DDA Info
+			if ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID).data() quit
+			do SESDINF^ZSTMEG(zdep,zdep.grp,.ZINFREC)
+			set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID)=ZINFREC	
+			
+			
+			
+		}
+		
+		if zdep.grp="CD" do {
+			//Fix
+			if ZFIXFLG do {
+				//CBS FD Transaction File
+				do SEFXACTRN^ZSTMEG(zdep,zdtj,io3,1)
+				set ^ZSECNT3(ZPID)=^ZSECNT3(ZPID)+1
+				
+				// wiphak
+				// add CON record
+				// credit, PUTCON=1
+				type RecordZUTBLTRCD ztrcd1=Db.getRecord("ZUTBLTRCD","ETC=:zdtj.etc",1)
+				if (zdtj.itc1=1),(ztrcd1.putcon=1) do {
+					do SEFXACTRN^ZSTMEG(zdep,zdtj,io3,2)
+					set ^ZSECNT3(ZPID)=^ZSECNT3(ZPID)+1
+				}
+				
+				//Fix Info
+				if ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID).data() quit
+				do SEFXACINF^ZSTMEG(zdep,.ZINFREC)
+				set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID)=ZINFREC
+			}
+			//Special Fix
+			if ZSFIXFLG do {
+				//CBS SFD Transaction File
+				do SESFXTRN^ZSTMEG(zdep,zdtj,io4,1)
+				set ^ZSECNT4(ZPID)=^ZSECNT4(ZPID)+1
+				
+				// wiphak
+				// add CON record
+				// credit, first dep, PUTCON=1
+				type RecordZUTBLTRCD ztrcd1=Db.getRecord("ZUTBLTRCD","ETC=:zdtj.etc",1)
+				if (zdtj.itc1=1),(zdep.bal=+zdtj.tamt),(ztrcd1.putcon=1) do {
+					do SESFXTRN^ZSTMEG(zdep,zdtj,io4,2)
+					set ^ZSECNT4(ZPID)=^ZSECNT4(ZPID)+1				
+				}
+				
+				//Special Fix Info
+				if ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID).data() quit
+				do SEFXACINF^ZSTMEG(zdep,.ZINFREC)
+				set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID)=ZINFREC	
+			}
+			
+		}
+		
+		//EDW Non-Financial Transaction
+		do NONFIN^ZEDW(zdep,zdtj)
+		
+		//EDW EFT Transaction
+		do ZEFT^ZEDW(zdep,zdtj,ZOPPID)
+		
+	}
+	
+	// for swap tx, if the kept record is the last record of the account
+	if ZSWTJD'="" do {
+	
+		// store current var
+		new ZKTJD,ZKDATTIM,ZKCID,ZKTSEQ
+		set ZKTJD=ZTJD
+		set ZKDATTIM=ZDATTIM
+		set ZKCID=CID
+		set ZKTSEQ=ZTSEQ
+		
+		set ZTJD=ZSWTJD
+		set ZDATTIM=ZSWDATTIM
+		set CID=ZSWCID
+		set ZTSEQ=ZSWTSEQ
+		
+		type RecordDTJ zdtj1=Db.getRecord("DTJ","TJD=:ZTJD,DATETIME=:ZDATTIM,CID=:CID,TSEQ=:ZTSEQ",1)
+		if zdep.grp="SAV" do {
+			do SESDTX^ZSTMEG(zdep,zdtj1,zdep.grp,io1)
+			set ^ZSECNT1(ZPID)=^ZSECNT1(ZPID)+1
+		}
+		
+		if zdep.grp="DDA" do {
+			do SESDTX^ZSTMEG(zdep,zdtj1,zdep.grp,io2)
+			set ^ZSECNT2(ZPID)=^ZSECNT2(ZPID)+1
+		}
+		
+		
+		// Restore variable
+		set ZTJD=ZKTJD
+		set ZDATTIM=ZKDATTIM
+		set CID=ZKCID
+		set ZTSEQ=ZKTSEQ
+		
+		set (ZSWTJD,ZSWDATTIM,ZSWCID,ZSWTSEQ)=""
+	}
+	
+	
+	//D03 - Close Account
+	if zdep.dtc=ZTJD do {
+		
+		if zdep.grp="SAV" do {
+			//Open Account SAV
+			do SESDTXOC^ZSTMEG(zdep,zdep.grp,0,.io1)
+			set ^ZSECNT1(ZPID)=^ZSECNT1(ZPID)+1
+			
+			//SAV Info
+			if ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID).data() quit
+			do SESDINF^ZSTMEG(zdep,zdep.grp,.ZINFREC)
+			set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID)=ZINFREC
+		}
+			
+		if zdep.grp="DDA" do {
+			//Open Account DDA
+			do SESDTXOC^ZSTMEG(zdep,zdep.grp,0,.io2)
+			set ^ZSECNT2(ZPID)=^ZSECNT2(ZPID)+1
+			
+			//DDA Info
+			if ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID).data() quit
+			do SESDINF^ZSTMEG(zdep,zdep.grp,.ZINFREC)
+			set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID)=ZINFREC
+		}
+		
+		if zdep.grp="CD" do {
+			//Fix
+			if ZFIXFLG do {
+				//Fix Open Account
+				do SEFXACTRNOP^ZSTMEG(zdep,0,.io3)
+				set ^ZSECNT3(ZPID)=^ZSECNT3(ZPID)+1
+				
+				//Fix Info
+				if ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID).data() quit
+				do SEFXACINF^ZSTMEG(zdep,.ZINFREC)
+				set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID)=ZINFREC
+				
+			}
+			//Special Fix
+			if ZSFIXFLG do {
+				//Special Fix Open Account
+				do SESFXTRNOP^ZSTMEG(zdep,0,io4)
+				set ^ZSECNT4(ZPID)=^ZSECNT4(ZPID)+1
+				
+				//Special Fix Info
+				if ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID).data() quit
+				do SEFXACINF^ZSTMEG(zdep,.ZINFREC)
+				set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID)=ZINFREC
+			}
+			
+		}
+		kill ^ZSECL(ZTJD,zdep.cls,zdep.grp,zdep.type,CID)
+		
+	}
+	
+	quit
+	
+	
+EXC	// Log error to dayend
+
+	if $G(%FN)="" set %FN="ZBCHXDTJSE"
+	if $G(DESC)="" set DESC="Batch XDTJ Extract for Statement Engine"
+	if RM.get()="" set RM=ET.get()
+	do LOG^UTLEXC($T(+0),"*",DESC,SEQNUM.get(),CID.get(),%ZTSEQ.get(),RM.get())
+	kill RM,%ZTSEQ
+	
+	quit
+
+
+---------- THREXIT ------ Section marker
+
+	
+	do CLOSEIO^ZSTMEG(io1)
+	do CLOSEIO^ZSTMEG(io2)
+	do CLOSEIO^ZSTMEG(io3)
+	do CLOSEIO^ZSTMEG(io4)
+	
+	//---- LPM  (Pheraphat Nu.) 3 Apr 2014 --------
+	#if $$VALID^%ZRTNS("ZLPMEXT")=1
+	do ZPMTTHEXIT^ZLPMEXT(ZTJD)
+	#endif
+	//----------------------------------------------
+	
+	
+	quit
+
+

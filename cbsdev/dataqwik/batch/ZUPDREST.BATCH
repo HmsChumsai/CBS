@@ -1,0 +1,46 @@
+//DO NOT MODIFY  ZUPDREST|ZUPDREST||||||DEP|GRP='CD' AND TYPE=3401||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+---------- THRINIT ------ Section marker
+
+	set %UID="BATCH"
+        set TLO="BATCH"
+
+	quit
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	do Runtime.rollback()	
+
+        type RecordDEP dep=Db.getRecord("DEP","CID=:CID")
+        if dep.zmasflg=1 quit
+	if dep.zstatcd=4 quit
+ 	if 'dep.znbprflg quit
+
+	do Runtime.start("BA")
+
+	type DbSet ds1 = Db.selectDbSet("PHLD","CID=:CID AND PHC='63'")
+        if 'ds1.isEmpty(),ds1.next() do {
+	   type RecordRFLG zr=Class.new("RecordRFLG")
+	   set zr.cid=dep.cid
+	   set zr.rflg="ZNB4"
+	   do zr.bypassSave()
+        }	
+	
+        do Runtime.commit()
+  
+        quit
+
+---------- THREXIT ------ Section marker

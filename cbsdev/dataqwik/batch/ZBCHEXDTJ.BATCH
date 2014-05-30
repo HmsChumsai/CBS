@@ -1,0 +1,152 @@
+//DO NOT MODIFY  Extract Data from DTJ|ZEXDTJ||||||DTJ|TJD BETWEEN :STDATE AND :ENDATE AND CLS='L'|9|100|32000|STDATE,ENDATE,ZARTRN|0|10000|10000|10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	kill ^ZTMPOUT1
+	
+	set %TAB("STDATE")="/DES=Start Date/REQ/TYP=D/LEN=10"
+	set %TAB("ENDATE")="/DES=END Date/REQ/TYP=D/LEN=10"
+
+	set %READ="@@%FN,,,STDATE,ENDATE"
+	do ^UTLREAD if VFMQ="Q" set %BatchExit=1 quit 
+	
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	new IOTYP,io
+	type IO io1=Class.new("IO")
+	set io1.fileName="DTJ_"_$$DAT^%ZM(STDATE,"DDMMYEAR")_"_"_$$DAT^%ZM(ENDATE,"DDMMYEAR")_".TXT"
+	set io1.directory=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")
+	set io1.openParams="NEWV/WRITE"
+	set io1.recordSize=3000
+	do io1.open()
+	
+	set ZDATA=""
+	set ZDATA="Seq|Customer Number|Response Unit|Cost Center|AccountNO.|Trans.Seq|Date|Time|UID|TranCode|Transaction Description|TransAmount|DateOfNote|OpenDate|ProductType|MarketCode|Class"
+	do io1.write(ZDATA)             
+	set SEQ=1
+	type ResultSet rs2=Db.select("TJD,TYP,CID,TSEQ","ZTMPOUT1","","TJD,TYP,CID")
+        while rs2.next() do {
+        	set ZDATA=""
+        	set ZTJD=rs2.getCol(1)
+        	set ZTYP=rs2.getCol(2)
+        	set ZCID=rs2.getCol(3)
+        	set ZTSEQ=rs2.getCol(4)
+        	type RecordZTMPOUT1 tmpoutm=Db.getRecord("ZTMPOUT1","TJD=:ZTJD,TYP=:ZTYP,CID=:ZCID,TSEQ=:ZTSEQ",1)
+        	set ZTJD=$$DAT^%ZM(ZTJD,"DD/MM/YEAR")
+        	set ZODT=$$DAT^%ZM(tmpoutm.odt,"DD/MM/YEAR")
+        	set ZDTNT=$$DAT^%ZM(tmpoutm.dtnt,"DD/MM/YEAR")
+        	//set ZTIME=$$TIM^%ZM(tmpoutm.time,"24:60:SS")
+        	set ZTIME=$$TIME^I18NUTL(tmpoutm.time)
+		set ZDATA=SEQ_"|"_tmpoutm.acn_"|"_tmpoutm.zresunit_"|"_tmpoutm.cc_"|"_ZCID_"|"_tmpoutm.tseq
+		set ZDATA=ZDATA_"|"_ZTJD_"|"_ZTIME_"|"_tmpoutm.uid_"|"_tmpoutm.etc_"|"_tmpoutm.desc_"|"_tmpoutm.tot
+		set ZDATA=ZDATA_"|"_ZDTNT_"|"_ZODT_"|"_ZTYP_"|"_tmpoutm.zmktcd_"|"_tmpoutm.darcls
+		do io1.write(ZDATA)
+		set SEQ=SEQ+1
+	}
+	set IOTYP="RMS"
+        do io1.close()	
+        quit
+
+---------- THRINIT ------ Section marker
+
+	do Schema.createTable("ZTMPOUT1","TJD,TYP,CID,TSEQ","TIME,ETC,DESC,TOT,UID,ETC,DESC,TOT,ACN,ZRESUNIT,CC,ODT,DTNT,ZMKTCD,DARCLS","ZTMPOUT1")
+	set ZARTRN("CMWOPP")=""
+	set ZARTRN("CMRWOPP")=""
+	set ZARTRN("CMAIPDR")=""
+	set ZARTRN("CMADP")=""
+	set ZARTRN("LWOPP")=""
+	set ZARTRN("LRWOPP")=""
+	set ZARTRN("LAIPDR")=""
+	set ZARTRN("LADP")=""
+	set ZARTRN("CMWFHC")=""
+	set ZARTRN("CMRWFHC")=""
+	set ZARTRN("CMWPHC")=""
+	set ZARTRN("CMRWPHC")=""
+	set ZARTRN("LWFHC")=""
+	set ZARTRN("LRWFHC")=""
+	set ZARTRN("LWPHC")=""
+	set ZARTRN("LRWPHC")=""
+	set ZARTRN("LWOP")=""
+	set ZARTRN("LWOI")=""
+	set ZARTRN("LWOF")=""
+	set ZARTRN("LRWOP")=""
+	set ZARTRN("LRWOI")=""
+	set ZARTRN("LWRWOF")=""
+	set ZARTRN("CMWOP")=""
+	set ZARTRN("CMWOI")=""
+	set ZARTRN("CMWOF")=""
+	set ZARTRN("CMRWOP")=""
+	set ZARTRN("CMRWOI")=""
+	set ZARTRN("CMRWOF")=""
+	set ZARTRN("LRWFULL")=""
+	set ZARTRN("CMRWFULL")=""
+	set ZARTRN("RLNFEE")=""
+	set ZARTRN("CMRECDR")=""
+	set ZARTRN("CMRECCR")=""
+	set ZARTRN("LRECDR")=""
+	set ZARTRN("LRECCR")=""
+	quit
+	
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	do Runtime.rollback()
+	
+	set CHKDATE=62091 //31-DEC-2010
+	type RecordLN ln=Db.getRecord("LN","CID=:CID",1)
+	if 'ln.getMode() quit
+	if ln.odt > CHKDATE quit
+	
+	type RecordDTJ dtj=Db.getRecord("DTJ","TJD=:TJD,DATETIME=:DATETIME,CID=:CID,TSEQ=:TSEQ")
+	
+	if '$D(ZARTRN(dtj.etc)) quit // check trns. code
+
+	if dtj.zbatch quit // skip Batch user record
+
+	new ZRESUNIT,ZCC
+	set (ZRESUNIT,ZCC) = ""
+	type RecordZTMPOUT1 tmpoutm=Class.new("RecordZTMPOUT1")
+	set tmpoutm.tjd=TJD
+	set tmpoutm.typ=dtj.type
+	set tmpoutm.cid=CID
+	set tmpoutm.tseq=TSEQ
+	set tmpoutm.time=dtj.time
+	set tmpoutm.uid=dtj.uid
+	set tmpoutm.acn=ln.acn
+	
+	if 'ln.zresunit.isNull() do {
+		if 'Db.isDefined("UTBLCCNTR","CC=:ln.zresunit") quit
+		type RecordUTBLCCNTR ccntr=Db.getRecord("UTBLCCNTR","CC=:ln.zresunit",1)
+		set ZRESUNIT=ln.zresunit_" "_ccntr.desc
+		set tmpoutm.zresunit=ZRESUNIT
+	}
+	if 'ln.cc.isNull() do {
+		if 'Db.isDefined("UTBLCCNTR","CC=:ln.cc") quit
+		type RecordUTBLCCNTR ccntr=Db.getRecord("UTBLCCNTR","CC=:ln.cc",1)
+		set ZCC=ln.cc_" "_ccntr.desc
+		set tmpoutm.cc=ZCC
+	}
+	
+	set tmpoutm.etc=dtj.etc
+	if 'dtj.etc.isNull() do {
+		if 'Db.isDefined("TRN","ETC=:dtj.etc") quit
+		type RecordTRN trn=Db.getRecord("TRN","ETC=:dtj.etc",1)
+		set tmpoutm.desc=trn.des
+	}
+	set tmpoutm.tot=dtj.tot
+	set tmpoutm.odt=ln.odt
+	set tmpoutm.dtnt=ln.dtnt
+	set tmpoutm.zmktcd=ln.zmktcd
+	set tmpoutm.darcls=ln.darcls
+	do tmpoutm.bypassSave()
+	quit
+	
+---------- THREXIT ------ Section marker

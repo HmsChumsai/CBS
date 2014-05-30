@@ -1,0 +1,182 @@
+//DO NOT MODIFY  Before INSERT new record|1|0|0|0|0|0||||
+
+	/*
+	 Revision History----------------------------------------------------
+	
+	02/20/10 - Siripong Prayoonhong (20Feb10) - Profile Upgrade
+		   Modified to update cif.lnm if it has no value and this CIF 
+		   is non-personal.
+
+	05/22/09 - Sedtha Jit. <= Revise on 29/05/2009
+	           Change XALPHA to ZXALPHA
+
+	01-09-08 - Anchalee Ch. (Profile Upgrade)
+		   Moved zciby and zciupdat update from AFTER_INSERT trigger
+		   to prevent calling the CIF filer from the triggers, which
+		   was causing a "Record already exists" error when creating
+		   customers.
+	
+	01/22/08 - Anitha C - CR29358
+		   Added code to set U.S. Residency Status if W-8 Date is
+		   received.
+		   
+	06/01/06 - GIRIDHAL - CR 21207
+		   Added new code to default date values for the credit review
+		   next date/last date fields
+		   
+	12/07/05 - KELLYP - CR 17423
+		   Modified to remove references to the TFSBANK, TFSCIFID, 
+		   and TFSHOEXT columns which are being obsoleted.  Also
+		   removed pre-2003 revision history and cleaned up.
+	
+	06/14/04 - SCHWARTZC - CR10219
+		   Moved code to default the product level relationship
+		   matrix (CIF.RELMAT)from the AFTER_INSERT_UPDATE
+		   trigger.  This prevents the need to call the CIF filer 
+		   from the trigger which was causing a "Record already
+		   exists" error when creating customers.
+	*/
+	
+	// US Residency Status
+	if 'cif.w8date.isNull() set cif.usrestat=1
+	if cif.usrestat=1 set cif.nr=1
+	
+	// If the UTBLBRCD.INACTV (inactive flag) is Y no accounts can be opened
+	// under this branch.
+	do { quit:ER 
+		new XBRCD,INACTV,XTYPE,A
+		set XBRCD=cif.boo
+		set XTYPE=cif.type
+		set INACTV=Db.getOneRow("INACTV","UTBLBRCD","XBRCD") quit:ER 
+		if INACTV=1 do Runtime.setErrMSG("CIF",3830,XBRCD) quit:ER 
+		if Db.isDefined("UTBLPRODAUTH","XBRCD,XTYPE") do Runtime.setErrMSG("CIF",4358,"XTYPE~XBRCD") quit:ER  //MJ 09/08/00
+		}
+
+	if cif.pers, cif.lnm.isNull(), 'cif.nam.isNull() set cif.lnm = cif.nam.trim().extract(1,20)     // Siripong - 20Feb10
+
+	// Customer Full Name default
+	if 'cif.pers,cif.nam="" do {
+		if cif.fname'="" set cif.fname=$$TRIM^%ZS(cif.fname)
+		if cif.mname'="" set cif.mname=$$TRIM^%ZS(cif.mname)
+		if cif.lnm'="" set cif.lnm=$$TRIM^%ZS(cif.lnm)
+		if cif.suffix'="" set cif.suffix=$$TRIM^%ZS(cif.suffix)
+		set cif.nam=$$NAM^CIFFUNCS(cif.fname,cif.mname,cif.lnm,cif.suffix)
+		}
+	
+	// Calulate alpha index name
+	if 'cif.pers set cif.xname=$$XNAME^ZXALPHA(cif.nam,cif.lnm)
+	// else  set cif.xname=$$UPPER^%ZFUNC($E(cif.nam,1,35))	// Sedtha 29/05/2009
+	else  do {
+		type Number C
+		type String ZLNM
+		set ZLNM=cif.lnm
+		set C=ZLNM.extract(1).ascii()
+                if ((C>64)&(C<91))!((C>96)&(C<123)) set cif.xname=$$UPPER^%ZFUNC($E(cif.nam,1,35))
+                else  set cif.xname=$E(cif.nam,1,35)
+	}
+	
+	// Cost center default
+	if cif.boo'="",cif.cc="" do {
+		type RecordUTBLBRCD ubrcd=Db.getRecord("UTBLBRCD","BRCD=:cif.boo")
+		set cif.cc=ubrcd.ccdef
+		}
+
+ 	// Check if SWIFT Address is defined, return error message if it's not
+ 	if cif.mt320=1 do {
+		if cif.mt320a="",cif.swiftadd="" do Runtime.setErrMSG("CIF",4029) quit:ER
+		if cif.mt320a="",cif.swiftadd'="" set cif.mt320a=cif.swiftadd 
+ 		}
+ 	if cif.mt900=1 do {
+		if cif.mt900a="",cif.swiftadd="" do Runtime.setErrMSG("CIF",4029) quit:ER
+        	if cif.mt900a="",cif.swiftadd'="" set cif.mt900a=cif.swiftadd
+		}
+ 	if cif.mt910=1 do {
+		if cif.mt910a="",cif.swiftadd="" do Runtime.setErrMSG("CIF",4029) quit:ER
+        	if cif.mt910a="",cif.swiftadd'="" set cif.mt910a=cif.swiftadd
+        	}
+ 	if cif.mt940=1 do { 
+		if cif.mt940a="",cif.swiftadd="" do Runtime.setErrMSG("CIF",4029) quit:ER
+        	if cif.mt940a="",cif.swiftadd'="" set cif.mt940a=cif.swiftadd
+		}
+ 	if cif.mt942=1 do { 
+		if cif.mt942a="",cif.swiftadd="" do Runtime.setErrMSG("CIF",4029) quit:ER
+        	if cif.mt942a="",cif.swiftadd'="" set cif.mt942a=cif.swiftadd
+		}
+ 	if cif.mt950=1 do { 
+		if cif.mt950a="",cif.swiftadd="" do Runtime.setErrMSG("CIF",4029) quit:ER
+        	if cif.mt950a="",cif.swiftadd'="" set cif.mt950a=cif.swiftadd
+        	}
+ 	// Checking for CIF.MT942G1 AND CIF.MT942G2
+ 	if cif.mt942=1 do {
+ 		if cif.mt942g1'=""!cif.mt942g2'="" do Runtime.setErrMSG("CIF",4113) quit:ER
+ 		}
+ 		
+ 	// Checking for CIF.MT942G1
+ 	if cif.mt942g1="",cif.mt942g2'="" do Runtime.setErrMSG("CIF",4114) quit:ER
+ 
+ 	// Checking for values (greater or not)
+ 	if cif.mt942g2'="",cif.mt942g1>cif.mt942g2 do Runtime.setErrMSG("CIF",4121) quit:ER
+ 
+ 	if cif.mt942g1#900'=0 do Runtime.setErrMSG("CIF",4186) quit:ER
+ 	if cif.mt942g2#900'=0 do Runtime.setErrMSG("CIF",4186) quit:ER
+
+	// Region Code validation through the branch of ownership
+	if cif.brreg="" do {
+		if cif.boo="" quit
+		type ResultSet rs2=Db.select("REGION","UTBLREGIONS","KEY=:cif.boo")
+		if rs2.next() set cif.brreg=rs2.getCol(1)
+		}
+
+	// Defaulting LCL and DCL from CUVAR
+	if cif.dcl="" set cif.dcl=+CUVAR.dcl
+	if cif.lcl="" set cif.lcl=+CUVAR.lcl
+ 	
+	// Mailing address default
+	if (cif.mad1'="")!(cif.mad2'="")!(cif.mad3'="")!(cif.mad4'="")
+	else  do {
+		set cif.mad1=cif.pad1
+		set cif.mad2=cif.pad2
+		set cif.mad3=cif.pad3
+		set cif.mad4=cif.pad4
+		set cif.mcity=cif.pcity
+		set cif.mstate=cif.pstate
+		set cif.mzip=cif.pzip
+		set cif.mcntry=cif.pcntry
+		}
+	
+	// Validate Tax Id
+	if cif.taxid'="" do {  quit:ER
+		new X,TYPE
+		set TYPE=cif.type
+		set X=cif.taxid
+		do EXT^VERTIN(.cif)
+		if X'=cif.taxid set cif.taxid=X
+		}
+	
+	// Default Relationship Matrix value from product type level.
+	type RecordPRODDFTC proddftc=Db.getRecord("PRODDFTC","TYPE=:cif.type")
+	set cif.relmat=proddftc.relmat
+	
+	//Default values for credit review next date/last dates
+	if 'cif.crerefre.isNull(),cif.schrvnd.isNull() do {  quit:ER
+		set cif.schrvnd = %SystemDate.nextFreqDate(cif.crerefre) quit:ER
+		set cif.schrvld = %SystemDate
+		} 
+	
+	if 'cif.finstfre.isNull(),cif.stmtrvnd.isNull() do {  quit:ER
+		set cif.stmtrvnd = %SystemDate.nextFreqDate(cif.finstfre) quit:ER
+		set cif.stmtrvld = %SystemDate
+		} 
+		
+	// 01-09-08 - Anchalee Ch.
+	// Moved zciby and zciupdat update from AFTER_INSERT trigger to 
+	// prevent calling the CIF filer from the triggers, which was causing 
+	// a "Record already exists" error when creating customers.
+	// Set zciby and zciupddat according to user and update date
+	if (cif.zciby'=%UserID)!(cif.zciupddat'=%SystemDate) do {
+		set cif.zciby=%UserID
+                set cif.zciupddat=%SystemDate
+	}
+	// End of 01-09-08
+	
+	quit

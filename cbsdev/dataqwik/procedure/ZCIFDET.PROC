@@ -1,0 +1,1454 @@
+//DO NOT MODIFY  CIF Detail Inquiry|ZCIFDET|||||||1
+	/*
+	ORIG: Jureerat B. - 14 Sep 2007
+	DESC: CIF Detail Inquiry
+
+	---- Comments --------------------------------------------------------
+
+	---- Revision History ------------------------------------------------
+	15/07/2011    Chatchawit
+ 		o Change field utblemployer.emplno to zutblpvcom.zccomcd
+  		o Change length CIF48 from 12 tp 13
+	
+	27-May-2011 Saowaluk
+	        o Extended lenght of Employer Code from 12 to 20
+	
+	15-Nov-2010 Saowaluk
+		o Ignore special character.
+	
+	25-May-2010 Tawiton C.
+		o Modify Method to Check ISIC Code
+		
+	27-Jan-2010 - Chatchawit C.
+		o Change English Description to Thai Description
+	
+	08-Aug-2008 - Saowaluk R.
+	        o Add Customer Picture Flag field.
+
+	14-May-2008 - Rapeepan Y.
+	        o Added fields : CustTypDesc,LegalSubDistrictDesc,LegalDistrictDesc ,LegalStateProvDesc 
+	          ,LegalCountryDesc ,MailingSubDistrictDesc,MailingDistrictDesc,MailingStateProvDesc
+	          ,MailingCountryDesc,OfficeSubDistrictDesc,OfficeDistrictDesc,OfficeStateProvDesc
+	          ,OfficeCountryDesc,MaritalStatDesc,SexDesc,NationalityDesc,EducationCdDesc,ResidencyCdDesc
+	          ,HomeOwnStatDesc,OccupationGrpDesc,SubOccupationGrpDesc,EmployeeCdDesc,EmployerCdDesc
+	          ,ISICCd3Desc,IncomeCdDesc,KYCStatDesc,BankCdDesc,OwnerBranchDesc,CompCdDesc,KTBCustCdDesc
+	          ,InvovedPartyGrpDesc,DriversLicenseProvinceDesc,CountryOfIssueDesc,OthIdtypDesc,CustCdDesc
+	          ,OfficerCdDesc,MailFlgDesc,ResponseUnitDesc,MarketInfoPrivacyCdDesc,MarketInfoSolicCdDesc
+	          ,MarketInfoLocaleCdDesc,MarketInfoRegionCdDesc,MarketInfoShareholdCdDesc,PlanDesc
+	          ,HouseholdTypDesc,RelationshipToHouseholdDesc at the end of record 
+	          
+	16-Jan-2008 - Saowaluk R.
+	        o Verify numeric fields (EmployeeCd,OfficerCd,ResponseUnit
+	                                 MarketInfoPrivacyCd,MarketInfoSolicCd).
+
+	****** Consider using setAuditFlag for all objects in this procedure
+	example :do dep.setAuditFlag(1)
+
+	*/
+
+	quit
+
+PROC(IM,NUMREC)
+
+	new BLANK,MSGKEY
+	new RESPCD,RESPDESC,OMTMP
+	
+	do Runtime.rollback()
+
+	set BLANK=""
+	set RESPCD=0
+	set (OMTMP,RESPDESC)=BLANK	
+		
+	//15-26 = CIF Number
+	set MSGKEY=$$TRIM^%ZS(IM.extract(15,26))	
+	
+	do CIFDET(IM,MSGKEY,.OMTMP)
+
+	if RESPCD'=0 do {
+		set OM=RESPCD.zero(12)_RESPDESC.blank(40)	
+		set OM=OM_OMTMP
+	}
+	else  set OM=OMTMP
+	write !,"* Length OM: "_$L(OM)
+	quit OM
+	
+
+CIFDET(IM,MSGKEY,OUTM)
+
+	new BLANK
+	new CIF2,CIF3,CIF4,CIF5,CIF6,CIF7,CIF8,CIF9,CIF10
+	new CIF11,CIF12,CIF13,CIF14,CIF15,CIF16,CIF17,CIF18,CIF19,CIF20
+	new CIF21,CIF22,CIF23,CIF24,CIF25,CIF26,CIF27,CIF28,CIF29,CIF30
+	new CIF31,CIF32,CIF33,CIF34,CIF35,CIF36,CIF37,CIF38,CIF39,CIF40
+	new CIF41,CIF42,CIF43,CIF44,CIF45,CIF46,CIF47,CIF48,CIF49,CIF50
+	new CIF51,CIF52,CIF53,CIF54,CIF55,CIF56,CIF57,CIF58,CIF59,CIF60
+	new CIF61,CIF62,CIF63,CIF64,CIF65,CIF66,CIF67,CIF68,CIF69,CIF70
+	new CIF71,CIF72,CIF73,CIF74,CIF75,CIF76,CIF77,CIF78,CIF79,CIF80
+	new CIF81,CIF82,CIF83,CIF84,CIF85,CIF86,CIF87,CIF88,CIF89,CIF90
+	new CIF91,CIF92,CIF93,CIF94,CIF95,CIF96,CIF97,CIF98,CIF99,CIF100
+	new CIF101,CIF102,CIF103,CIF104,CIF105,CIF106,CIF107,CIF108,CIF109,CIF110
+	new CIF111,CIF112,CIF113,CIF114,CIF115,CIF116,CIF117,CIF118,CIF119,CIF120
+	new CIF121,CIF122,CIF123,CIF124,CIF125,CIF126,CIF127,CIF128,CIF129,CIF130
+	new CIF131,CIF132,CIF133,CIF134,CIF135,CIF136,CIF137,CIF138,CIF139,CIF140
+	new CIF141,CIF142,CIF143,CIF144,CIF145,CIF146
+	
+	// 14-May-2008 - Rapeepan Y. : Added fields
+	new CIF147,CIF148,CIF149,CIF150,CIF151,CIF152,CIF153,CIF154,CIF155,CIF156
+	new CIF157,CIF158,CIF159,CIF160,CIF161,CIF162,CIF163,CIF164,CIF165,CIF166
+	new CIF167,CIF168,CIF169,CIF170,CIF171,CIF172,CIF173,CIF174,CIF175,CIF176
+	new CIF177,CIF178,CIF179,CIF180,CIF181,CIF182,CIF183,CIF184,CIF185,CIF186
+	new CIF187,CIF188,CIF189,CIF190,CIF191,CIF192,CIF193,CIF194,CIF195
+	
+	new ZCO
+	new CIFNUM
+
+	// Initialization
+	set BLANK=""
+	set OUTM=BLANK
+	set ZCO="KTB"
+
+	set (CIF2,CIF3,CIF4,CIF5,CIF6,CIF7,CIF8,CIF9,CIF10)=BLANK
+	set (CIF11,CIF12,CIF13,CIF14,CIF15,CIF16,CIF17,CIF18,CIF19,CIF20)=BLANK
+	set (CIF21,CIF22,CIF23,CIF24,CIF25,CIF26,CIF27,CIF28,CIF29,CIF30)=BLANK
+	set (CIF31,CIF32,CIF33,CIF34,CIF35,CIF36,CIF37,CIF38,CIF39,CIF40)=BLANK
+	set (CIF41,CIF42,CIF43,CIF44,CIF45,CIF46,CIF47,CIF48,CIF49,CIF50)=BLANK
+	set (CIF51,CIF52,CIF53,CIF54,CIF55,CIF56,CIF57,CIF58,CIF59,CIF60)=BLANK
+	set (CIF61,CIF62,CIF63,CIF64,CIF65,CIF66,CIF67,CIF68,CIF69,CIF70)=BLANK
+	set (CIF71,CIF72,CIF73,CIF74,CIF75,CIF76,CIF77,CIF78,CIF79,CIF80)=BLANK
+	set (CIF81,CIF82,CIF83,CIF84,CIF85,CIF86,CIF87,CIF88,CIF89,CIF90)=BLANK
+	set (CIF91,CIF92,CIF93,CIF94,CIF95,CIF96,CIF97,CIF98,CIF99,CIF100)=BLANK
+	set (CIF101,CIF102,CIF103,CIF104,CIF105,CIF106,CIF107,CIF108,CIF109,CIF110)=BLANK
+	set (CIF111,CIF112,CIF113,CIF114,CIF115,CIF116,CIF117,CIF118,CIF119,CIF120)=BLANK
+	set (CIF121,CIF122,CIF123,CIF124,CIF125,CIF126,CIF127,CIF128,CIF129,CIF130)=BLANK
+	set (CIF131,CIF132,CIF133,CIF134,CIF135,CIF136,CIF137,CIF138,CIF139,CIF140)=BLANK
+	set (CIF141,CIF142,CIF143,CIF144,CIF145,CIF146)=BLANK	
+	
+	// 14-May-2008 - Rapeepan Y. : Added fields
+	set (CIF147,CIF148,CIF149,CIF150,CIF151,CIF152,CIF153,CIF154,CIF155,CIF156)=BLANK
+	set (CIF157,CIF158,CIF159,CIF160,CIF161,CIF162,CIF163,CIF164,CIF165,CIF166)=BLANK
+	set (CIF167,CIF168,CIF169,CIF170,CIF171,CIF172,CIF173,CIF174,CIF175,CIF176)=BLANK
+	set (CIF177,CIF178,CIF179,CIF180,CIF181,CIF182,CIF183,CIF184,CIF185,CIF186)=BLANK
+	set (CIF187,CIF188,CIF189,CIF190,CIF191,CIF192,CIF193,CIF194,CIF195)=BLANK
+	
+	// 15-Nov-2010 : Ignore special character
+	type String ZREP,ZCHAR
+
+	set ZREP=""
+	
+	set ZCHAR=$C(1)_$C(2)_$C(3)_$C(4)_$C(5)_$C(6)_$C(7)_$C(8)_$C(9)_$C(10)
+	set ZCHAR=ZCHAR_$C(11)_$C(12)_$C(13)_$C(14)_$C(15)_$C(16)_$C(17)_$C(18)_$C(19)_$C(20)
+	set ZCHAR=ZCHAR_$C(21)_$C(22)_$C(23)_$C(24)_$C(25)_$C(26)_$C(27)_$C(28)_$C(29)_$C(30)_$C(31)
+	
+	// CIF Number
+	set CIFNUM=$$TRIM^%ZS(MSGKEY.extract(1,12))
+	set CIFNUM=+CIFNUM
+	
+	if 'Db.isDefined("CIF","ACN=:CIFNUM") do { quit
+		set OUTM=CIFNUM.blank(12)_BLANK.blank(3844)
+		set RESPCD=3100
+		set RESPDESC=$$^MSG(RESPCD,CIFNUM)
+	}
+
+	type RecordCIF cif=Db.getRecord("CIF","ACN=:CIFNUM")
+
+	if cif.co'=ZCO do { quit
+		set OUTM=CIFNUM.blank(12)_BLANK.blank(3844)
+		set RESPCD=3100
+		set RESPDESC=$$^MSG(RESPCD,CIFNUM)
+	}
+
+	//CIF1 = CIF Number (CIFNo)
+	//CIF2 = Customer Type (CustTyp) 
+	set CIF2=cif.pers
+	       
+	//CIF3 = Thai Salutation (ThaiTitle)    
+	set CIF3=cif.ztitle  
+		
+	//CIF4 = Thai First Name (ThaiFName)
+	set CIF4=cif.fname 
+	//Ignore special character
+	set CIF4=CIF4.translate(ZCHAR,ZREP)
+		
+	//CIF5 = Thai Last Name (ThaiLName)
+	set CIF5=cif.lnm
+	//Ignore special character
+	set CIF5=CIF5.translate(ZCHAR,ZREP)
+		
+	//CIF6 = Thai Middle Name (ThaiMname)
+	set CIF6=cif.mname
+	//Ignore special character
+	set CIF6=CIF6.translate(ZCHAR,ZREP)
+		
+	//CIF7 = Customer Thai Name (ThaiName)
+	set CIF7=cif.nam
+	//Ignore special character
+	set CIF7=CIF7.translate(ZCHAR,ZREP)
+		
+	//CIF8 = English Salutation (EngTitle)
+	set CIF8=cif.zetitle
+		
+	//CIF9 = English First Name (EngFName)
+	set CIF9=cif.zefname
+	//Ignore special character
+	set CIF9=CIF9.translate(ZCHAR,ZREP)
+		
+	//CIF10 = English Last Name (EngLName)
+	set CIF10=cif.zelnm
+	//Ignore special character
+	set CIF10=CIF10.translate(ZCHAR,ZREP)
+		
+	//CIF11 = English Middle Name (EngMname)
+	set CIF11=cif.zemname
+	//Ignore special character
+	set CIF11=CIF11.translate(ZCHAR,ZREP)
+		
+	//CIF12 = Customer English Name (EngName)
+	set CIF12=cif.zenam
+	//Ignore special character
+	set CIF12=CIF12.translate(ZCHAR,ZREP)
+		
+	//CIF13 = Legal Address Line 1 (LegalAddr1)
+	set CIF13=cif.pad1
+	//Ignore special character
+	set CIF13=CIF13.translate(ZCHAR,ZREP)
+		
+	//CIF14 = Legal Address Line 2 (LegalAddr2)
+	set CIF14=cif.pad2
+	//Ignore special character
+	set CIF14=CIF14.translate(ZCHAR,ZREP)
+		
+	//CIF15 = Legal Address Line 3 (LegalAddr3)
+	set CIF15=cif.pad3
+	//Ignore special character
+	set CIF15=CIF15.translate(ZCHAR,ZREP)
+		
+	//CIF16 = Legal Sub-District (LegalSubDistrict)
+	set CIF16=cif.zpsdiscd
+		
+	//CIF17 = Legal District (LegalDistrict)
+	set CIF17=cif.pcity
+		
+	//CIF18 = Legal Province (LegalStateProv)
+	set CIF18=cif.pstate
+		
+	//CIF19 = Legal Postal Code (LegalPostalCd)
+	set CIF19=cif.pzip
+		
+	//CIF20 = Legal Country (LegalCountry)
+	set CIF20=cif.pcntry
+		
+	//CIF21 = Mailing Address Line 1 (MailingAddr1)
+	set CIF21=cif.mad1
+	//Ignore special character
+	set CIF21=CIF21.translate(ZCHAR,ZREP)
+		
+	//CIF22 = Mailing Address Line 2 (MailingAddr2)
+	set CIF22=cif.mad2
+	//Ignore special character
+	set CIF22=CIF22.translate(ZCHAR,ZREP)
+		
+	//CIF23 = Mailing Address Line 3 (MailingAddr3)
+	set CIF23=cif.mad3
+	//Ignore special character
+	set CIF23=CIF23.translate(ZCHAR,ZREP)
+		
+	//CIF24 = Mailing Sub-District (MailingSubDistrict)
+	set CIF24=cif.zmsdiscd
+		
+	//CIF25 = Mailing District (MailingDistrict)
+	set CIF25=cif.mcity
+		
+	//CIF26 = Mailing Province (MailingStateProv)
+	set CIF26=cif.mstate
+		
+	//CIF27 = Mailing Postal Code (MailingPostalCd)
+	set CIF27=cif.mzip
+		
+	//CIF28 = Mailing Country (MailingCountry)
+	set CIF28=cif.mcntry
+		
+	//CIF29 = Office Address Line 1 (OfficeAddr1)
+	set CIF29=cif.zoad1
+	//Ignore special character
+	set CIF29=CIF29.translate(ZCHAR,ZREP)
+		
+	//CIF30 = Office Address Line 2 (OfficeAddr2)
+	set CIF30=cif.zoad2
+	//Ignore special character
+	set CIF30=CIF30.translate(ZCHAR,ZREP)
+		
+	//CIF31 = Office Address Line 3 (OfficeAddr3)
+	set CIF31=cif.zoad3
+	//Ignore special character
+	set CIF31=CIF31.translate(ZCHAR,ZREP)
+		
+	//CIF32 = Office Sub-District (OfficeSubDistrict)]
+	set CIF32=cif.zosdiscd
+		
+	//CIF33 = Office District (OfficeDistrict)
+	set CIF33=cif.zocity
+		
+	//CIF34 = Office Province (OfficeStateProv)
+	set CIF34=cif.zostate
+		
+	//CIF35 = Office Postal Code (OfficePostalCd)
+	set CIF35=cif.zozip
+		
+	//CIF36 = Office Country (OfficeCountry)
+	set CIF36=cif.zocntry
+		
+	//CIF37 = Marital Status (MaritalStat)
+	set CIF37=cif.mar
+		
+	//CIF38 = Sex (Sex)
+	set CIF38=cif.sex
+		
+	//CIF39 = Date of Birth (DateOfBirth)
+	set CIF39=cif.dob
+		
+	//CIF40 = Nationality (Nationality)
+	set CIF40=cif.nation
+		
+	//CIF41 = Education Code (EducationCd)
+	set CIF41=cif.educ
+		
+	//CIF42 = Residency Code (ResidencyCd)
+	set CIF42=cif.zrescd
+		
+	//CIF43 = Home Ownership Status (HomeOwnStat)
+	set CIF43=cif.own
+		
+	//CIF44 = Number of Dependents (NumberOfDeps)
+	set CIF44=cif.dep
+			
+	//CIF45 = Occupation Group (OccupationGrp)
+	set CIF45=cif.zocc
+		
+	//CIF46 = Sub-occupation (SubOccupationGrp)
+	set CIF46=cif.zsocc
+		
+	//CIF47 = Employee Code (EmployeeCd)
+	set CIF47=cif.zposcd
+		
+	//CIF48 = Employer Code (EmployerCd)
+	set CIF48=cif.emplno
+		
+	//CIF49 = ISIC Code1 (ISICCd1)
+	set CIF49=cif.zisicsd
+		
+	//CIF50 = ISIC Code2 (ISICCd2)
+	set CIF50=cif.zisicgc
+		
+	//CIF51 = ISIC Code3 (ISICCd3)
+	set CIF51=cif.zisicts
+		
+	//CIF52 = Income Code (IncomeCd)
+	set CIF52=cif.inc
+		
+	//CIF53 = Home Phone (HomePhone)
+	set CIF53=cif.hph
+	//Ignore special character
+	set CIF53=CIF53.translate(ZCHAR,ZREP)
+		
+	//CIF54 = Mobile Phone (MobilePhone)
+	set CIF54=cif.aph
+	//Ignore special character
+	set CIF54=CIF54.translate(ZCHAR,ZREP)
+		
+	//CIF55 = Office Phone (officePhone)
+	set CIF55=cif.bph
+	//Ignore special character
+	set CIF55=CIF55.translate(ZCHAR,ZREP)
+		
+	//CIF56 = Office Phone Extension (OfficePhoneExt)
+	set CIF56=cif.bphext
+	//Ignore special character
+	set CIF56=CIF56.translate(ZCHAR,ZREP)
+		
+	//CIF57 = Fax number (FaxNumber)
+	set CIF57=cif.faxnum
+	//Ignore special character
+	set CIF57=CIF57.translate(ZCHAR,ZREP)
+		
+	//CIF58 = VIP Flag (VIPFlg)
+	set CIF58=cif.zvipflg
+		
+	//CIF59 = Ext Customer Number (ExtCustNumber)
+	set CIF59=cif.extcif
+	//set CIF59 =+CIF59
+		
+	//CIF60 = Date of Death (DateOfDate)
+	set CIF60=cif.dod
+		
+	//CIF61 = Electronic Mail (Email)
+	set CIF61=cif.email
+	//Ignore special character
+	set CIF61=CIF61.translate(ZCHAR,ZREP)
+		
+	//CIF62 = Risk Rating (RiskRating)
+	set CIF62=cif.zrrt
+		
+	//CIF63 = Warning Message (WarningMsg)
+	set CIF63=cif.atn
+		
+	//CIF64 = KTB Credit Risk Rating Date (KTBCreditRiskRatingDt)
+	set CIF64=cif.zcrrtdt
+		
+	//CIF65 = KYC/CDD Status (KYCStat)
+	set CIF65=cif.zkycstat
+		
+	//CIF66 = Staff ID (StaffId)
+	set CIF66=cif.zstfid
+		
+	//CIF67 = Net Fixed Asset (exclude Land) (NetFixedAsset) -Net Fixed Asset (exclude Land)Sign (NetFixedAssetSign)	
+	set CIF67=cif.znfa
+			 
+	//CIF68=Annual Sales (AnnualSales)-Annual Sales Sign (AnnualSalesSign)
+	set CIF68=cif.as
+			
+	//CIF69 = Number of Employees (NumberOfEmps)
+	set CIF69=cif.ne
+	//set CIF69 =+CIF69
+		
+	//CIF70 = Total Assets (TotAssets) -Total Assets Sign (TotAssetsSign)	
+	set CIF70=cif.ta
+			
+	//CIF71 = Last Year-End Update (LastYearEndUpd)
+	set CIF71=cif.lfu
+		
+	//CIF72 = Net Worth (NetWorth) - Net Worth Sign (NetWorthSign)
+	set CIF72=cif.nw
+		
+	//CIF73 = Credit Line (CreditLine)- Credit Line Sign (CreditLineSign)
+	set CIF73=cif.cre
+		
+	//CIF74 = Fiscal Year-End (MMDD) (FiscalYearEnd)
+	set CIF74=cif.fye
+		
+	//CIF75 = Government Owned Flag (GovOwned)
+	set CIF75=cif.govt
+		
+	//CIF76 = Primary Contact (PrimaryContact)
+	set CIF76=cif.con
+		
+	//CIF77 = Bank Code (BankCd)
+	set CIF77=cif.zextbnk
+		
+	//CIF78 = Owner Branch (OwnerBranch)
+	set CIF78=cif.boo
+	//set CIF78 =+CIF78
+		
+	//CIF79 = Company Code (CompCd)
+	set CIF79=cif.co
+		
+	//CIF80 = KTB Customer Code (KTBCustCd)
+	set CIF80=cif.zktbccode
+		
+	//CIF81 = Involved party Group (InvovedPartyGrp)
+	set CIF81=cif.zipc
+		
+	//CIF82 = Citizen ID (CitizenId)
+	set CIF82=cif.zcizid
+		
+	//CIF83 = TAX Id (TAXId)
+	set CIF83=cif.taxid
+	
+	//CIF84 = Drivers License Number (DriversLicenseNumber)
+	set CIF84=cif.dlnum
+		
+	//CIF85 = Drivers License Province (DriversLicenseProvince)
+	set CIF85=cif.dlstate
+		
+	//CIF86 = Drivers License Expiration Date (DriversLicenseExpDt)
+	set CIF86=cif.dlexpdt
+		
+	//CIF87 = Passport Number (PassportNumber)
+	set CIF87=cif.pasnum
+		
+	//CIF88 = Country of Issue (CountryOfIssue)
+	set CIF88=cif.pci
+		
+	//CIF89 = Passport Expiration Date (PassportExpDt)
+	set CIF89=cif.ped
+		
+	//CIF90 = BOT Assigned Code (BOTAssignedCd)
+	set CIF90=cif.zbotnum
+		
+	//CIF91 = Government Organization ID (GovOrgID)
+	set CIF91=cif.zgovnum
+		
+	//CIF92 = Oversea Juristic ID (OverseaJuristicId)
+	set CIF92=cif.zovrseaj
+		
+	//CIF93 = Customer Information Flag (CustInfoFlg)
+	set CIF93=cif.zciflg
+	set CIF93=CIF93.blank(1)
+	
+	//CIF94 = BOI Flag (BOIFlg)
+	set CIF94=cif.zboiflg
+		
+	//CIF95 = Juristic ID (JuristicId)
+	set CIF95=cif.zjin
+		
+	//CIF96 = Juristic Register Date (JuristicRegDt)
+	set CIF96=cif.zjrdate
+		
+	//CIF97 = SWIFT Code (SWIFTCd)
+	set CIF97=cif.zswiftcd
+		
+	//CIF98 = FI Code (FICd)
+	set CIF98=cif.zficd
+		
+	//CIF99 = FI Assigned Code (FIAssignedCd)
+	set CIF99=cif.zfiasscd
+		
+	//CIF100 = International Org and Oversea Government ID (InterOrgOvrseaGovId)
+	set CIF100=cif.zintovgov
+		
+	//CIF101 = Other Juristic Reference ID (OthJuristicRefId)
+	set CIF101=cif.zothjid
+		
+	//CIF102 = Other ID type (OthIdtyp)
+	set CIF102=cif.oit
+	
+	//CIF103 = Other Issuer (OthIssuer)
+	set CIF103=cif.issr
+		
+	//CIF104 = Other Identification Number (OthIdentNumber)
+	set CIF104=cif.oin
+		
+	//CIF105 = Other Expiry Date (OthExpDt)
+	set CIF105=cif.oed
+		
+	//CIF106 = Customer Code (CustCd)
+	set CIF106=cif.ccode
+		
+	//CIF107 = Officer Code (OfficerCd)
+	set CIF107=cif.zoffcd
+			
+	//CIF108 = Mail Flag (MailFlg)
+	set CIF108=cif.mf
+		
+	//CIF109 = Response Unit (ResponseUnit)
+	set CIF109=cif.zresunit
+			
+	//CIF110 = Statement Frequency (StmtFrequency)
+	//CIF111 = Statement Address (StmtAddr)
+	//CIF112 = Statement Next date (StmtNextDt)
+	//CIF113  = Statement Description (StmtDescription)
+	if 'Db.isDefined("CMBGRP","ACN=:CIFNUM,STMGRP=1") set (CIF110,CIF111,CIF112,CIF113)=BLANK
+	else  do {
+		type RecordCMBGRP cmbgrp=Db.getRecord("CMBGRP","ACN=:CIFNUM,STMGRP=1")
+		set CIF110=cmbgrp.sfre		
+		set CIF111=cmbgrp.addr
+		set CIF112=cmbgrp.sndt
+		set CIF113=cmbgrp.desc
+	}
+	
+	//CIF114 = Marketing Info. Privacy Code (MarketInfoPrivacyCd)
+	set CIF114=cif.priv
+			
+	//CIF115 = Marketing Info. Solicitation Code (MarketInfoSolicCd)
+	set CIF115=cif.sol
+			
+	//CIF116 = Marketing Info.Decline Telemarketing (MarketInfoDeclineTele)
+	set CIF116=cif.martel
+		
+	//CIF117 = Marketing Info. Decline Email (MarketInfoDeclineEmail)
+	set CIF117=cif.marem
+		
+	//CIF118 = Marketing Info. Decline Direct Mail (MarketInfoDeclineDirectMail)
+	set CIF118=cif.mardm
+		
+	//CIF119 = Marketing Info. Agent (MarketInfoAgent)
+	set CIF119=cif.agent
+		
+	//CIF120 = Marketing Info. Locale Code (MarketInfoLocaleCd)
+	set CIF120=cif.locale
+		
+	//CIF121 = Marketing Info. Region Code (MarketInfoRegionCd)
+	set CIF121=cif.brreg
+		
+	//CIF122 = Marketing Info. Sharehold Code (MarketInfoShareholdCd)
+	set CIF122=cif.shhld
+		
+	//CIF123 = Customer Limit Amount (CustLimitAmt) -Customer Limit Amount Sign (CustLimitAmtSign)
+	set CIF123=cif.cusamt
+		
+	//CIF124 = Customer Review Date (CustReviewDt)
+	set CIF124=cif.cusdate
+		
+	//CIF125 = Plan (Plan)
+	set CIF125=cif.plan
+		
+	//CIF126 = Household Type (HouseholdTyp)
+	//CIF127 = Head of Household (HeadOfHousehold)
+	//CIF128 = Member of Household (MemberOfHousehold)
+	//CIF129 = Relationship To Household (RelationshipToHousehold	
+	type ResultSet rs1=Db.select("HHTYP,HHST,HEADACN,RELATE","CIFHH","ACN=:CIFNUM")
+	if rs1.isEmpty() set (CIF126,CIF127,CIF128,CIF129)=BLANK
+	if rs1.next() do {
+		set CIF126=rs1.getCol(1)
+		set CIF127=rs1.getCol(2)
+		set CIF128=rs1.getCol(3)
+		set CIF129=rs1.getCol(4)		
+	}	
+		
+	//CIF130 = Currency Code (CurrencyCd)
+	set CIF130=cif.crcd
+		
+	//CIF131 = Customer Restriction Flag (RestrictionFlg)
+	set CIF131=cif.rflgc
+		
+	//CIF132 = Account Open Date (AccountOpenDt)
+	set CIF132=cif.dao
+		
+	//CIF133 = Maintenance Last Date (MaintainLtDt)
+	set CIF133=cif.fmld
+			
+	//CIF134 = Conversion CIF Number (ConvCIF)
+	set CIF134=cif.convcif
+		
+	//CIF135 = Registered Business Name (RegisterBusNm)
+	set CIF135=cif.zrbnam
+		
+	//CIF136 = Registered Business Thai Name (RegisterBusThNm)
+	set CIF136=cif.zrbtnam
+		
+	//CIF137 = CI Primary Key (CIPrimKey)
+	set CIF137=cif.zcikey
+		
+	//CIF138 = Customer Information Update Date (CustInfoUpdDt)
+	set CIF138=cif.zciupddat
+		
+	//CIF139 = Customer Information Update By (CustInfoUpdBy)
+	set CIF139=cif.zciby
+		
+	//CIF140 = Related Involved Party ID1 (RelInvPartyID1)
+	set CIF140=cif.zcirip1
+		
+	//CIF141 = IP Relationship Type1 (IPRelTyp1)
+	set CIF141=cif.zciipt1
+		
+	//CIF142 = Rltd Ip type (RltdIpTyp)
+	set CIF142=cif.zcirit
+		
+	//CIF143 = DataSetDt (DataSetDt)
+	set CIF143=cif.zdataset
+		
+	//CIF144 = MOU Flag (MOUFlg)
+	set CIF144=cif.zmoufl
+		
+	//CIF145 = KTB Online Member Date (KTBOnlineMemberDt)
+	set CIF145=cif.zmemberdt
+		
+	//CIF146 = KTB Online Flag (KTBOnlineFlg)	
+	set CIF146=cif.zktbonfl
+		
+	// 14-May-2008 - Rapeepan Y. : Added fields
+	// CIF147 = Customer Type Description
+	if CIF2="" set CIF147=BLANK
+	else  do {
+		if 'Db.isDefined("STBLPERS","PERS=:CIF2") set CIF147=BLANK
+		else  do {
+			type RecordSTBLPERS perdes=Db.getRecord("STBLPERS","PERS=:CIF2")
+			set CIF147=perdes.desc 
+		}
+	}
+		
+	// CIF148 = Legal Sub-District Description
+	if (CIF20="")!(CIF18="")!(CIF17="")!(CIF16="") set CIF148=BLANK
+	else  do {
+		if 'Db.isDefined("ZUTBLSDISTCD","CNTRY=:CIF20,STATE=:CIF18,DIST=:CIF17,SUBDIST=:CIF16") set CIF148=BLANK
+		else  do {
+			type RecordZUTBLSDISTCD sdistcd=Db.getRecord("ZUTBLSDISTCD","CNTRY=:CIF20,STATE=:CIF18,DIST=:CIF17,SUBDIST=:CIF16")
+			set CIF148=sdistcd.desc
+		}
+	}
+	
+	// CIF149 = Legal District Description
+	if (CIF20="")!(CIF18="")!(CIF17="") set CIF149=BLANK
+	else  do {
+		if 'Db.isDefined("ZUTBLDIST","CNTRY=:CIF20,STATE=:CIF18,DIST=:CIF17") set CIF149=BLANK
+		else  do {
+			type RecordZUTBLDIST zutbldist=Db.getRecord("ZUTBLDIST","CNTRY=:CIF20,STATE=:CIF18,DIST=:CIF17")
+			set CIF149=zutbldist.des
+		}
+	}
+		
+	// CIF150 = Legal Province Description
+	if (CIF20="")!(CIF18="") set CIF150=BLANK
+	else  do {
+		if 'Db.isDefined("STBLCNTRY1","CNTRY=:CIF20,STATE=:CIF18") set CIF150=BLANK
+		else  do {
+			type RecordSTBLCNTRY1 cntry1=Db.getRecord("STBLCNTRY1","CNTRY=:CIF20,STATE=:CIF18")
+			set CIF150=cntry1.desc
+		}
+	}
+		
+	// CIF151 = Legal Country Description
+	if CIF20="" set CIF151=BLANK
+	else  do {
+		if 'Db.isDefined("STBLCNTRY","CNTRY=:CIF20") set CIF151=BLANK
+		else  do {
+			type RecordSTBLCNTRY cntry=Db.getRecord("STBLCNTRY","CNTRY=:CIF20")
+			set CIF151=cntry.desc
+		}
+	}
+	
+	// CIF152 = Mailing Sub-District Description
+	if (CIF28="")!(CIF26="")!(CIF25="")!(CIF24="") set CIF152=BLANK
+	else  do {
+		if 'Db.isDefined("ZUTBLSDISTCD","CNTRY=:CIF28,STATE=:CIF26,DIST=:CIF25,SUBDIST=:CIF24") set CIF152=BLANK
+		else  do {
+			type RecordZUTBLSDISTCD distcd=Db.getRecord("ZUTBLSDISTCD","CNTRY=:CIF28,STATE=:CIF26,DIST=:CIF25,SUBDIST=:CIF24")
+			set CIF152=distcd.desc
+		}
+	}
+	
+    	// CIF153 = Mailing District Description
+    	if (CIF28="")!(CIF26="")!(CIF25="") set CIF153=BLANK
+	else  do {
+	    	if 'Db.isDefined("ZUTBLDIST","CNTRY=:CIF28,STATE=:CIF26,DIST=:CIF25") set CIF153=BLANK
+		else  do {
+			type RecordZUTBLDIST dist=Db.getRecord("ZUTBLDIST","CNTRY=:CIF28,STATE=:CIF26,DIST=:CIF25")
+			set CIF153=dist.des
+		}
+	}
+	
+	// CIF154 = Mailing Province Description
+	if (CIF28="")!(CIF26="") set CIF154=BLANK
+	else  do {
+		if 'Db.isDefined("STBLCNTRY1","CNTRY=:CIF28,STATE=:CIF26") set CIF154=BLANK
+		else  do {
+			type RecordSTBLCNTRY1 stblcntry1=Db.getRecord("STBLCNTRY1","CNTRY=:CIF28,STATE=:CIF26")
+			set CIF154=stblcntry1.desc
+		}
+	}
+	
+	// CIF155 = Mailing Country Description
+	if CIF28="" set CIF155=BLANK
+	else  do {
+		if 'Db.isDefined("STBLCNTRY","CNTRY=:CIF28") set CIF155=BLANK
+		else  do {
+			type RecordSTBLCNTRY stblcntry=Db.getRecord("STBLCNTRY","CNTRY=:CIF28")
+			set CIF155=stblcntry.desc
+		}
+	}
+	
+	// CIF156 = Office Sub-District Description
+	if (CIF36="")!(CIF34="")!(CIF33="")!(CIF32="") set CIF156=BLANK
+	else  do {
+		if 'Db.isDefined("ZUTBLSDISTCD","CNTRY=:CIF36,STATE=:CIF34,DIST=:CIF33,SUBDIST=:CIF32") set CIF156=BLANK
+		else  do {
+			type RecordZUTBLSDISTCD sdistcd=Db.getRecord("ZUTBLSDISTCD","CNTRY=:CIF36,STATE=:CIF34,DIST=:CIF33,SUBDIST=:CIF32")
+			set CIF156=sdistcd.desc
+		}
+	}	
+	// CIF157 = Office District Description
+	if (CIF36="")!(CIF34="")!(CIF33="") set CIF157=BLANK
+	else  do {
+		if 'Db.isDefined("ZUTBLDIST","CNTRY=:CIF36,STATE=:CIF34,DIST=:CIF33") set CIF157=BLANK
+		else  do {
+			type RecordZUTBLDIST zutbldist=Db.getRecord("ZUTBLDIST","CNTRY=:CIF36,STATE=:CIF34,DIST=:CIF33")
+			set CIF157=zutbldist.des
+		}
+	}
+	
+	// CIF158 = Office Province Description
+	if (CIF36="")!(CIF34="") set CIF158=BLANK
+	else  do {
+		if 'Db.isDefined("STBLCNTRY1","CNTRY=:CIF36,STATE=:CIF34") set CIF158=BLANK
+		else  do {
+			type RecordSTBLCNTRY1 stblcntry1=Db.getRecord("STBLCNTRY1","CNTRY=:CIF36,STATE=:CIF34")
+			set CIF158=stblcntry1.desc
+		}
+	}
+	
+	// CIF159 = Office Country Description
+	if CIF36="" set CIF159=BLANK
+	else  do {
+		if 'Db.isDefined("STBLCNTRY","CNTRY=:CIF36") set CIF159=BLANK
+		else  do {
+			type RecordSTBLCNTRY stblcntry=Db.getRecord("STBLCNTRY","CNTRY=:CIF36")
+			set CIF159=stblcntry.desc
+		}
+	}
+	
+	// CIF160 = Marital Status Description
+	if CIF37="" set CIF160=BLANK
+	else  do {
+		if 'Db.isDefined("UTBLMS","MAR =:CIF37") set CIF160=BLANK
+		else  do {
+			type RecordUTBLMS utblms=Db.getRecord("UTBLMS","MAR =:CIF37")
+			set CIF160=utblms.desc
+		}
+	}
+	
+	// CIF161 = Sex Description
+	if CIF38="" set CIF161=BLANK
+	else  do {
+		if 'Db.isDefined("UTBLSEX","SEX=:CIF38") set CIF161=BLANK
+		else  do {
+			type RecordUTBLSEX utblsex=Db.getRecord("UTBLSEX","SEX=:CIF38")
+			set CIF161=utblsex.desc
+		}
+	}
+	
+	// CIF162 = Nationality  Description
+	if CIF40="" set CIF162=BLANK
+	else  do {
+		if 'Db.isDefined("ZUTBLNATION","NATCD=:CIF40") set CIF162=BLANK
+		else  do {
+			type RecordZUTBLNATION nation=Db.getRecord("ZUTBLNATION","NATCD=:CIF40")
+			set CIF162=nation.desc
+		}
+	}
+	
+	// CIF163 = Education Code Description
+	if CIF41="" set CIF163=BLANK
+	else  do {
+		if 'Db.isDefined("UTBLEDUC","EDUC=:CIF41") set CIF163=BLANK
+		else  do {
+			type RecordUTBLEDUC educ=Db.getRecord("UTBLEDUC","EDUC=:CIF41")
+			set CIF163=educ.desc
+		}
+	}
+	
+	// CIF164 = Residency Code Description
+	if CIF42="" set CIF164=BLANK
+	else  do {
+		if 'Db.isDefined("STBLCNTRY","CNTRY=:CIF42") set CIF164=BLANK
+		else  do {
+			type RecordSTBLCNTRY stblcntry=Db.getRecord("STBLCNTRY","CNTRY=:CIF42")
+			set CIF164=stblcntry.desc
+		}
+	}
+	
+	// CIF165 = Home Ownership Status Description
+	if CIF43="" set CIF165=BLANK
+	else  do {
+		if 'Db.isDefined("UTBLOWN","OWN=:CIF43") set CIF165=BLANK
+		else  do {
+			type RecordUTBLOWN utblown=Db.getRecord("UTBLOWN","OWN=:CIF43")
+			set CIF165=utblown.desc
+		}
+	}
+
+	// CIF166 = Occupation Group Description
+	if CIF45="" set CIF166=BLANK
+	else  do {
+		if 'Db.isDefined("ZUTBLOC","OCC=:CIF45") set CIF166=BLANK
+		else  do {
+			type RecordZUTBLOC zutbloc=Db.getRecord("ZUTBLOC","OCC=:CIF45")
+			//27-01-2010 - Change Desc to Thai Desc
+			//set CIF166=zutbloc.des
+			set CIF166=zutbloc.tdes
+		}
+	}
+	
+	// CIF167 = Sub-occupation Description
+	if (CIF45="")!(CIF46="") set CIF167=BLANK
+	else  do {
+		if 'Db.isDefined("ZUTBLSOC","OCC=:CIF45,SOCC=:CIF46") set CIF167=BLANK
+		else  do {
+			type RecordZUTBLSOC zutblsoc=Db.getRecord("ZUTBLSOC","OCC=:CIF45,SOCC=:CIF46")
+			//27-01-2010 - Change Desc to Thai Desc
+			//set CIF167=zutblsoc.des
+			set CIF167=zutblsoc.tdes
+		}
+	}
+
+	// CIF168 = Employee Code Description
+	if CIF47="" set CIF168=BLANK
+	else  do {
+		if 'Db.isDefined("ZUTBLPOSITN","POSCD=:CIF47") set CIF168=BLANK
+		else  do {
+			type RecordZUTBLPOSITN positn=Db.getRecord("ZUTBLPOSITN","POSCD=:CIF47")
+			set CIF168=positn.desc
+		}
+	}
+	
+	// CIF169 = Employer Code Description
+	if CIF48="" set CIF169=BLANK
+	else  do {
+		/*
+		if 'Db.isDefined("UTBLEMPLOYER","EMPLNO=:CIF48") set CIF169=BLANK
+		else  do {
+			type RecordUTBLEMPLOYER employer=Db.getRecord("UTBLEMPLOYER","EMPLNO=:CIF48")
+			set CIF169=employer.nam
+		}
+		*/
+		if 'Db.isDefined("ZUTBLPVCOM","ZCCOMCD=:CIF48") set CIF169=BLANK
+		else  do {
+			type RecordZUTBLPVCOM employer=Db.getRecord("ZUTBLPVCOM","ZCCOMCD=:CIF48")
+			set CIF169=employer.ccomth
+		}
+		
+	}
+	
+	// CIF170 = ISIC Code 1 Description
+	if CIF49="" set CIF170=BLANK
+	else  do {
+		/*  Tawiton Comment  25/05/2010
+		if 'Db.isDefined("ZUTBLISICSD","ISICSD=:CIF49") set CIF170=BLANK
+		else  do {
+			type RecordZUTBLISICSD isicsd=Db.getRecord("ZUTBLISICSD","ISICSD=:CIF49")
+			//27-01-2010 - Change Desc to Thai Desc
+			//set CIF170=isicsd.des
+			set CIF170=isicsd.tdes
+		}
+		*/
+			
+		// Tawiton Add  25/05/2010
+		type RecordZUTBLISICSD zisicsd=Db.getRecord("ZUTBLISICSD","ISICSD=:CIF49",1)
+		if 'zisicsd.getMode() do {
+			set CIF170=BLANK
+		}
+		else  do {
+			set CIF170=zisicsd.tdes
+		}
+	}
+	
+	// CIF171 = ISIC Code 2 Description
+	if (CIF49="")!(CIF50="") set CIF171=BLANK
+	else  do {
+		
+		/* Tawiton Comment  25/05/2010
+		if 'Db.isDefined("ZUTBLISICGC","ISICSD=:CIF49,ISICGC=:CIF50") set CIF171=BLANK
+		else  do {
+			type RecordZUTBLISICGC sicgc=Db.getRecord("ZUTBLISICGC","ISICSD=:CIF49,ISICGC=:CIF50")
+			//set CIF171=sicgc.des
+			//27-01-2010 - Change Desc to Thai Desc
+			set CIF171=sicgc.tdes
+		}
+		*/
+		
+		// Tawiton Add  25/05/2010
+		type RecordZUTBLISICGC zisicgc=Db.getRecord("ZUTBLISICGC","ISICSD=:CIF49,ISICGC=:CIF50",1)
+		if 'zisicgc.getMode() do {
+			set CIF171=BLANK
+		}
+		else  do {
+			set CIF171=zisicgc.tdes
+		}
+	}
+		
+	// CIF172 = ISIC Code3  Description
+	if (CIF49="")!(CIF50="")!(CIF51="") set CIF172=BLANK
+	else  do {
+			/*   Tawiton Comment  25/05/2010
+			if 'Db.isDefined("ZUTBLISICTS","ISICSD=:CIF49,ISICGC=:CIF50,ISICTS=:CIF51") set CIF172=BLANK
+			else  do {
+				type RecordZUTBLISICTS lisicts=Db.getRecord("ZUTBLISICTS","ISICSD=:CIF49,ISICGC=:CIF50,ISICTS=:CIF51")
+				//set CIF172=lisicts.des
+				//27-01-2010 - Change Desc to Thai Desc
+				set CIF172=lisicts.tdes
+			}
+			*/
+			
+			// Tawiton Add  25/05/2010
+		type RecordZUTBLISICTS zisicts=Db.getRecord("ZUTBLISICTS","ISICSD=:CIF49,ISICGC=:CIF50,ISICTS=:CIF51",1)
+		if 'zisicts.getMode() do {
+			set CIF171=BLANK
+		}
+		else  do {
+			set CIF171=zisicts.tdes
+		}
+	}
+	
+	// CIF173 = Income Code Description
+	if CIF52="" set CIF173=BLANK
+	else  do {
+		if 'Db.isDefined("UTBLIC","INC=:CIF52") set CIF173=BLANK
+		else  do {
+			type RecordUTBLIC utblic=Db.getRecord("UTBLIC","INC=:CIF52")
+			set CIF173=utblic.desc
+		}
+	}
+	
+	// CIF174 = KYC/CDD Status Description
+	if CIF65="" set CIF174=BLANK
+	else  do {
+		if 'Db.isDefined("ZUTBLKYCSTAT","LEVEL=:CIF65") set CIF174=BLANK
+		else  do {
+			type RecordZUTBLKYCSTAT kycstat=Db.getRecord("ZUTBLKYCSTAT","LEVEL=:CIF65")
+			if CIF2=0 set CIF174=kycstat.desc1	// for individual
+			if CIF2=1 set CIF174=kycstat.desc2	// for non-individual
+		}
+	}
+	
+	// CIF175 = Bank Code Description
+	if CIF77="" set CIF175=BLANK
+	else  do {
+		if 'Db.isDefined("UTBLEFTINST","KEY=:CIF77") set CIF175=BLANK
+		else  do {
+			type RecordUTBLEFTINST eftinst=Db.getRecord("UTBLEFTINST","KEY=:CIF77")
+			set CIF175=eftinst.nam
+		}
+	}
+	
+	// CIF176 = Owner Branch Description
+	if CIF78="" set CIF176=BLANK
+	else  do {
+		if 'Db.isDefined("UTBLBRCD","BRCD=:CIF78") set CIF176=BLANK
+		else  do {
+			type RecordUTBLBRCD utblbrcd=Db.getRecord("UTBLBRCD","BRCD=:CIF78")
+			set CIF176=utblbrcd.desc
+		}
+	}
+	
+	// CIF177 = Company Code Description
+	if CIF79="" set CIF177=BLANK
+	else  do {
+		if 'Db.isDefined("UTBLCC","CCODE=:CIF79") set CIF177=BLANK
+		else  do {
+			type RecordUTBLCC utblcc=Db.getRecord("UTBLCC","CCODE=:CIF79")
+			set CIF177=utblcc.desc
+		}
+	}
+	
+	// CIF178 = KTB Customer Code Description
+	if CIF80="" set CIF178=BLANK
+	else  do {
+		if 'Db.isDefined("ZUTBLKTBCUST","KTBCCODE=:CIF80") set CIF178=BLANK
+		else  do {
+			type RecordZUTBLKTBCUST ktbcust=Db.getRecord("ZUTBLKTBCUST","KTBCCODE=:CIF80")
+			set CIF178=ktbcust.desc
+		}
+	}
+	
+	// CIF179 = Involved party Group Description
+	if CIF81="" set CIF179=BLANK
+	else  do {
+		if 'Db.isDefined("ZUTBLINVP","IPCODE=:CIF81") set CIF179=BLANK
+		else  do {
+			type RecordZUTBLINVP zutblinvp=Db.getRecord("ZUTBLINVP","IPCODE=:CIF81")
+			set CIF179=zutblinvp.desc
+		}
+	}
+	
+	//CNTRY = CIF28 (Mail Cntry) ??
+	// CIF180 = Drivers License Province Description
+	if (CIF28="")!(CIF85="") set CIF180=BLANK
+	else  do {
+		if 'Db.isDefined("STBLCNTRY1","CNTRY=:CIF28,STATE=:CIF85") set CIF180=BLANK
+		else  do {
+			type RecordSTBLCNTRY1 stblcntry1=Db.getRecord("STBLCNTRY1","CNTRY=:CIF28,STATE=:CIF85")
+			set CIF180=stblcntry1.desc
+		}
+	}
+	
+	// CIF181 = Country of Issue Description
+	if CIF88="" set CIF181=BLANK
+	else  do {
+		if 'Db.isDefined("STBLCNTRY","CNTRY=:CIF88") set CIF181=BLANK
+		else  do {
+			type RecordSTBLCNTRY stblcntry=Db.getRecord("STBLCNTRY","CNTRY=:CIF88")
+			set CIF181=stblcntry.desc
+		}
+	}
+	
+   	// CIF182 = Other ID type Description
+   	if CIF102="" set CIF182=BLANK
+	else  do {
+	   	if 'Db.isDefined("UTBLID","IDTYP=:CIF102") set CIF182=BLANK
+		else  do {
+			type RecordUTBLID utblid=Db.getRecord("UTBLID","IDTYP=:CIF102")
+			set CIF182=utblid.des
+		}
+	}
+	
+	// CIF183 = Customer Code Description
+	if CIF106="" set CIF183=BLANK
+	else  do {
+		if 'Db.isDefined("UTBLCC","CCODE=:CIF106") set CIF183=BLANK
+		else  do {
+			type RecordUTBLCC utblcc=Db.getRecord("UTBLCC","CCODE=:CIF106")
+			set CIF183=utblcc.desc
+		}
+	}
+	
+	// CIF184 = Officer Code Description
+	if CIF107="" set CIF184=BLANK
+	else  do {
+		if 'Db.isDefined("ZUTBLOFFICER","OFFCD=:CIF107") set CIF184=BLANK
+		else  do {
+			type RecordZUTBLOFFICER zutblofficer=Db.getRecord("ZUTBLOFFICER","OFFCD=:CIF107")
+			set CIF184=zutblofficer.empname
+		}
+	}
+		
+	// CIF185 = Mail Flag Description
+	if CIF108="" set CIF185=BLANK
+	else  do {
+		if 'Db.isDefined("UTBLMF","MF=:CIF108") set CIF185=BLANK
+		else  do {
+			type RecordUTBLMF utblmf=Db.getRecord("UTBLMF","MF=:CIF108")
+			set CIF185=utblmf.desc
+		}
+	}
+	
+	// CIF186 = Response Unit Description
+	if CIF109="" set CIF186=BLANK
+	else  do {
+		if 'Db.isDefined("UTBLCCNTR","CC=:CIF109") set CIF186=BLANK
+		else  do {
+			type RecordUTBLCCNTR utblccntr=Db.getRecord("UTBLCCNTR","CC=:CIF109")
+			set CIF186=utblccntr.desc
+		}
+	}
+		
+	// CIF187 = Marketing Info. Privacy Code Description
+	if CIF114="" set CIF187=BLANK
+	else  do {
+		if 'Db.isDefined("STBLCIFPRIV","PRIV=:CIF114") set CIF187=BLANK
+		else  do {
+			type RecordSTBLCIFPRIV stblcifpriv=Db.getRecord("STBLCIFPRIV","PRIV=:CIF114")
+			set CIF187=stblcifpriv.des
+		}
+	}
+	
+	// CIF188 = Marketing Info. Solicitation Code Description
+	if CIF115="" set CIF188=BLANK
+	else  do {
+		if 'Db.isDefined("STBLCIFSOL","SOL=:CIF115") set CIF188=BLANK
+		else  do {
+			type RecordSTBLCIFSOL stblcifsol=Db.getRecord("STBLCIFSOL","SOL=:CIF115")
+			set CIF188=stblcifsol.des
+		}
+	}
+	
+	// CIF189 = Marketing Info. Locale Code Description
+	if CIF120="" set CIF189=BLANK
+	else  do {
+		if 'Db.isDefined("UTBLLOCALE","LOCALE=:CIF120") set CIF189=BLANK
+		else  do {
+			type RecordUTBLLOCALE utbllocale=Db.getRecord("UTBLLOCALE","LOCALE=:CIF120")
+			set CIF189=utbllocale.desc
+		}
+	}
+	
+	// CIF190 = Marketing Info. Region Code Description
+	if CIF121="" set CIF190=BLANK
+	else  do {
+		if 'Db.isDefined("UTBLREGION","KEY=:CIF121") set CIF190=BLANK
+		else  do {
+			type RecordUTBLREGION utblregion=Db.getRecord("UTBLREGION","KEY=:CIF121")
+			set CIF190=utblregion.desc
+		}
+	}
+		
+	// CIF191 = Marketing Info. Sharehold Code Description
+	if CIF122="" set CIF191=BLANK
+	else  do {
+		if 'Db.isDefined("UTBLSHHLD","SHHLD=:CIF122") set CIF191=BLANK
+		else  do {
+			type RecordUTBLSHHLD utblshhld=Db.getRecord("UTBLSHHLD","SHHLD=:CIF122")
+			set CIF191=utblshhld.desc
+		}
+	}
+	
+	/*
+	// CIF192 = Plan Description
+	if 'Db.isDefined("UTBLPLANGLIM","PLAN=:CIF125,GRPLIM=:") set CIF192=BLANK
+	else  do {
+		type RecordUTBLPLANGLIM utblplanglim=Db.getRecord("UTBLPLANGLIM","PLAN=:CIF125,GRPLIM=:")
+		set CIF192=utblplanglim.
+	}
+	*/
+		
+	// CIF193 = Household Type Description
+	if CIF126="" set CIF193=BLANK
+	else  do {
+		if 'Db.isDefined("UHHOLD","KEY=:CIF126") set CIF193=BLANK
+		else  do {
+			type RecordUHHOLD uhhold=Db.getRecord("UHHOLD","KEY=:CIF126")
+			set CIF193=uhhold.desc
+		}
+	}
+	
+	// CIF194 = Relationship To Household Description
+	if CIF129="" set CIF194=BLANK
+	else  do {
+		if 'Db.isDefined("UTBLHRC","HRCODE=:CIF129") set CIF194=BLANK
+		else  do {
+			type RecordUTBLHRC utblhrc=Db.getRecord("UTBLHRC","HRCODE=:CIF129")
+			set CIF194=utblhrc.hrcdesc
+		}
+	}
+	
+	/*-- Modified by Saowaluk R 08/08/2008 --*/
+	if Db.isDefined("CIFPIC","ACN=:CIFNUM") set CIF195=1 
+	else  set CIF195=0
+		
+	/*-- End 08/08/2008 ---*/
+		
+	// Format message
+	set CIF2=CIF2.zero(1)
+	set CIF3=CIF3.blank(35)
+	set CIF4=CIF4.blank(17)
+	set CIF5=CIF5.blank(20)
+	set CIF6=CIF6.blank(17)
+	set CIF7=CIF7.blank(40)
+	set CIF8=CIF8.blank(35)
+	set CIF9=CIF9.blank(17)
+	set CIF10=CIF10.blank(20)
+	set CIF11=CIF11.blank(17)
+	set CIF12=CIF12.blank(40)
+	set CIF13=CIF13.blank(40)
+	set CIF14=CIF14.blank(40)
+	set CIF15=CIF15.blank(40)
+	set CIF16=CIF16.blank(4)
+	set CIF17=CIF17.blank(3)
+	set CIF18=CIF18.blank(2)
+	set CIF19=CIF19.blank(10)
+	set CIF20=CIF20.blank(2)
+	set CIF21=CIF21.blank(40)
+	set CIF22=CIF22.blank(40)
+	set CIF23=CIF23.blank(40)
+	set CIF24=CIF24.blank(4)
+	set CIF25=CIF25.blank(3)
+	set CIF26=CIF26.blank(2)
+	set CIF27=CIF27.blank(10)
+	set CIF28=CIF28.blank(2)
+	set CIF29=CIF29.blank(40)
+	set CIF30=CIF30.blank(40)
+	set CIF31=CIF31.blank(40)
+	set CIF32=CIF32.blank(4)
+	set CIF33=CIF33.blank(3)
+	set CIF34=CIF34.blank(2)
+	set CIF35=CIF35.blank(10)
+	set CIF36=CIF36.blank(2)
+	set CIF37=CIF37.blank(2)
+	set CIF38=CIF38.blank(1)
+	set CIF39=$$DAT^%ZM(CIF39,"YEARMMDD")
+	set CIF39=CIF39.blank(8)
+	set CIF40=CIF40.blank(2)
+	set CIF41=CIF41.blank(4)
+	set CIF42=CIF42.blank(2)
+	set CIF43=CIF43.blank(1)
+	//set CIF44 =+CIF44
+	set CIF44=CIF44.zero(2)
+	set CIF45=CIF45.blank(4)
+	set CIF46=CIF46.blank(2)
+	/*-- Modified by Saowaluk R 16/01/2008 --*/
+	if CIF47=BLANK set CIF47=CIF47.blank(4)
+	else  set CIF47=CIF47.zero(4)
+	/*-- End 16/01/2008 ---*/
+	//set CIF48=CIF48.blank(12)
+	// 21/07/2011 - Extended lenght of Employer Code from 12 to 13
+	set CIF48=CIF48.blank(13)
+	
+	set CIF49=CIF49.blank(3)
+	set CIF50=CIF50.blank(1)
+	set CIF51=CIF51.blank(3)
+	set CIF52=CIF52.blank(3)
+	set CIF53=CIF53.blank(12)
+	set CIF54=CIF54.blank(12)
+	set CIF55=CIF55.blank(12)
+	set CIF56=CIF56.zero(4)
+	set CIF57=CIF57.blank(30)
+	set CIF58=CIF58.blank(1)
+	set CIF59=CIF59.zero(12)
+	set CIF60=$$DAT^%ZM(CIF60,"YEARMMDD")
+	set CIF60=CIF60.blank(8)
+	set CIF61=CIF61.blank(55)
+	set CIF62=CIF62.blank(6)
+	set CIF63=CIF63.blank(50)
+	set CIF64=$$DAT^%ZM(CIF64,"YEARMMDD")
+	set CIF64=CIF64.blank(8)
+	set CIF65=CIF65.blank(1)
+	set CIF66=CIF66.blank(8)
+	set CIF67=CIF67.zero(17,2,1,1)
+	set CIF68=CIF68.zero(17,2,1,1)
+	set CIF69=CIF69.zero(5)
+	set CIF70=CIF70.zero(17,2,1,1)
+	set CIF71=$$DAT^%ZM(CIF71,"YEARMMDD")
+	set CIF71=CIF71.blank(8)
+	set CIF72=CIF72.zero(17,2,1,1)
+	set CIF73=CIF73.zero(17,2,1,1)
+	set CIF74=$$DAT^%ZM(CIF74,"MMDD")
+	set CIF74=CIF74.blank(4)
+	set CIF75=CIF75.blank(1)
+	set CIF76=CIF76.blank(30)
+	set CIF77=CIF77.blank(12)
+	set CIF78=CIF78.zero(6)
+	set CIF79=CIF79.blank(12)
+	set CIF80=CIF80.blank(3)
+	set CIF81=CIF81.blank(6)
+	set CIF82=CIF82.blank(13)
+	set CIF83=CIF83.blank(20)
+	set CIF84=CIF84.blank(20)
+	set CIF85=CIF85.blank(2)
+	set CIF86=$$DAT^%ZM(CIF86,"YEARMMDD")
+	set CIF86=CIF86.blank(8)
+	set CIF87=CIF87.blank(20)
+	set CIF88=CIF88.blank(2)
+	set CIF89=$$DAT^%ZM(CIF89,"YEARMMDD")
+	set CIF89=CIF89.blank(8)
+	set CIF90=CIF90.blank(10)
+	set CIF91=CIF91.blank(15)
+	set CIF92=CIF92.blank(15)
+	set CIF94=CIF94.blank(1)
+	set CIF95=CIF95.blank(20)
+	set CIF96=$$DAT^%ZM(CIF96,"YEARMMDD")
+	set CIF96=CIF96.blank(8)
+	set CIF97=CIF97.blank(20)
+	set CIF98=CIF98.blank(15)
+	set CIF99=CIF99.blank(15)
+	set CIF100=CIF100.blank(15)
+	set CIF101=CIF101.blank(15)
+	set CIF102=CIF102.blank(20)
+	set CIF103=CIF103.blank(20)
+	set CIF104=CIF104.blank(20)
+	set CIF105=$$DAT^%ZM(CIF105,"YEARMMDD")
+	set CIF105=CIF105.blank(8)
+	set CIF106=CIF106.blank(3)
+	/*-- Modified by Saowaluk R 16/01/2008 --*/
+	//if CIF107=BLANK set CIF107=CIF107.blank(6)
+	//else  set CIF107=CIF107.zero(6)
+	/*-- End 16/01/2008 ---*/
+	set CIF107=CIF107.zero(6)
+	set CIF108=CIF108.zero(1)
+	/*-- Modified by Saowaluk R 16/01/2008 --*/
+	if CIF109=BLANK set CIF109=CIF109.blank(6)
+	else  set CIF109=CIF109.zero(6)
+	/*-- End 16/01/2008 ---*/
+	set CIF110=CIF110.blank(12)	
+	set CIF111=CIF111.blank(12)
+	if CIF112 '=BLANK set CIF112=$$DAT^%ZM(CIF112,"YEARMMDD")
+	else  set CIF112=CIF112.blank(8)
+	set CIF113=CIF113.blank(30)
+	//set CIF114 =+CIF114
+	/*-- Modified by Saowaluk R 16/01/2008 --*/
+	if CIF114=BLANK set CIF114=CIF114.blank(2)
+	else  set CIF114=CIF114.zero(2)
+	/*-- End 16/01/2008 ---*/
+	//set CIF115 =+CIF115
+	/*-- Modified by Saowaluk R 16/01/2008 --*/
+	if CIF115=BLANK set CIF115=CIF115.blank(2)
+	else  set CIF115=CIF115.zero(2)
+	/*-- End 16/01/2008 ---*/
+	set CIF116=CIF116.blank(1)
+	set CIF117=CIF117.blank(1)
+	set CIF118=CIF118.blank(1)
+	set CIF119=CIF119.blank(1)
+	set CIF120=CIF120.blank(4)
+	set CIF121=CIF121.blank(6)
+	set CIF122=CIF122.blank(4)
+	set CIF123=CIF123.zero(18,2,1,1)
+	set CIF124=$$DAT^%ZM(CIF124,"YEARMMDD")
+	set CIF124=CIF124.blank(8)
+	set CIF125=CIF125.blank(12)
+	set CIF126=CIF126.blank(4)
+	set CIF127=CIF127.blank(1)
+	set CIF128=CIF128.zero(12)
+	set CIF129=CIF129.zero(4)
+	set CIF130=CIF130.blank(3)
+	set CIF131=CIF131.blank(1)
+	set CIF132=$$DAT^%ZM(CIF132,"YEARMMDD")
+	set CIF132=CIF132.blank(8)
+	set CIF133=$$DAT^%ZM(CIF133,"YEARMMDD")
+	set CIF133=CIF133.blank(8)
+	set CIF134=CIF134.blank(20)
+	set CIF135=CIF135.blank(80)
+	set CIF136=CIF136.blank(80)
+	set CIF137=CIF137.blank(20)
+	set CIF138=$$DAT^%ZM(CIF138,"YEARMMDD")
+	set CIF138=CIF138.blank(8)
+	set CIF139=CIF139.blank(20)
+	set CIF140=CIF140.blank(20)
+	set CIF141=CIF141.blank(20)
+	set CIF142=CIF142.blank(20)
+	set CIF143=$$DAT^%ZM(CIF143,"YEARMMDD")
+	set CIF143=CIF143.blank(8)
+	set CIF144=CIF144.blank(1)
+	set CIF145=$$DAT^%ZM(CIF145,"YEARMMDD")
+	set CIF145=CIF145.blank(8)
+	set CIF146=CIF146.blank(1)
+	
+	// 14-May-2008 - Rapeepan Y. : Added fields
+	set CIF147=CIF147.blank(40)
+	set CIF148=CIF148.blank(40)
+	set CIF149=CIF149.blank(40)
+	set CIF150=CIF150.blank(40)
+	set CIF151=CIF151.blank(40)
+	set CIF152=CIF152.blank(40)
+	set CIF153=CIF153.blank(40)
+	set CIF154=CIF154.blank(40)
+	set CIF155=CIF155.blank(40)
+	set CIF156=CIF156.blank(40)
+	set CIF157=CIF157.blank(40)
+	set CIF158=CIF158.blank(40)
+	set CIF159=CIF159.blank(40)
+	set CIF160=CIF160.blank(40)
+	set CIF161=CIF161.blank(40)
+	set CIF162=CIF162.blank(40)
+	set CIF163=CIF163.blank(40)
+	set CIF164=CIF164.blank(40)
+	set CIF165=CIF165.blank(40)
+	set CIF166=CIF166.blank(40)
+	set CIF167=CIF167.blank(40)
+	set CIF168=CIF168.blank(40)
+	set CIF169=CIF169.blank(40)
+	set CIF170=CIF170.blank(40)
+	set CIF171=CIF171.blank(40)
+	set CIF172=CIF172.blank(40)
+	set CIF173=CIF173.blank(40)
+	set CIF174=CIF174.blank(40)
+	set CIF175=CIF175.blank(40)
+	set CIF176=CIF176.blank(40)
+	set CIF177=CIF177.blank(40)
+	set CIF178=CIF178.blank(40)
+	set CIF179=CIF179.blank(40)
+	set CIF180=CIF180.blank(40)
+	set CIF181=CIF181.blank(40)
+	set CIF182=CIF182.blank(40)
+	set CIF183=CIF183.blank(40)
+	set CIF184=CIF184.blank(40)
+	set CIF185=CIF185.blank(40)
+	set CIF186=CIF186.blank(40)
+	set CIF187=CIF187.blank(40)
+	set CIF188=CIF188.blank(40)
+	set CIF189=CIF189.blank(40)
+	set CIF190=CIF190.blank(40)
+	set CIF191=CIF191.blank(40)
+	set CIF192=CIF192.blank(40)
+	set CIF193=CIF193.blank(40)
+	set CIF194=CIF194.blank(40)
+	set CIF195=CIF195.blank(1)
+	
+	
+	//**************** Header ****************
+	set OUTM=RESPCD.zero(12)_RESPDESC.blank(40)
+	
+	//**************** Detail ****************
+	set OUTM=OUTM_CIFNUM.blank(12)
+	set OUTM=OUTM_CIF2_CIF3_CIF4_CIF5_CIF6_CIF7_CIF8_CIF9_CIF10
+	set OUTM=OUTM_CIF11_CIF12_CIF13_CIF14_CIF15_CIF16_CIF17_CIF18_CIF19_CIF20
+	set OUTM=OUTM_CIF21_CIF22_CIF23_CIF24_CIF25_CIF26_CIF27_CIF28_CIF29_CIF30
+	set OUTM=OUTM_CIF31_CIF32_CIF33_CIF34_CIF35_CIF36_CIF37_CIF38_CIF39_CIF40
+	set OUTM=OUTM_CIF41_CIF42_CIF43_CIF44_CIF45_CIF46_CIF47_CIF48_CIF49_CIF50
+	set OUTM=OUTM_CIF51_CIF52_CIF53_CIF54_CIF55_CIF56_CIF57_CIF58_CIF59_CIF60
+	set OUTM=OUTM_CIF61_CIF62_CIF63_CIF64_CIF65_CIF66_CIF67_CIF68_CIF69_CIF70
+	set OUTM=OUTM_CIF71_CIF72_CIF73_CIF74_CIF75_CIF76_CIF77_CIF78_CIF79_CIF80
+	set OUTM=OUTM_CIF81_CIF82_CIF83_CIF84_CIF85_CIF86_CIF87_CIF88_CIF89_CIF90
+	set OUTM=OUTM_CIF91_CIF92_CIF93_CIF94_CIF95_CIF96_CIF97_CIF98_CIF99_CIF100
+	set OUTM=OUTM_CIF101_CIF102_CIF103_CIF104_CIF105_CIF106_CIF107_CIF108_CIF109_CIF110
+	set OUTM=OUTM_CIF111_CIF112_CIF113_CIF114_CIF115_CIF116_CIF117_CIF118_CIF119_CIF120
+	set OUTM=OUTM_CIF121_CIF122_CIF123_CIF124_CIF125_CIF126_CIF127_CIF128_CIF129_CIF130
+	set OUTM=OUTM_CIF131_CIF132_CIF133_CIF134_CIF135_CIF136_CIF137_CIF138_CIF139_CIF140
+	set OUTM=OUTM_CIF141_CIF142_CIF143_CIF144_CIF145_CIF146
+	
+	// 14-May-2008 - Rapeepan Y. : Added fields
+	set OUTM=OUTM_CIF147_CIF148_CIF149_CIF150_CIF151_CIF152_CIF153_CIF154_CIF155_CIF156
+	set OUTM=OUTM_CIF157_CIF158_CIF159_CIF160_CIF161_CIF162_CIF163_CIF164_CIF165_CIF166
+	set OUTM=OUTM_CIF167_CIF168_CIF169_CIF170_CIF171_CIF172_CIF173_CIF174_CIF175_CIF176
+	set OUTM=OUTM_CIF177_CIF178_CIF179_CIF180_CIF181_CIF182_CIF183_CIF184_CIF185_CIF186
+	set OUTM=OUTM_CIF187_CIF188_CIF189_CIF190_CIF191_CIF192_CIF193_CIF194_CIF195
+
+	quit
+	
+ 
+		

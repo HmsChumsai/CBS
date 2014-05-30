@@ -1,0 +1,184 @@
+//DO NOT MODIFY  Batch For OD Re-Structure|ZBODREST||||||ZODTIER|||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+	do Db.fastDelete("TMPRPT5","KEY1='RPT_SR_OD'")
+	do Db.fastDelete("TMPRPT5","KEY1='ZODRESTRUCT'")
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+	
+	type Date ZTJD
+	set ZTJD=%SystemDate.toString("YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/SR_OD_"_ZTJD_".xls"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	
+	type DbSet ds = Db.selectDbSet("TMPRPT5","KEY1='ZODRESTRUCT'")
+	while ds.next() do {
+		type String ZDATA
+		type RecordTMPRPT5 rpt = ds.getRecord("TMPRPT5")
+		type RecordTMPRPT5 sum = Db.getRecord("TMPRPT5","PID=:%ProcessID,KEY1='RPT_SR_OD',KEY2=:rpt.key2,KEY3=:rpt.key3,KEY4=:rpt.key4,KEY5=:rpt.key5",1)
+		set ZDATA=rpt.data
+		set sum.data=ZDATA
+		
+		do sum.save()
+	}
+	
+	type ResultSet rs = Db.select("DATA","TMPRPT5","PID=:%ProcessID AND KEY1='RPT_SR_OD'")
+	while rs.next() do {
+		type String output
+		set output=rs.getCol(1)
+		do io1.write(output)
+	}
+	
+	do io1.close()
+	
+	quit	
+	
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	do PROC(CID,SEQ)
+	quit
+	
+PROC(CID,SEQ)
+	
+
+	if 'Db.isDefined("DEP","CID=:CID") quit
+	
+	type Number ZBOO,ZACN,ZSTATCD
+	type String output,ZTAB,MCNTRY,MSTATE,MCITY,ZMSDISCD,ZKTBCCODE
+	type Date ZTJD,Delinquent
+	type RecordDEP dep = Db.getRecord("DEP","CID=:CID")
+	if '(dep.odlim>0),'(dep.ZSTATCD<>4) quit
+	
+	set ZBOO=dep.BOO
+	set ZTYPE=dep.type
+	set ZACN=dep.ACN
+	set ZSTATCD=dep.ZSTATCD
+	set Delinquent = (%SystemDate-dep.DELDT).toString("DD/MM/YEAR")
+	set ZTJD=%SystemDate.toString("DD/MM/YEAR")
+	set ZTAB=$C(9)
+	
+	type RecordZODTIER ZODTIER = Db.getRecord("ZODTIER","CID,SEQ")
+	type RecordCIF cif = Db.getRecord("CIF","ACN=:ZACN")
+	
+	set ZKTBCCODE=cif.ZKTBCCODE
+	set MCNTRY=cif.MCNTRY
+	set MSTATE=cif.MSTATE
+	set MCITY=cif.MCITY
+	set ZMSDISCD=cif.ZMSDISCD
+	
+	set output.piece(ZTAB,1)	= ZBOO
+	
+	if ZBOO.isNull() set output.piece(ZTAB,2) = ""
+	else do {
+		type RecordUTBLBRCD UTBLBRCD 	= Db.getRecord("UTBLBRCD","BRCD=:ZBOO")
+		set output.piece(ZTAB,2)	= UTBLBRCD.DESC
+	}
+	set output.piece(ZTAB,3)	= ZACN
+	
+	if ZKTBCCODE.isNull() set output.piece(ZTAB,4) = ""
+	else do {
+		if 'Db.isDefined("ZUTBLKTBCUST","KTBCCODE=:ZKTBCCODE") set output.piece(ZTAB,4) = "" quit
+		type RecordZUTBLKTBCUST ZUTBLKTBCUST = Db.getRecord("ZUTBLKTBCUST","KTBCCODE=:ZKTBCCODE")
+		set output.piece(ZTAB,4)	= ZUTBLKTBCUST.DESC
+	}
+	
+	set output.piece(ZTAB,5)	= cif.nam
+	
+	if 'Db.isDefined("ACNADDR","CID=:CID") do {
+	
+		type RecordACNADDR ACNADDR 	= Db.getRecord("ACNADDR","CID=:CID")
+		set output.piece(ZTAB,6)	= ACNADDR.AD1
+		set output.piece(ZTAB,7)	= ACNADDR.AD2
+		set output.piece(ZTAB,8)	= ACNADDR.AD3
+		set output.piece(ZTAB,9)	= ACNADDR.AD4
+	}
+	else do {
+		
+		set output.piece(ZTAB,6)	= ""
+		set output.piece(ZTAB,7)	= ""
+		set output.piece(ZTAB,8)	= ""
+		set output.piece(ZTAB,9)	= ""
+	}
+	set output.piece(ZTAB,10)	= cif.MZIP
+	
+	if (MCNTRY="")!(MSTATE="")!(MCITY="")!(ZMSDISCD="") set output.piece(ZTAB,11) = ""
+	else do {
+		if 'Db.isDefined("ZUTBLSDISTCD","MCNTRY,MSTATE,MCITY,ZMSDISCD") set output.piece(ZTAB,11) = "" quit
+		type RecordZUTBLSDISTCD ZUTBLSDISTCD 	= Db.getRecord("ZUTBLSDISTCD","MCNTRY,MSTATE,MCITY,ZMSDISCD")
+		set output.piece(ZTAB,11)	= ZUTBLSDISTCD.DESC
+	}
+	
+	if (MCNTRY="")!(MSTATE="")!(MCITY="") set output.piece(ZTAB,12) = ""
+	else do {
+		if 'Db.isDefined("ZUTBLDIST","MCNTRY,MSTATE,MCITY") set output.piece(ZTAB,12) = "" quit
+		type RecordZUTBLDIST ZUTBLDIST 		= Db.getRecord("ZUTBLDIST","MCNTRY,MSTATE,MCITY")
+		set output.piece(ZTAB,12)	= ZUTBLDIST.DES
+	}
+	if (MCNTRY="")!(MSTATE="") set output.piece(ZTAB,13) = "" 
+	else do {
+		if 'Db.isDefined("STBLCNTRY1","MCNTRY,MSTATE") set output.piece(ZTAB,13) = "" quit
+		type RecordSTBLCNTRY1 STBLCNTRY1 	= Db.getRecord("STBLCNTRY1","MCNTRY,MSTATE")
+		set output.piece(ZTAB,13)	= STBLCNTRY1.DESC
+	}
+	set output.piece(ZTAB,14)	= cif.HPH
+	set output.piece(ZTAB,15)	= cif.BPH
+	set output.piece(ZTAB,16)	= cif.APH
+	set output.piece(ZTAB,17)	= dep.type
+	set output.piece(ZTAB,18)	= dep.CID
+	set output.piece(ZTAB,19)	= ZODTIER.CLAMT
+	set output.piece(ZTAB,20)	= dep.BAL
+	set output.piece(ZTAB,21)	= dep.BALAVL
+	if ZSTATCD.isNull() set output.piece(ZTAB,22) = ""
+	else do {
+		if 'Db.isDefined("ZUTBLSTATD","ZSTATCD=:ZSTATCD") set output.piece(ZTAB,22) = "" quit
+		type RecordZUTBLSTATD ZUTBLSTATD	= Db.getRecord("ZUTBLSTATD","ZSTATCD=:ZSTATCD")
+		set output.piece(ZTAB,22)	= ZUTBLSTATD.DES
+	}
+	set output.piece(ZTAB,23)	= dep.DTC
+	set output.piece(ZTAB,24)	= dep.HLDAMT
+	set output.piece(ZTAB,25)	= ""
+	set output.piece(ZTAB,26)	= dep.ZRFACR
+	set output.piece(ZTAB,27)	= dep.ACR
+	set output.piece(ZTAB,28)	= dep.RESINT
+	set output.piece(ZTAB,29)	= dep.ZLCHG
+	set output.piece(ZTAB,30)	= dep.ZAR
+	set output.piece(ZTAB,31)	= dep.ZSP
+	set output.piece(ZTAB,32)	= dep.DELDT
+	set output.piece(ZTAB,33)	= SEQ
+	set output.piece(ZTAB,34)	= ZODTIER.RATECMP
+	set output.piece(ZTAB,35)	= ZODTIER.STDT
+	set output.piece(ZTAB,36)	= ZODTIER.EXPDT
+	set output.piece(ZTAB,37)	= dep.darcls
+	set output.piece(ZTAB,38)	= dep.ZCCLSTDR
+	set output.piece(ZTAB,39)	= dep.ZRINT
+	set output.piece(ZTAB,40)	= dep.ZASINT
+	set output.piece(ZTAB,41)	= dep.ZCLTOT
+	set output.piece(ZTAB,42)	= dep.INP
+	set output.piece(ZTAB,43)	= dep.SNDT
+	set output.piece(ZTAB,44)	= dep.ODLD
+	set output.piece(ZTAB,45)	= dep.ODFACN
+	set output.piece(ZTAB,46)	= ZTJD
+	set output.piece(ZTAB,47)	= dep.ZLCHGRATE
+	set output.piece(ZTAB,48)	= Delinquent
+	set output.piece(ZTAB,49)	= dep.ZRSTR
+	
+	type RecordTMPRPT5 tmp = Db.getRecord("TMPRPT5","PID=:%ProcessID,KEY1='ZODRESTRUCT',KEY2=:ZBOO,KEY3=:ZTYPE,KEY4=:CID,KEY5=:SEQ",1)
+	set tmp.DATA=output
+	do tmp.save()
+	
+	quit
+	
+	
+---------- THREXIT ------ Section marker

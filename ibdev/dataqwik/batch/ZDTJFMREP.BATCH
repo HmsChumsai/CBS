@@ -1,0 +1,252 @@
+//DO NOT MODIFY  Separate DTJ to 3 report|ZDTJFMRE||||||DTJFM|TJD=:XTJD ||100|32000|XTJD|0|||10|10|||0||1
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+        set XTJD=%SystemDate-1
+	do Db.fastDelete("ZDTJFMOD")	
+ 
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	//Extract ZDTJFMOD for report ZDR020A begin
+ 
+        new FIRSTREC,PREVCID,PREVTJD,PREVCLS,PREVGRP,PREVTYP,PREVTSEQ
+        new PREVCID1,PREVZOD,FIRSTOD,INTCD
+        set FIRSTREC="Y"
+	type ResultSet zdtjod1=Db.select("CID,TJD,CLS,GRP,TYP,TSEQ,ODSEQ,ZODLIM","ZDTJFMOD","TJD=:XTJD")
+	if zdtjod1.isEmpty() quit
+        while zdtjod1.next() do {
+           if FIRSTREC="Y" do {
+              set PREVCID=zdtjod1.getCol(1)
+              set PREVTJD=zdtjod1.getCol(2)
+              set PREVCLS=zdtjod1.getCol(3)
+              set PREVGRP=zdtjod1.getCol(4)
+              set PREVTYP=zdtjod1.getCol(5)
+              set PREVTSEQ=zdtjod1.getCol(6)
+              set PREVZOD=zdtjod1.getCol(8)
+              set FIRSTREC="N"
+           }
+        //set zddadt.uid=9999
+        //do zddadt.save()
+        //save O/D information; 1 A/C could have many O/D cr. limit
+        //set uid as o/d seq no.
+        //set flag for first od
+           if PREVCID=zdtjod1.getCol(1) do {
+              set PREVTJD=zdtjod1.getCol(2)
+              set PREVCLS=zdtjod1.getCol(3)
+              set PREVGRP=zdtjod1.getCol(4)
+              set PREVTYP=zdtjod1.getCol(5)
+              set PREVTSEQ=zdtjod1.getCol(6)
+              set PREVZOD=zdtjod1.getCol(8)
+           }
+ 
+ 
+           if PREVCID'=zdtjod1.getCol(1) do {
+              type ResultSet zodtier=Db.select("SEQ,STDT,EXPDT,RATE,IRDIF,CLAMT","ZODTIER","CID=:PREVCID")
+              if zodtier.isEmpty() do {  quit
+                 set PREVCID=zdtjod1.getCol(1)
+                 set PREVTJD=zdtjod1.getCol(2)
+                 set PREVCLS=zdtjod1.getCol(3)
+                 set PREVGRP=zdtjod1.getCol(4)
+                 set PREVTYP=zdtjod1.getCol(5)
+                 set PREVTSEQ=zdtjod1.getCol(6)
+                 set PREVZOD=zdtjod1.getCol(8)
+              }
+              if 'zodtier.isEmpty() do { 
+                 set PREVCID1=PREVCID
+                 set PREVCID=zdtjod1.getCol(1)
+                 type RecordZDTJFMOD zdtjod2=Class.new("RecordZDTJFMOD")
+                 set zdtjod2.cid=PREVCID1
+                 set zdtjod2.tjd=PREVTJD
+                 set zdtjod2.cls=PREVCLS
+                 set zdtjod2.grp=PREVGRP
+                 set zdtjod2.typ=PREVTYP
+                 set zdtjod2.tseq=PREVTSEQ
+                 set zdtjod2.zodlim=PREVZOD
+                 set FIRSTOD="Y"
+                 set zdtjod2.zodflag="0"
+                 while zodtier.next() do {
+                    set zdtjod2.odseq=zodtier.getCol(1)
+                    set zdtjod2.odstdt=zodtier.getCol(2)
+                    set zdtjod2.odexpdt=zodtier.getCol(3)
+                    set zdtjod2.odclamt=zodtier.getCol(6)
+                    if FIRSTOD="N" set zdtjod2.zodflag="0"
+                    if FIRSTOD="Y" set zdtjod2.zodflag="1"
+                    set FIRSTOD="N"
+                    type RecordDEP dep=Db.getRecord("DEP","CID=:PREVCID1")
+                    if (dep.grp="DDA"),(dep.type'=1002) do {
+			set INTCD=zodtier.getCol(4)		// Int Code
+		        set RDIF=zodtier.getCol(5)
+		    }
+	            else  if (dep.grp="SAV")!(dep.type=1002) do {
+		          set RDIF=dep.intspr+dep.intspra
+			  set INTCD=dep.index			// Int Code
+		          type ResultSet rs=Db.select("RATE","INDEX1","INDEX=:INTCD AND RMIN='-DEP.ODLIM' AND EFD NOT>:XTJD","EFD DESC")
+		          if rs.next() set INTCD=rs.getCol(1)
+		    }
+		    
+		    set zdtjod2.odrate=INTCD
+		    set zdtjod2.odirdif=RDIF
+                    do zdtjod2.bypassSave()
+                 }
+              }
+	      set PREVTJD=zdtjod1.getCol(2)
+              set PREVCLS=zdtjod1.getCol(3)
+              set PREVGRP=zdtjod1.getCol(4)
+              set PREVTYP=zdtjod1.getCol(5)
+              set PREVTSEQ=zdtjod1.getCol(6)
+              set PREVZOD=zdtjod1.getCol(8)
+           }
+        }
+
+        // eof for zodtier.isEmpty()=0
+        type ResultSet zodtier=Db.select("SEQ,STDT,EXPDT,RATE,IRDIF,CLAMT","ZODTIER","CID=:PREVCID")
+        if zodtier.isEmpty() quit
+        type RecordZDTJFMOD zdtjod2=Class.new("RecordZDTJFMOD")
+        set zdtjod2.cid=zdtjod1.getCol(1)
+        set zdtjod2.tjd=zdtjod1.getCol(2)
+        set zdtjod2.cls=zdtjod1.getCol(3)
+        set zdtjod2.grp=zdtjod1.getCol(4)
+        set zdtjod2.typ=zdtjod1.getCol(5)
+        set zdtjod2.tseq=zdtjod1.getCol(6)
+        set zdtjod2.zodlim=zdtjod1.getCol(8)
+	set XCID=zdtjod1.getCol(1)
+        set FIRSTOD="Y"
+        set zdtjod2.zodflag="0"
+        while zodtier.next() do {
+              set zdtjod2.odseq=zodtier.getCol(1)
+              set zdtjod2.odstdt=zodtier.getCol(2)
+              set zdtjod2.odexpdt=zodtier.getCol(3)
+              set zdtjod2.odrate=zodtier.getCol(4)
+              set zdtjod2.odclamt=zodtier.getCol(6)
+              if FIRSTOD="N" set zdtjod2.zodflag="0"
+              if FIRSTOD="Y" set zdtjod2.zodflag="1"
+              set FIRSTOD="N"
+              type RecordDEP dep=Db.getRecord("DEP","CID=:XCID")
+              if (dep.grp="DDA"),(dep.type'=1002) do {
+		  set INTCD=zodtier.getCol(4)		// Int Code
+		  set RDIF=zodtier.getCol(5)		  
+	      }
+	      else  if (dep.grp="SAV")!(dep.type=1002) do {
+			set RDIF=dep.intspr+dep.intspra		       
+                        set INTCD=dep.index		// Int Code
+		        type ResultSet rs=Db.select("RATE","INDEX1","INDEX=:INTCD AND RMIN='-DEP.ODLIM' AND EFD NOT>:XTJD","EFD DESC")
+		        if rs.next() set INTCD=rs.getCol(1)
+		    }
+              set zdtjod2.odrate=INTCD
+	      set zdtjod2.odirdif=RDIF
+              do zdtjod2.bypassSave()
+        }
+ 
+        quit
+
+        //Extract ZDTJFMOD for report ZDR020A end
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	do Runtime.rollback()
+        new ZTCMT
+	// get data from dtj
+
+	type RecordDTJFM dtjfm=Db.getRecord("DTJFM","TJD=:TJD,CLS=:CLS,GRP=:GRP,TYP=:TYP,CID=:CID,TSEQ=:TSEQ")
+	type RecordZDTJFMTYPE zdtjfmtype=Class.new("RecordZDTJFMTYPE")
+	
+	//28/03/2012 Ravipong Ch.  For Adjust Rate Report
+	set ZCID=dtjfm.cid
+	if dtjfm.CLS="D",dtjfm.GRP="CD",(ZCID'>99999999999),(ZCID'<90000000000) do {
+		type RecordDEP sub = Db.getRecord("DEP","CID=:CID")
+		set mtCid = sub.ZMASTER
+		type RecordZADJRATE adj = Db.getRecord("ZADJRATE","TJD,mtCid,TSEQ",1)
+		
+		
+		type RecordDEP mt = Db.getRecord("DEP","CID=:mtCid")
+		set adj.brcd=mt.boo
+		set adj.subcid=sub.ZSEQ
+		set adj.NAME=mt.title1
+		set adj.MODT=mt.odt
+		set adj.SODT=sub.odt
+		set adj.amt=sub.bal
+		set adj.ort=dtjfm.OLDV
+		set adj.nrt=dtjfm.newv
+		//set adj.adjdt=dtjfm.tjd
+		set adj.uid=dtjfm.uid
+		
+		do adj.save()
+	}
+	
+	
+	set ZTCMT=dtjfm.tcmt
+	set zdtjfmtype.zacstatus = 0
+	set zdtjfmtype.zodlim = 0
+
+	// check for branch user id
+	set zdtjfmtype.zbuid = 0
+	if dtjfm.uid'="" do {
+		if dtjfm.zbatch = 0 set zdtjfmtype.zbuid = 1
+	}
+
+	// check for A/C status change
+
+	if ZTCMT["ZSTATCD" set zdtjfmtype.zacstatus = 1
+
+	// check for OD limit maintenance
+
+	if ZTCMT["ZODTIER" set zdtjfmtype.zodlim = 1
+	if ZTCMT["Overdraft" set zdtjfmtype.zodlim = 1
+
+	// Save to ZDTJFMTYPE
+	set zdtjfmtype.tjd=TJD
+	set zdtjfmtype.cls=CLS
+	set zdtjfmtype.grp=GRP
+	set zdtjfmtype.typ=TYP
+	set zdtjfmtype.cid=CID
+	set zdtjfmtype.tseq=TSEQ
+
+	//Filip Gierczak 08.09.2004 beg ins
+	type RecordACN acn=Db.getRecord("ACN","CID=:CID")
+	set zdtjfmtype.acncc=acn.cc
+	
+	new isln
+	set isln=$S(acn.cls="L":1,1:0)
+	if isln do {
+		type RecordLN ln=Db.getRecord("LN","CID=:CID")
+		set zdtjfmtype.subt=ln.subt
+		set zdtjfmtype.zmktcd=ln.zmktcd
+		set zdtjfmtype.acctname=ln.acctname
+		}
+	//Filip Gierczak 08.09.2004 end ins
+	
+	do zdtjfmtype.bypassSave()
+	
+	
+	//Extract ZDTJFMOD for report ZDR020A begin
+	
+        type RecordZDTJFMOD zdtjfmod=Class.new("RecordZDTJFMOD")
+        set zdtjfmod.zbuid=zdtjfmtype.zbuid
+        set zdtjfmod.zacstatus=zdtjfmtype.zacstatus        
+        set zdtjfmod.zodlim=zdtjfmtype.zodlim
+        set zdtjfmod.tjd=zdtjfmtype.tjd
+        set zdtjfmod.cls=zdtjfmtype.cls
+        set zdtjfmod.grp=zdtjfmtype.grp
+        set zdtjfmod.typ=zdtjfmtype.typ
+        set zdtjfmod.cid=zdtjfmtype.cid
+        set zdtjfmod.tseq=zdtjfmtype.tseq
+        set zdtjfmod.odseq=0
+        if zdtjfmod.zodlim=1 do {
+           do zdtjfmod.bypassSave()
+        }
+        quit
+        
+        //Extract ZDTJFMOD for report ZDR020A end
+						
+---------- THREXIT ------ Section marker

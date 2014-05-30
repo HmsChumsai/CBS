@@ -1,0 +1,755 @@
+//DO NOT MODIFY  ECS Cheque Functions|ZECSFUNC|||||||1
+  /*
+	ORIG: CHANTAJA		Jun 9, 2003	
+	DESC: 
+
+---- Comments --------------------------------------------------------
+
+---- Revision History ------------------------------------------------
+
+ ****** Consider using setAuditFlag for all objects in this procedure
+   example :do dep.setAuditFlag(1)
+	
+	Jun 21, 2010 - Anchalee
+		Modified CONVOCID, corrected CID condition when getRecord from
+		ZCHECK of converted account.
+	
+	Jan 18, 2010 - Anchalee
+		Modified CONVOCID, select cid from COVNACN where CONVCID
+		is not null.
+	
+	Dec 02, 2009 - Anchalee
+		Modified REASONMSG, quit if RET is null.
+	
+	Jul 11, 2009 - Anchalee
+		Added CONVOCID and GETOCID sections.
+	
+	Jun 19, 2009 - Anchalee
+		Modified VERIFYCK, modified all unmapped BOT code to 11
+	
+	Jun 15, 2009 - Anchalee
+		Modified GETFTP and PUTFTP, modified local and remote file
+		name and pass 2 more parameters to ftp script.
+	
+	Apr 22, 2009 - Anchalee Ch.
+		Added section GETINCCC to return default cost center of
+		posting source.
+	
+	Sep 22, 2006 Pongsak R.
+		Modified VERIFYCK, chage reason code variable 18 to 11,
+		21 to 14
+
+ */
+ 	quit
+ 	
+TCMTD(ftc,chq,status,reason)
+	/*
+	Returns appropriate comment field (TCMT) for file maintenance
+        activity for use by the ZCHQCLR_D file journal for deleting.
+
+	Arguments
+		ftc	: File type code
+		chq	: Cheque number
+		status	: Posting status
+		reason	: Return reason code
+	*/
+	
+	new TCMT
+	
+	set TCMT="Delete cheque clearing data record - "_ftc_", "_chq_", "_status_", and "_reason
+
+	quit TCMT
+
+TCMTI(ftc,chq,status,reason)
+	/*
+	Returns appropriate comment field (TCMT) for file maintenance
+        activity for use by the ZCHQCLR_I file journal for inserting.
+
+	Arguments
+		ftc	: File type code
+		chq	: Cheque number
+		status	: Posting status
+		reason	: Return reason code
+	*/
+	
+	new TCMT
+	
+	set TCMT="Add cheque clearing data record - "_ftc_", "_chq_", "_status_", and "_reason
+
+	quit TCMT
+	
+TCMTU(column,old,new)
+	/*
+	Returns appropriate comment field (TCMT) for file maintenance
+        activity for use by the ZCHQCLR_U file journal for updating.
+        
+	Arguments
+		column	: Column name
+		old	: Old value
+		new	: New value
+	*/
+
+	new TCMT
+	
+	set TCMT="[ZCHQCLR]"_column_":"_old_":"_new
+
+	quit TCMT
+	
+HLD8TCMT(column,old,new)
+	/*
+	Returns appropriate comment field (TCMT) for file maintenance
+	activity for used by the ZHLDAMT_U file journal for updating.
+	
+	Arguments
+		column	: Column name
+		old	: Old value
+		new	: New value
+	*/
+	
+	new TCMT
+	
+	set TCMT="[HLD8]"_column_":OLD="_old_":NEW="_new
+	
+	quit TCMT
+	
+RETFUNC(X)
+	/*
+	Verify the input return reason code from input screen.
+	The valid value 
+	- Length of field is 2
+	- Only numeric both 2 digits
+	
+	Argument
+		X	: Input value
+	Return
+		RET	: 0 = valid, 1 = invalid
+	*/
+	
+	new RET
+	if $L(X)<2 set RET=1 
+	else  do {
+		if '$$isInt^UCGM(X) set RET=1
+		else  set RET=0
+		}
+	quit RET
+	
+DOCTYPE(ZDOC)	
+	/* 
+	Verify the document type is valid or not.
+	Document type will be invalid in case of
+		Not existing in ZUTBLDOCTYPE.TYPE - RET="93"
+		In range '06'-'09'		  - RET="66"
+	
+	Arguments
+	   	ZDOC	: Document Type
+	   	
+	Return: RET|DESC when
+		RET	: Reason code
+		DESC	: Reason code description
+	*/
+
+	new RET,DESC
+	set (RET,DESC)=""
+	
+	if Db.isDefined("ZUTBLDOCTYP","TYPE=:ZDOC") do {
+		set ZDOC=+ZDOC
+		if (ZDOC>5),(ZDOC<10) set RET="66",DESC=$$RESONMSG(RET)
+		}
+	else  set RET="93",DESC=$$RESONMSG(RET)
+
+	quit RET_"|"_DESC 
+	
+VERIFYCK(ZCID,ZCHQ,ZAMT,ZTAX,ZDIV)
+	/* 
+	Check it is personsal cheque or official cheque.
+	For personal cheque, it is invalid status if cheque status is not 11
+	(Issued/Unused). For official cheque (type 0,1,2), it is invalid 
+	status if cheque status is "U" (Unclaimed).
+	   
+	Arguments
+	   	ZCID	: Cheque Account Number
+	   	ZCHQ	: Cheque Number
+	   	ZAMT	: Cheque Amount
+	   	ZTAX	: Tax Revenue Cheque Flag
+	   	ZDIV	: Dividen Cheque Flag
+	Return - Reason Code|Description
+	   	Reason Code values
+			""	: Valid cheque
+			"11"	: Stopped cheque
+			"14"	: Amount not match issuing amount 
+				  (for Tax Revenue cheque, dividend cheque
+				  and official cheque)
+			"91"	: Cheque not issue
+			"92"	: Not cheque account
+			"91"	: Cheque number not exist (in Refund Tax
+				  Cheque table or Dividend Cheque table)
+	Jun 19, 2009 - Anchalee
+		Modified all unmapped BOT code to 11
+	
+	Sep 22, 2006 - Pongsak R. change reason code values 18 to 11,
+		21 to 14
+				  
+	Mar 2, 2005 - Anchalee
+		Modified to verify stopped cheque of tax revenue from STOP3
+		instead of ZCHECK.
+	*/
+	
+	new ZCHKTYP,RETCODE,DESC,ZTJD
+	set (RETCODE,DESC)=""
+	set ZTAX=$G(ZTAX)
+	set ZDIV=$G(ZDIV)
+	set ZTJD=%SystemDate
+	
+	type RecordDEP dep=Db.getRecord("DEP","CID=:ZCID")
+	set ZCHKTYP=dep.zchks
+
+	// Personal Cheque
+	if dep.zpcflg do { quit RETCODE_"|"_DESC
+		if Db.isDefined("ZCHECK","CID=:ZCID,CHKS=:ZCHKTYP,CHKNUM=:ZCHQ") do {
+			type RecordZCHECK zcheck=Db.getRecord("ZCHECK","CID=:ZCID,CHKS=:ZCHKTYP,CHKNUM=:ZCHQ")
+			
+			// Stopped cheque
+			if zcheck.chksts=15 set RETCODE="11",DESC=$$RESONMSG(RETCODE) quit
+			
+			//19/06/2009 - Anchalee
+			//Modified reason code from 91 to 11
+			// Status is "Inward"
+			if zcheck.chksts=12 set RETCODE="11",DESC=$$^MSG(658134) quit
+			
+			// Cheque status not "Issued/Unused"
+			if zcheck.chksts'=11 set RETCODE="11",DESC=$$^MSG(659122) quit
+			
+			if ZDIV do {
+				if 'Db.isDefined("ZUTBLDIVCHQ","CHKNO=:ZCHQ") do { quit 
+					set RETCODE="11"	//"91"
+					set DESC=$$^MSG(658034,"Dividend Cheque")
+					}
+				type RecordZUTBLDIVCHQ zdivchq=Db.getRecord("ZUTBLDIVCHQ","CHKNO=:ZCHQ")
+				// Status is "Paid"
+				if zdivchq.divpaid set RETCODE="11",DESC=$$^MSG(658134)_" in ZUTBLDIVCHQ" quit
+				// Amount not match issuing amount
+				if (+zdivchq.chqamt)'=ZAMT set RETCODE="11",DESC=$$^MSG(658148)
+				}
+			}
+		// Cheque number doesn't exist
+		else  set RETCODE="11",DESC=$$^MSG(658033)
+		}
+	
+	// Official Cheque
+	if dep.ars do { quit RETCODE_"|"_DESC
+		if Db.isDefined("ZARS","CID=:ZCID,CKNO=:ZCHQ") do {
+			/* Official cheque valid statuses are 'O'(Outward),
+			   'U'(Unclaimed), and 'M'(Miscellaneous) */
+			type RecordZARS zars=Db.getRecord("ZARS","CID=:ZCID,CKNO=:ZCHQ")
+			
+			// Stopped cheque
+			if zars.zstat="S" set RETCODE="11",DESC=$$RESONMSG(RETCODE) quit
+			
+			// Inward cheque
+			if zars.zstat="I" set RETCODE="11",DESC=$$^MSG(658135) quit
+			
+			// Other status except 'O','U','M'
+			if "O,U,M"'[zars.zstat set RETCODE="11",DESC=$$^MSG(659123) quit
+			
+			// Cheque amount not match outward amount
+			if 'Db.isDefined("ARS","CID=:ZCID,CKNO=:ZCHQ") do { quit
+				set RETCODE="11"	//"91"
+				set DESC=$$^MSG(658034,"ARS")
+				}
+			type RecordARS ars=Db.getRecord("ARS","CID=:ZCID,CKNO=:ZCHQ")
+			if (+ars.iamt)'=ZAMT set RETCODE="11",DESC=$$^MSG(658148)
+			}
+		// Cheque number doesn't exist
+		else  set RETCODE="11",DESC=$$^MSG(658033)
+		}
+	
+	// It is not cheque account
+	//set RETCODE="92",DESC=$$RESONMSG(RETCODE)
+	set RETCODE="11",DESC=$$^MSG(659121)
+
+	quit RETCODE_"|"_DESC
+
+RESONMSG(RET)	
+	/* 
+	Get Return Reason Code Message
+	
+	Arguments
+		RET	: Return reason code
+	Return - Return reason code description
+	*/
+
+	if RET.get().isNull() quit "Reason code is null"
+
+	if Db.isDefined("ZUTBLCHQRET","RET=:RET") do {
+		type RecordZUTBLCHQRET zchqret=Db.getRecord("ZUTBLCHQRET","RET=:RET")
+		set RESONMSG=zchqret.des
+		}
+	else  set RESONMSG=$$^MSG(658141)	// Reason code not defined
+	quit RESONMSG
+	
+FILETYP(ZSRC)
+	/*
+	Get valid file types of posting source
+	
+	Argument
+		ZSRC	: Posting source
+	Return - All of file type codes that belong to the input posting source
+		 separated by "|"
+	*/
+	new FILETYP set FILETYP=""
+	if $G(ZSRC)="" quit ""
+	type ResultSet rs=Db.select("TYP","ZUTBLCHQTYP","SRC=:ZSRC")
+	if rs.isEmpty() quit ""
+	if rs.next() set FILETYP=rs.getCol("TYP")
+	quit FILETYP
+	
+GETCKTRN(CKTRN)
+	/* 
+	Pull up deposit cheque transaction code from ZUTBLCKTRN to CKTRN array.
+	
+	Arguments
+		CKTRN	: array (pass by referrence)
+	Return
+		CKTRN	: CKTRN(Group,Type,Individual flag)=Deposit by cheque transaction
+	Example
+		CKTRN("CD",3001,1)="FDCK|FDCKC"
+		CKTRN("DDA",1001,1)="CDCK"
+		CKTRN("DDA",1001,0)="CDCKT"
+		CKTRN("SAV",2001,1)="SDCK"
+	*/
+
+	new ZGRP,ZTYPE,ZINDFLG
+	type ResultSet rs=Db.select("GRP,TYPE,TRN,INDIVIDUAL","ZUTBLCKTRN")
+	while rs.next() do {
+		set ZGRP=rs.getCol(1)
+		set ZTYPE=rs.getCol(2)
+		set ZINDFLG=rs.getCol(4)
+		set CKTRN(ZGRP,ZTYPE,ZINDFLG)=$S($D(CKTRN(ZGRP,ZTYPE,ZINDFLG)):CKTRN(ZGRP,ZTYPE,ZINDFLG)_"|"_rs.getCol(3),1:rs.getCol(3))
+		}
+	quit
+	
+GETCKDOC(DOCTYP)
+	/*
+	Pull up document type and KTB cheque type on Profile into DOCTYP array.
+	
+	Arguments
+		DOCTYP	: array (pass by referrence)
+	Return
+		DOCTYP	: DOCTYP("Document Type")=KTB cheque type
+	Example
+		DOCTYP("00")="PERS"
+		DOCTYP("02")=1
+	*/
+	type ResultSet rs=Db.select("TYPE,CHKS","ZUTBLDOCTYP")
+	while rs.next() set DOCTYP(rs.getCol(1))=rs.getCol(2)
+	quit
+	
+DR162TOT(ZFTC1,ZFTC2,ZEJD,ZPBRCD,COMCNT,COMTOT,INCCNT,INCTOT)
+	/*
+	Calculate summary of the total number and total amount of complete and
+	incomplete transactions separated by pay branch for DR162 report.
+	
+	DR162 is for personal cheques only so all document types exclude '02',
+	'03', and '04' document types.
+	
+	Arguments
+		- Pass by value
+		ZFTC	: File type code	(type=text)
+		ZEJD	: File processing date	(type=date)
+		ZPBRCD	: Pay branch code	(type=numeric)
+		- Pass by referrence
+		COMCNT	: Total number of complete trans (type=numeric)
+		COMTOT	: Total amount of complete trans (type=numeric)
+		INCCNT	: Total number of incomplete trans (type=numeric)
+		INCTOT	: Total amount of incomplete trans (type=numeric)
+	*/
+
+	set (COMCNT,COMTOT,INCCNT,INCTOT)=0
+	//type ResultSet rs=Db.select("STATUS,AMT","ZCHQCLR","FTC IN (:ZFTC1,:ZFTC2) AND EJD=:ZEJD AND ORGPBRCD=:ZPBRCD AND (NOT DOC IN ('02','03','04'))")
+	type ResultSet rs=Db.select("STATUS,AMT","ZCHQCLR","FTC IN (:ZFTC1,:ZFTC2) AND EJD=:ZEJD AND PBRCD=:ZPBRCD AND (NOT DOC IN ('02','03','04'))")
+	if 'rs.isEmpty() while rs.next() do {
+		if rs.getCol(1)="P" set COMCNT=COMCNT+1,COMTOT=COMTOT+rs.getCol(2)
+		else  set INCCNT=INCCNT+1,INCTOT=INCTOT+rs.getCol(2)
+		}
+
+	quit
+	
+DR163TOT(ZFTC1,ZFTC2,ZEJD,ZBOO,COMCNT,COMTOT,INCCNT,INCTOT)
+	/*
+	Calculate summary of the total number and total amount of complete and
+	incomplete transactions separated by branch of ownership of deposit 
+	account for DR163 report.
+	
+	DR163 is for personal cheques only so all document types exclude '02',
+	'03', and '04' document types.
+	
+	Arguments
+		- Pass by value
+		ZFTC	: File type code	(type=text)
+		ZEJD	: File processing date	(type=date)
+		ZBOO	: Pay branch code	(type=numeric)
+		- Pass by referrence
+		COMCNT	: Total number of complete trans (type=numeric)
+		COMTOT	: Total amount of complete trans (type=numeric)
+		INCCNT	: Total number of incomplete trans (type=numeric)
+		INCTOT	: Total amount of incomplete trans (type=numeric)
+	*/
+
+	set (COMCNT,COMTOT,INCCNT,INCTOT)=0
+	type ResultSet rs=Db.select("STATUS,AMT","ZECSRETCHQ","FTC IN (:ZFTC1,:ZFTC2) AND EJD=:ZEJD AND BOO=:ZBOO")
+	if 'rs.isEmpty() while rs.next() do {
+		if rs.getCol(1)="P" set COMCNT=COMCNT+1,COMTOT=COMTOT+rs.getCol(2)
+		else  set INCCNT=INCCNT+1,INCTOT=INCTOT+rs.getCol(2)
+		}
+
+	quit
+	
+DR086TOT(ZFTC1,ZFTC2,ZEJD,ZPBRCD,COMCNT,COMTOT,INCCNT,INCTOT)
+	/*
+	Calculate summary of the total number and total amount of complete and
+	incomplete transactions separated by pay branch for DR086 report.
+
+	DR086 is for official cheques only so summary only '02','03', and '04'
+	document types.
+		
+	Arguments
+		- Pass by value
+		ZFTC	: File type code	(type=text)
+		ZEJD	: File processing date	(type=date)
+		ZPBRCD	: Pay branch code	(type=numeric)
+		- Pass by referrence
+		COMCNT	: Total number of complete trans (type=numeric)
+		COMTOT	: Total amount of complete trans (type=numeric)
+		INCCNT	: Total number of incomplete trans (type=numeric)
+		INCTOT	: Total amount of incomplete trans (type=numeric)
+	*/
+
+	set (COMCNT,COMTOT,INCCNT,INCTOT)=0
+	type ResultSet rs=Db.select("STATUS,AMT","ZCHQCLR","FTC IN (:ZFTC1,:ZFTC2) AND EJD=:ZEJD AND PBRCD=:ZPBRCD AND (DOC IN ('02','03','04'))")
+	if 'rs.isEmpty() while rs.next() do {
+		if rs.getCol(1)="P" set COMCNT=COMCNT+1,COMTOT=COMTOT+rs.getCol(2)
+		else  set INCCNT=INCCNT+1,INCTOT=INCTOT+rs.getCol(2)
+		}
+
+	quit
+	
+FTCDESC(ZFTC)
+	/*
+	Get file type code description.
+	*/
+	if $G(ZFTC)="" quit ""
+	if 'Db.isDefined("ZUTBLCHQTYP","TYP=:ZFTC") quit ""
+	type RecordZUTBLCHQTYP zchqtyp=Db.getRecord("ZUTBLCHQTYP","TYP=:ZFTC")
+	quit zchqtyp.des
+	
+TRNDESC(TRN)
+	// Get transaction code description
+	
+	if $G(TRN)="" quit ""
+	if 'Db.isDefined("TRN","ETC=:TRN") quit ""
+	type RecordTRN trn=Db.getRecord("TRN","ETC=:TRN")
+	quit trn.des
+	
+GETOWBR(ZCID)
+	// Get branch of account
+
+	if $G(ZCID)="" quit ""
+	set ZCID=ZCID.zero(10)
+	quit +$E(ZCID,1,3)
+	
+GETFTP(ZSRC)
+
+	new SCRIPTDI,ZRESULT,PROFILEDIR,LFILE,RFILE
+		
+	set ZRESULT=0
+	set LNAME=""		//Local file
+	set RFILE=""		//Remote file
+	
+	//set FNAME=ZSRC	//$S(ZSRC="INCB":"INCBD",ZSRC="INCL":"INCLD",1:ZSRC)
+	//set FNAME=$$LOWER^%ZFUNC(FNAME)
+	do {
+		if ZSRC="INCL" set RFILE="ECS_INCLRNORMAL" quit
+		if ZSRC="OUTCLD" set RFILE="ECS_OUTCLRNORMAL" quit
+		if ZSRC="OUTCLRD" set RFILE="ECS_OUTCLRRET" quit
+		if ZSRC="INCLRD" set RFILE="ECS_INCRET" quit
+		set (LFILE,RFILE)=""
+	}
+	
+	if RFILE.isNull() write !,$$MSG^%TRMVT("Get file for "_ZSRC_" FAILED!!","",1) quit
+	
+	set LFILE=ZSRC
+	
+	write !!!,"Start getting "_RFILE_" file from FTP Server, please wait...",!
+	
+	set PROFILEDIR=$$TRNLNM^%ZFUNC("PROFILE_DIR")
+	set SCRIPTDI=$$TRNLNM^%ZFUNC("SCAU_BATCH_SCRIPT")
+	
+	set ZRESULT=$$SYS^%ZFUNC(SCRIPTDI_"/ECS_GET_D.sh "_PROFILEDIR_" "_RFILE_" "_LFILE)
+	
+	// Transfer file successfully
+	if 'ZRESULT do {
+		write !,$$MSG^%TRMVT("Get file "_RFILE_" successfully!!","",1)
+		}
+	// Transfer file failed
+	else  do {
+		write !,$$MSG^%TRMVT("Get file "_RFILE_" FAILED!!","",1)
+		}
+		
+	quit
+	
+GETFTP2(ZSRC)
+
+	new FNAME,SCRIPTDI,ZRESULT
+		
+	set ZRESULT=0
+	
+	set FNAME=$S(ZSRC="INCB":"INCBD",ZSRC="INCL":"INCLD",1:ZSRC)
+	set FNAME=$$LOWER^%ZFUNC(FNAME)
+	
+	write !!!,"Start getting "_FNAME_" file from NCR, please wait...",!
+	
+	set SCRIPTDI=$$TRNLNM^%ZFUNC("SCAU_BATCH_SCRIPT")
+	
+	set ZRESULT=$$SYS^%ZFUNC(SCRIPTDI_"/ECS1_GET_D.sh "_FNAME)
+	
+	// Transfer file successfully
+	if 'ZRESULT do {
+		write !,$$MSG^%TRMVT("Get file for "_ZSRC_" successfully!!","",1)
+		}
+	// Transfer file failed
+	else  do {
+		write !,$$MSG^%TRMVT("Get file for "_ZSRC_" FAILED!!","",1)
+		}
+		
+	quit
+	
+PUTFTP(FNAME)
+	
+	new SCRIPTDI,ZRESULT
+	
+	set ZRESULT=0
+	
+	write !!!,"Start sending "_FNAME_" to FTP Server, please wait...",!
+	
+	set PROFILEDIR=$$TRNLNM^%ZFUNC("PROFILE_DIR")
+	set SCRIPTDI=$$TRNLNM^%ZFUNC("SCAU_BATCH_SCRIPT")
+	
+	set ZRESULT=$$SYS^%ZFUNC(SCRIPTDI_"/ECS_PUT_D.sh "_PROFILEDIR_" "_FNAME)
+	
+	if 'ZRESULT write !,"Send "_FNAME_" to FTP Server successfully!!"
+	else  write !,"Send "_FNAME_" to FTP Server FAILED!!"
+	
+	quit ZRESULT
+	
+PUTFTP2(FNAME)
+	
+	new SCRIPTDI,ZRESULT
+	
+	set ZRESULT=0
+	
+	write !!!,"Start sending "_FNAME_" to BOC, please wait...",!
+	
+	set SCRIPTDI=$$TRNLNM^%ZFUNC("SCAU_BATCH_SCRIPT")
+	
+	set ZRESULT=$$SYS^%ZFUNC(SCRIPTDI_"/ECS1_PUT_D.sh "_FNAME)
+	
+	if 'ZRESULT write !,"Send "_FNAME_" to BOC successfully!!"
+	else  write !,"Send "_FNAME_" to BOC FAILED!!"
+	
+	quit ZRESULT
+
+OVRDESC(ZSJD,ZBRCD,ZUID,ZTRC,ORGCID,ZGRP)
+
+	new PSEQ,ZCID,ZFLG,ZGRP,ZOVR,ZOVRDESC,ZSEQ,ZSTAT
+	
+	set ZOVRDESC=""
+	set (ZFLG,ZRFLG,ZSTAT)=0
+	if $G(ZGRP)="" set ZGRP="DDA"
+
+	if 'Db.isDefined("EXC","TJD=:ZSJD,BRCD=:ZBRCD,UID=:ZUID,TSEQ=:ZTRC") quit ZOVRDESC
+	type ResultSet rs1=Db.select("OVRFLG,OVR,CID","EXC1","TJD=:ZSJD AND BRCD=:ZBRCD AND UID=:ZUID AND TSEQ=:ZTRC AND CLSOVR='*'")
+	if rs1.isEmpty() do { quit ZOVRDESC
+		type RecordEXC exc=Db.getRecord("EXC","TJD=:ZSJD,BRCD=:ZBRCD,UID=:ZUID,TSEQ=:ZTRC")
+		set ZOVRDESC=exc.tcmt
+		}
+
+	// rs1 not empty
+	set ZSEQ=0
+	
+	while rs1.next() set ZSEQ=ZSEQ+1,ZOVR(ZSEQ)=rs1.getCol(1)_"|"_rs1.getCol(2)_"|"_rs1.getCol(3)
+	
+	set (PSEQ,ZSEQ)=""
+	for  set ZSEQ=$O(ZOVR(ZSEQ)) quit:ZSEQ=""  do {
+		if $P(ZOVR(ZSEQ),"|",1)["RFLG" set (PSEQ,ZRFLG)=ZSEQ quit
+		if $P(ZOVR(ZSEQ),"|",2)["STAT" set ZSTAT=1,PSEQ=ZSEQ quit
+		if $P(ZOVR(ZSEQ),"|",2)["FLG" set (PSEQ,ZFLG)=ZSEQ quit
+		}
+	
+	if PSEQ'="" set ZCID=$P(ZOVR(PSEQ),"|",3)
+	else  set ZCID=ORGCID
+	
+	do {
+		type RecordDEP dep=Db.getRecord("DEP","CID=:ZCID")
+		if ZCID'=ORGCID set ZGRP=dep.grp
+		
+		if ZSTAT do { quit
+			set ZSTAT=dep.zstatcd
+			set ZOVRDESC=$$OVRDESC^ZECSPOST("OVR|STAT"_ZSTAT,ZGRP)
+			}
+			
+		if ZFLG do { quit
+			set ZOVRDESC=$$OVRDESC^ZECSPOST("OVR|"_$P(ZOVR(ZFLG),"|",2),ZGRP)
+			}
+			
+		if ZRFLG do { quit
+			set ZOVRDESC=$$OVRDESC^ZECSPOST("RFLG|"_$P(ZOVR(ZRFLG),"|",2),ZGRP)
+			}
+			
+		set ZOVRDESC=$$OVRDESC^ZECSPOST("OVR|"_$P(ZOVR(1),"|",2),ZGRP)
+		}
+	
+	if ZCID'=ORGCID set ZOVRDESC=ZCID_":"_ZOVRDESC
+	quit ZOVRDESC
+
+FILLZERO(ZNUM,ZLEN)
+	/* Fill zero to string */
+
+	set ZNUM=+$G(ZNUM)
+	set ZLEN=$G(ZLEN)
+	
+	if $L(ZNUM)>ZLEN set ZNUM=$E(ZNUM,1,ZLEN)
+	
+	quit ZNUM.zero(ZLEN)
+	
+GETINCCC(String ZSRC)
+
+	if ZSRC.isNull() quit ""
+
+	type RecordCTBLINC zinc=Db.getRecord("CTBLINC","KEY=:ZSRC",1)
+	if zinc.brcd="" quit ""
+
+	type RecordUTBLBRCD zbrcd=Db.getRecord("UTBLBRCD","BRCD=:zinc.brcd",1)
+
+	quit zbrcd.ccdef
+	
+CONVOCID(Number XCID, Number XCHQ)
+	/*
+	Find out the given CID is from 12-digit CID or 15-digit CID
+	
+	Input:
+		XCID	:	10-digit account number		//REQ
+		XCHQ	:	Check number			//NOREQ
+		
+	Return:
+		12-digit account number
+	*/
+
+	type Boolean FLG12,FLG15
+	type Number CID12		//12-digit CID
+	type String CID15		//12-digit CID from 15-digit CID
+	type String CONVCID		//15-digit CID
+	type Date CONVDT		//Conversion date
+	
+	set (FLG12,FLG15)=0
+	set CID12=XCID
+	set CONVCID=$$GETOCID(XCID)	//Get 15-digit account number
+
+	//Check if account with given CID exists
+	type RecordDEP dep=Db.getRecord("DEP","CID=:XCID",1)
+	if dep.getMode() set FLG12=1
+
+	//18/01/2010 - Anchalee
+	//Select when CONVCID is not null
+	//Get Profile CID from 15-digit CID
+	if 'CONVCID.isNull() do {
+		type ResultSet rs=Db.select("CID","DEP","CONVACN=:CONVCID")
+		if rs.next() set CID15=rs.getCol("CID"),FLG15=1
+		else  set FLG15=0
+	}
+	else  set FLG15=0
+	//End of 18/01/2010
+
+
+	if ('FLG12),('FLG15) quit ""
+	if FLG12,('FLG15) quit CID12
+	if ('FLG12),(FLG15) quit CID15_"|"_CONVCID
+	
+	if XCHQ.get().isNull() quit ""
+	
+	set (NNFLG,NOFLG,OFLG)=0
+	set XCHQ=+XCHQ
+	
+	type RecordDEP odep=Db.getRecord("DEP","CID=:CID15",1)
+	
+	//If found both CIDs from 12-digit CID and 15-digit CID, bring check
+	//number to determine.
+	do {
+		//Section for account which CID from exact given CID
+		if dep.convacn.isNull() set NNFLG=1
+		//Validate conversion account from check number
+		else  do {
+			//If account was converted from old account and account
+			//number from clearing file is Profile account means
+			//this check was issued after go-live, issued date of check 
+			//must be after conversion date.
+			set CONVDT=dep.convdt
+			if CONVDT.isNull() quit
+			type RecordZCHECK zcheck=Db.getRecord("ZCHECK","CID=:CID12,CHKS='PERS',CHKNUM=:XCHQ",1)
+			if 'zcheck.getMode() quit
+			if zcheck.issd>CONVDT set NOFLG=1
+		}
+		//End of section for account which CID from exact given CID
+		
+		//Section for account which CID from conversion CID of given CID
+		//Validate conversion account from check number
+		set CONVDT=odep.convdt
+		if CONVDT.isNull() quit
+		//If account was converted from old account and account number
+		//from clearing file is old account means this check was issued
+		//before go-live, issued date of check must be before or equal
+		//to conversion date.
+		//21/06/10 - Anchalee Ch.
+		//Corrected CID condition, replaced CID12 with CID15
+		type RecordZCHECK zcheck=Db.getRecord("ZCHECK","CID=:CID15,CHKS='PERS',CHKNUM=:XCHQ",1)
+		//End of 21/06/10
+		if 'zcheck.getMode() quit
+		if zcheck.issd'>CONVDT set OFLG=1
+		//End of section for account which CID from conversion CID of given CID
+	}
+	
+	if (NNFLG),('NOFLG),('OFLG) quit CID12
+	if (NNFLG),('NOFLG),(OFLG) quit CID15_"|"_CONVCID
+	if ('NNFLG),(NOFLG),('OFLG) quit CID12
+	if ('NNFLG),(NOFLG),(OFLG) quit CID15_"|"_CONVCID
+	if ('NNFLG),('NOFLG),(OFLG) quit CID15_"|"_CONVCID
+
+	quit ""
+	
+GETOCID(Number XCID)
+	/*
+	Get old account number (15 digits) from given account number
+	Input:
+		Account number 10 digits
+		
+	Return:
+		Account number 15 digits
+		
+	Ex.	   001-1 - 23456-7
+			 |
+		969602-10-123456-7
+	
+	*/
+	
+	type Number XBRCD
+	type String TMPCID,CONVCID
+
+	set CONVCID=""
+	set TMPCID=XCID.zero(10)
+	set XBRCD=+TMPCID.extract(1,3)
+	
+	type RecordZUTBLECSBRCD zbrcd=Db.getRecord("ZUTBLECSBRCD","BRCD=:XBRCD",1)
+	if 'zbrcd.getMode() quit ""
+	
+	set CONVCID=zbrcd.obrcd_TMPCID.extract(4)_"00"_TMPCID.extract(5,10)
+
+	quit CONVCID

@@ -1,0 +1,40 @@
+//DO NOT MODIFY  ZCTRCTACN Before Insert|1|0|0|0|0|0||||
+
+	/*
+	----------------Revision History--------------
+	07/11/05 - Oracha
+		   Check Account closed and Credit Limit of account linkage cannot be zero
+	
+	ORG:Wiphak
+	----------------------------------------------
+	*/
+
+	// if cid is a deposit account, it must exist in ZODTIER
+	// if cid is a loan account, ln.ccl must be null
+	new ZCID
+	
+	set ZCID=zctrctacn.cid
+	
+	//  7822  Invalid account number (account does not exist)
+	if 'Db.isDefined("ACN","CID=:ZCID") set ER=1 do Runtime.setErrMSG("ZCTRCTACN",7822) quit
+	type RecordACN zacn=Db.getRecord("ACN","CID=:ZCID")
+	if zacn.cls="D" do { quit:ER
+		type ResultSet zrsodt=Db.select("CID","ZODTIER","CID=:ZCID")
+		// 6580133 Cannot link to contract, this account does not have OD.
+		if zrsodt.isEmpty() set ER=1 do Runtime.setErrMSG("ZCTRCTACN",6580133) quit
+		}
+	if zacn.cls="L" do { quit:ER
+		// 6580134 Cannot link to contract, this account links to Commitment A/C.
+		set zacn={RecordLN}zacn
+		if zacn.ccl'="" set ER=1 do Runtime.setErrMSG("ZCTRCTACN",6580134) quit
+		}
+	
+	// Oracha - 07Nov2005	
+	// 6580027 Account ~p1 already closed
+	if zacn.stat=4 set ER=1 do Runtime.setErrMSG("ZCTRCTACN",6580027,ZCID) quit:ER
+	
+	// 6580222 Cannot link to account ~p1, Credit Limit is zero
+	if (zacn.zcrlmt=0) ! (zacn.zcrlmt="") set ER=1 do Runtime.setErrMSG("ZCTRCTACN",6580222,ZCID) quit:ER
+	// Oracha - 07Nov2005 - End
+			
+	quit

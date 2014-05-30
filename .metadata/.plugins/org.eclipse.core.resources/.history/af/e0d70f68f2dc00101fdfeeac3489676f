@@ -1,0 +1,3281 @@
+//DO NOT MODIFY  Transaction Driver|TRNDRV|||||||1
+TRNDRV
+
+	/*
+	PROFILE Transaction driver
+	
+	***********************************************************************
+	FUTURE DEVELOPMENT NOTES:
+	
+	1)  There are still a number of public scope variables in use.  These
+	    cannot easily be changed without changes to callers, but at some
+	    point, that should be done.  Use TRNINPUT and TRNDRVI, or, if
+	    eventually have a transaction class, look at making these various
+	    things properties of the class.
+	    
+	2)  See note in EXEC section regarding issues related to SBN processing
+	    and potential to eliminated TRNDRVI("SBNMSG").
+	    
+	3)  Do we still need to deal with passbooks?  If not, remove line that
+	    checks in TTXUPD.
+	    
+	4)  Determine if there is a better way to deal with the POSTTJD, ORIGTJD,
+	    POSTTPD, ORIGTPD usage.
+	     
+	***********************************************************************
+	
+	NOTES:
+	Because primary transactions can spawn secondaries (which can further
+	spawn secondaries), and processing and account updating occur in the
+	order that the transactions actually process (i.e., secondary updates
+	first, then primary), BUT the journal files (HIST, etc.), need to
+	reflect the primary first, we defer updates of the journal files
+	until all secondaries for an account are processed.
+	
+	This is done by carrying a "stack", or list of accounts currently
+	involved in the transaction chain (TRNPSSTK).  This is
+	managed in the EXEC section.  As each transaction is started, it
+	adds the account number to the end of the list.  At the point of
+	filing journals (TRNFILE), the account is taken off the end of the
+	list and if it's the last reference to the account, all the journals
+	for the account can be updated.  If it is not the last reference,
+	the journal info for that transaction (ttx info) is saved in the
+	TTXOBJS() array for use when the final reference to the account
+	is eventually reached.
+	
+	See further notes throughout EXEC and TRNFILE for specific details.
+	An important point, and significant difference with the prior
+	implementation, is that no HIST slot is reserved (record inserted)
+	for the primary and secondaries do not update HIST as they process.
+	
+	One side effect is that any file maintenance that is done during
+	the course of transactions processing that updates HIST will end
+	up prior to the primary and secondary HIST entries.
+	
+	------ Revision History -----------------------------------------------
+	
+	09/09/11 - Sedtha Jittiarunchai
+		   Modify EXEC to check the 3nd bit of BNR in case of reverse transaction
+	
+	07/06/10 - Siripong Prayoonhong (06Jul10)
+		   Modified EXEC and EXECMISC sections to also execute 
+		   commands in TRN.PPB if TRNMODE is 2.
+
+	02/18/10 - Wiphak
+		   Replace suspense account for failed transaction with value in TSO when specified
+	
+	10/26/09 - Pete Chenard
+		   Modified FILEJRNS to get the transaction mode from the ttx object rather
+		   than TRNMODE, since TRNMODE will be the value for the primary transaction, 
+		   not necessarily the secondary transaction.
+		   
+	10/18/09 - Pete Chenard
+		   Modified FILEJRNS to check $$TTXFILE to see whether TTX
+		   should be filed.
+		   
+	10/08/09 - Pete Chenard
+		   Modified FILEJRNS to only save the ttx object if it is
+		   a primary transaction.
+		   
+	10/02/09 - Pete Chenard
+		   Modified TTXUPD to accept an additional argument, SAVE, that
+		   is used to indicate whether the ttx object should be saved in 
+		   that section or not.  
+		   
+		   Modified FILEJRNLS to add ttx.bypassSave after the setting
+		   of ttx.endbal.
+		   
+	08/26/09 - Pete Chenard (Profile upgrade)
+		   Modified TRNSET to kill TRNDRV("ZFSN") array at the
+		   start of the tansaction.
+		   
+	08/17/09 - Allan Mattson (Profile Upgrade)
+	           Corrected problem where future dated transactions were
+	           double posted under certain conditions because the
+	           update to TTXUID.LSEQ was rolled back.	
+	           
+	08/15/09 - Anchalee Ch. (Profile Upgrade)
+		   Re-applied missing custom changes of TRNDRVI("updTTX")
+		   to TRNSET.
+	
+	08/03/09 - Allan Mattson (Profile Upgrade)
+		   Re-applied custom changes to core version.
+
+	07/19/09 - SmithCD / KumarB - CR 39807
+		   Added optional acn1, acnseg1(), acn2, acnseg2() parameters 
+		   to TRNSET section, and pass them as applicable to the EXEC 
+		   section. Batch definitions need to have the ability to pass 
+		   account and segment objects for accounts within ttx(). 
+		   This is necessary to uniformly support rejection handling 
+		   and multicurrency from batches, particularly batches that 
+		   are called externally and accept acount / segment objects 
+		   themselves. Also added new TRNDRVI(,) parameter skipBalancing
+		   to allow for cases where batch definitions accumulate 
+		   offsets for performance purposes (hence making the 
+		   transaction set unbalanced until subsequent GL 
+		   accumulation). Additional minor changes to clear up several 
+		   warnings.
+
+	06/22/09 - DHANALAKSHMI R - CR 39575
+		   Modified the section TRNFILE to update the new column 
+		   HISTDST.RSEQ for the secondary and tertiary transaction.
+		   This value will be used to pick the correct history record
+		   during the reversal in DEPEC1.
+
+	06/19/09 - DHANALAKSHMI R - CR 38912
+		   Modified the section EXEC to correct the condition before
+		   calling DEPNSF procedure. This corrects the issue incorrect
+		   update to NSF counters.
+
+	06/04/09 - DHANALAKSHMI R - CR 40287
+		   Modified the section TRNFILE to identify the secondary and 
+		   tertiary transactions and then call FILEJRNS section for 
+		   each transaction in correct order. This corrects the issue
+		   secondary and tertiary transactions are listein reverse order in 
+		   each in history.
+
+	03/31/09 - PUTTASWH - 38803
+		   Modified FILEJRNS section to fix the undefined error that is
+		   thrown when an official check posted to an ARS account is 
+		   being REV/EC. The compiled code was killing off vobj(dep) 
+		   where dep is equal to acn therefore killing off the account 
+		   record. Hence the undefined error is thrown when the account
+		   object is accessed after the execution of code in this loop.  
+		   
+	03/16/09 - Bijoy Chelora - CR 36612
+		   Modified the EXEC section for validating "Maximum Transaction 
+		   Amount" (TRN.TRMAX) which is configured on a transaction code.		   
+	
+	01/15/09 - Bijoy Chelora - CR 36822
+		   Modified the TRNFILE section to generate a unique sequence
+		   number for SPV/SPV1.TSEQ for batch tellers.  Under heavy load,
+		   the system can wind up generating "update failed 3x" errors
+		   for batch tellers because of the updates necessary to TTXUID 
+		   when multiple accounts processed by multiple threads are 
+		   encountering restrictions.
+			
+	08/05/08 - Kirk Nemeth - CR 35163
+		   Added custom hook to FILEEXC section to facilitate custom general
+		   ledger reporting on rejected transactions.
+		   
+	06/11/08 - BIJOY CHELORA - CR 33901
+		   Changed Db.selectDbSet for EXEC such that HIST select
+                   statement for reversal of payoff/closure will grab all
+                   primary and system-generated (ITC7=2) transactions
+                   in HIST but not any secondary (ITC7=1) transactions.
+
+	05/12/08 - KELLYP - CR 33696
+		   Modified FILEJRNS to handle a new ttx stored value, NBTR.
+		   This new value is used to handle negative balance transfer
+		   processing (see NBTR and NBTRUPD sections of LNPTS2).
+	
+	04/16/08 - Ajitkumar - CR 32350
+		   Modified EXECMISC not to call ECSCAN when error correcting a
+		   secondary or system-generated G/L transasction.  This, along
+		   with changes to REVSEC^LNPTSR, prevent an OOB from being 
+		   reported because ITC6 wasn't enabled on a g/l offset to a 
+		   loan secondary when a payoff is error corrected.
+
+	04/08/08 - WCHESTER - CR 32893
+		   Removed call to TTXUPD when ETC = "", and replaced with
+		   throwing of %PBS error to prevent unecessary execution of
+		   code causes invalid ETC to be handled correctly. In section
+		   FILEEXC replaced ttx.etc with ttxexc.etc in getRecord of TRN
+		   to prevent second error when ttx.etc = "".
+		   
+	01/24/08 - JAGJEET .S PAWAR - CR 31689
+		   Modified FILEJRNS section to accomodate a new storedValue for 
+		   Small balance closeout, SBTP.  This is necessary because 
+		   a loan should only be evaluated for this type of processing
+		   once per transaction after all other updates have been filed.
+		    		   
+	01/22/08 - MBUIM - CR 31519
+		   Invalid account number is not specified in return message 
+		   when multiple account numbers are submitted.
+		   Modified EXEC section to include CID in the return message.
+		   Example: Record Not On File 123456789012 
+		   (%PSL-E-RECNOFL - ACN, vDb7+9^TRNDRV) where 123456789012 is 
+		   an invalid account number.
+
+	01/16/08 - NATRAJAH - CR 29690
+		   . In TRNSET section, added call to INIT^CRTHLD and UPD^CRTHLD
+		     for effective dated transaction to load TTXHLD,
+		     since RECALC1 does not have ttx array to build the TTXHLD.
+		   . In EXEC section, modified the check which set the 
+		     TRNDRVI("CHECKS") to validate the already processed check 
+		     transction also.
+		     
+	01/09/08 - Nagarjuna PR/Chad Smith - CR 28940
+		   Modified TRNFILE section to include post conditional quit if 
+		   ttx.getStoredValue("noJournal").The negative interest accrual
+		   shouldn't show up in history, this is b/c the offsetting accrual 
+		   GL hit is accumulated by BCHINTPOST. If the accrual GL position 
+		   in the history is populated in history transaction as well, the 
+		   accrual amount will be double-counted, hence causing the OOB. 
+		   	
+	12/28/07 - JAGJEET SINGH PAWAR - CR 30595
+		   Modified FILEEXC section to Prevent field length 
+		   from being exceeded by truncating.
+	
+	12/10/07 - ANKIT JAIN - CR 30894
+		   Modified the TRNFILE section to pass acn by reference when
+		   calling the FILEJRNS section.  This corrects a problem where
+		   vobj(acn) would become undefined after calling NBTRUPD^LNPTS2 
+		   from FILEJRNS because, in some cases, the system may perform
+		   a future-dated payoff quote which causes PAYOFF1^LNPO2 to 
+		   copy over the ln object, thus killing the original vobj node 
+		   # and creating a new one.
+	
+	11/19/07 - STOUT.D - CR 29715
+		   In the error trap in EXEC, if error.description is null, 
+		   this fix attempts to find the error in STBLER and update
+		   error.description to RM and RM2. This causes system errors
+		   to have their more user friendly messages displayed in 
+		   addition to the technical error messages for any errors 
+		   thrown where the description wasn't set. Specifically,
+		   PSL-E-RECNOFL errors do not have a description set due 
+		   to database independence issues.  
+	
+	11/10/07 - KUMARB - CR 29960
+	 	   Modified the section EXEC to move the set of block which
+	 	   checks the OVR MXUCLSTR to before the call of EXECMISC
+	 	   and also modified this to set OVR("*" for group "*" and
+	 	   Miscellaneous.
+	 	   Modified section EXECMISC, in the check which call to
+	 	   procedure CRTOVR, to remove .exists() in variable LNPTSRV,
+	 	   since this is passed as LNPTSRV.get() in the calling
+	 	   section EXEC.
+	
+	10/17/07 - PUTTASWH - CR 29557
+		   Modified TRNFILE section to reverse the order in which the
+		   TTXOBJS array is traversed. This is required to reverse the 
+		   order in which the transactions are applied to the account. 
+		   For transactions involving secondary/tertiary transactions,
+		   the secondary transaction has to be applied first, followed
+		   by the tertiary transaction.
+		   	
+	09/12/07 - SmithCD - CR 28928
+		   Added RecordACNSEG acnseg() parameter to TRNSINGL and EXEC 
+		   sections. 
+
+		   Modified EXEC section to load acnseg() if not present, and 
+		   pass .acnseg() in calls to ^LNPTS2, ^DEPPI, ^DEPPO, and 
+		   TRNFILE section.
+
+		   Modified TRNFILE to save acnseg() objects.
+		   
+		   Modified FILEJRNS to handle HISTSLSEG.
+		   
+		   Moved quit:PRMBDTLN from EXEC section to TRNFILE, and moved 
+		   the Supervisory Override processing to the beginning of 
+		   TRNFILE (just before the quit:PRMBDTLN). This change allows 
+		   overrides set in the reapply portion of backdated 
+		   transaction processing to get processed correctly.
+	
+	08/30/07 - RussellDS - CR28928
+		   Brought rewrite from P04 forward.  This includes:
+		   
+		   Added use of cache for SCAU and SCAU0.
+		   
+		   Fixed error in EXEC for validating trn.grp = acn.grp
+
+		   Modified TRNSET section to call TTXUPD before calling FILEDMJ
+		   to set the ITC for the System Generated Transactions.
+		   This solves the Out of Balance issue being reported for the
+		   Foreign Exchange transactions after the Dayend.
+		   
+		   Optimizations.
+		   
+		   Moved CLSD, DPOA, EXECFM, FILEARS, FILERJH, ITCUPD, OVERRIDE,
+		   REJECT, RETURN code in-line.
+		   
+		   Renamed MISCINFO(,) to TRNDRVI(,,) and changed structure to
+		   allow to carry more info.
+		   
+		   Modified handling of check/value date hold data.  No longer
+		   call INIT^CRTHLD on all transaction sets.  Only call at end
+		   of transaction set if encounter applicable transaction.
+		   
+		   Removed code that check XRET=2, since XRET is logical and
+		   will never equal 2.  Moved XRET into TRNINPUT("ReturnFile")
+		   
+		   Modified handling of HISTN data to carry in ttx stored value.
+		   
+		   Eliminated use of CK() array for check issued data and carry in
+		   ttx stored value to handle on individual transaction basis.
+		   
+		   Eliminated used of CTR array, from TRNUTL.  Now pass data in OM().
+		   
+		   Eliminated code in EXEC after call to DEPPO that set info into
+		   RETFL(TRNSEQ) based on overrides.  This data was not used
+		   anywhere.  It appears that in P01 it was used when filing to
+		   update the RET file, but it's not clear what the check for a
+		   *BAL* override had to do with any of this.
+		   
+		   Attempted to eliminate passing of object, versus parameters,
+		   as much as possible, to increase chances of optimization.
+		   
+		   Eliminated logic that pre-allocated the primary HIST record by
+		   doing a dummy insert, and adjusted ENDBAL in HIST at end.
+		   Now carry "stack" of accounts involved in primary/secondary
+		   chain (see NOTES, above, for details).
+		   
+		   Major reduction in public scope variables.
+		   
+		   Obsoleted ^UREV and moved code here (REVEC).
+		   
+		   Added support for generic debit and credit transaction
+		   codes (*CR* and *DR*).
+		   
+		   Removed revision history prior to 5/1/2006
+		   
+	07/27/07 - PUTTASWH - CR 28332
+		   Modified EXECMISC section to add an additional parameter
+		   POSTTPD that will be used as the transaction posting date
+		   instead of the public variable TPD . This is to fix the 
+		   negative value that was set in the 8th piece of DMJ.ITC since
+		   the transaction posting date and the system date were out of 
+		   sync. Modified EXEC section to invoke EXECMISC with the 
+		   additional parameter.
+		   
+	05/25/07 - BELTRANA - CR 27286
+		   A %PSL-E-RECNOFL error was being returned from TRNDRV.PROC 
+		   when an invalid account number existed in TTX. Changes were 
+		   made in the EXEC section catch block, to set RM with a 
+		   generic message and not log the error in SCAER. 
+		   Note: At some point the error.context will be changed to be
+		   specific enough to indicate which table the record is not 
+		   on file for. Example:
+		   Record Not On File  (%PSL-E-RECNOFL - ACN, EXEC+41^TRNDRV)
+	
+	03/06/07 - VARGAJ - CR 25540
+		   Modified EXECMISC section to call ^UREV to make sure that
+		   the original Miscellaneous Transaction Records got updated
+		   to reflect that they were error corrected.
+		   
+	02/23/07 - NATRAJAH - CR 25456
+		   Modified TRNFILE section to use the same query condition for 
+		   TSEQ while fetching records from SPV1 with that of SPV in 
+		   order to have the same sequence number in both the tables by
+		   changing the where clause to use TRNSEQ instead of ttx.tseq.	
+	
+	02/15/07 - NATRAJAH - CR 19332
+		   Modified TRNFILE section, added the additional conditional 
+		   check to call UPD^CRTHLD to avoid updating hold table twice
+		   during effective dated CK transaction.
+		   
+	10/20/06 - SmithCD/KinI - CR 23514
+		   Modified TRNFILE section to adjust ENDBAL for secondary 
+		   transaction so that it is saved accurately in HIST and DTX.
+		   Added the fix for CR 23681 in FILEARS section to quit if 
+		   account is not setup for ARS processing.
+		   
+	10/13/06 - SmithCD - CR 23395
+		   Removed code in ITCUPD section that was relying on 
+		   fractional TRNSEQ to determine secondary vs. system 
+		   generated ttx.itc7. This did not work for secondary 
+		   transactions b/c p04 has secondary as .001 whereas p01 has 
+		   secondary as .000001 (yet the code was quivalent in both 
+		   versions, and differentiated between the two). Instead we 
+		   are now relying strictly on TRNMODE to determine secondary 
+		   vs. system generated transactions in terms if ttx.itc7.
+		   Modified 10/12/06 change to move setting of PTRC into SPV 
+		   block of code in TRNFILE (avoids unnecessary gaps in TTX).
+
+	10/12/06 - SANTHUMS - CR 23400
+		   . Modified TRNFILE section to use Db.getRecord with the 
+		     third parameter as 1 instead of Db.isDefined(SPV1").
+		   . Added code to set PTRC variable if it is NULL.
+		   . Setting of the SPV keys is removed,  since this is already 
+		     handled by the SPV getRecord. 	
+	
+	10/05/06 - SANTHUMS - CR 22136 
+		   Modified MATCH section to use hist.itc6 and hist.itc12 
+		   instead of HITC.extract(6) and HITC.extract(12).
+		   
+	09/28/06 - KELLYP - CR 23341
+		   Modified FILEDMJ section to define DTX.CDT and DTX.TIME if
+		   not already defined via the ttx.copy().  This resolves a
+		   situation where system-generated exchange transactions did 
+		   not have these two columns defined which led to problems
+		   in TGLMON.  CDT and TIME should normally be taken from the
+		   TTX record, but in certain situations where secondary TTX's
+		   are filed to DTX before the primary, these columns won't be
+		   defined yet.
+
+        09/21/06 - Ravindra Rathi - CR 22770
+	           Modified EXEC^TRNDRV to move the "if PRMBDTLN quit" check  
+	           after the OVERRIDE and OVERRIDE^TRNDRV to only call 
+	           CRTOVR "if 'LNPTSRV.exists" for not processing overrides for
+	           any backdated processing.
+
+	09/08/06 - KELLYP - CR 22981
+		   Modified FILEEXC to populate the calendar date and clock time
+		   values in TTX for rejected transactions that will file to DTX.  
+		   This is necessary because these fields aren't populated until 
+		   TTXUPD is called and TTXUPD won't be called for rejected batch
+		   transactions.  This prevents a problem where TGLMON encountered 
+		   RDBSAVEFAIL errors when creating DMJ records for DTX suspense 
+		   records that didn't have DTX.CDT defined (which is required).
+
+	08/31/06 - SANTHUMS - CR 22480
+		   Modified to move the transaction information 
+		   ttx.setStoredValue("TranMode") and 
+		   ttx.setStoredValue("TranSeq") to the top of EXEC section.
+	
+	08/11/06 - SmithCD - CR 22489 (20748)
+		   Permanently removed %TRN* variables. Removed the setting of 
+		   dtx.cdt and dtx.time in TRNFILE and FILEDMJ sections to 
+		   avoid potential discrepancies with ttx.
+	
+	06/29/06 - DESHPANDE S K - CR 20748
+		   Modified functions TRNFILE, FILEDMJ by replacing dtx.tefd 
+		   with dtx.efd. 
+		   Modify TRNFILE by replacing dtx.ptype with dtx.type and 
+		   dtx.tpd with dtx.udprin.
+		   Replace exc.disc with exc.sysbase, and dtx.ctim with
+		   dtx.time.
+		   Replaced global transaction variables with 
+		   Transaction stored values.
+		   
+	06/28/06 - RussellDS - CR21755
+		   Modified TRNFILE and FILEDMJ sections to set
+		   dtx.trc=ttx.tseq to ensure that UBAL02 balancing report can
+		   tie the transactions together.
+		   
+		   Modified TTXUPD to only set ttx.trc to new value if it is
+		   null.
+
+	06/22/06 - NATRAJAH - CR 21284
+		   Modified PTRC parameter in FILEEXC call to be passed  by
+		   reference to prevent unique constraint violation when called
+		   a second time (PTRC is modified within FILEEXC).
+		   Modified the if condition which rollback the entire set
+		   failed transaction, since record created in EXC table is
+		   required for retry process.
+
+	06/07/06 - PUTTASWH - CR 21285
+		   Modified DPOA section to update Non-Sufficient Funds 
+		   counters if the principal amount of the transaction exceeds
+		   the account balance.
+		   
+	05/30/06 - SmithCD - CR 19732
+		   Modified to set PRMBDTLN for loan error corrects / reversals
+		   even if they are not effective dated (in case there are 
+		   intervening transactions in history that need to be unwound 
+		   / reapplied).
+	
+	05/17/06 - SmithCD - CR 20855
+		   . Added checks on 'ttx.getStoredValue("noPostProgram") to 
+		     avoid sequence matching, creation of HISTR and update TTX 
+		     records, and update holds-related tables and account 
+		     fields when the transaction is an error correct / reversal
+		     transaction that is to be journaled but not processed (as 
+		     is the case for deposit closeout reversal, for example)
+		   . Modified catch block in EXEC section to handle 
+		     %PSL-DBFILER errors like Profile application errors after 
+		     manipulating the presentation via RM
+		   . Modified EXEC section to store transaction information 
+		     that could be needed anywhere within transaction posting
+		     in the transaction itself in an effort to eventually 
+		     replace use of %TRN* and TRN* variables
+		   . Added acn parameter in call to CHREV^HLDREV
+		   . Further cleaned up and added documentation
+	*/
+
+	quit
+
+	
+public TRNSET(RecordTTX ttxset(),		// Transactions [*]		/REF:RW
+	      Date TPD,			// Processing date [*]	
+	      Number BRCD,		// Branch code [*]
+	      Number TRNMODE,		// Transaction mode [*]	
+	      Number PTRC,		// Primary trace seq [*]	/NOREQ/REF:R
+	      String RJ(,),		// Rejected transactions [*]	/NOREQ/REF:W
+	      String SPV(,,,),		// Supervisory array [*]	/NOREQ/REF:W
+	      String OVR(,,),		// Override array [*]		/NOREQ/REF:RW
+	      String OM(),		// Output records [*]		/NOREQ/REF:W
+	      Number REJMETIN,		// Reject method [*]		/NOREQ/REF:R
+	      String TRNINPUT(),	// Input info [*]		/NOREQ/REF:R
+	      RecordACN acn1,		// Account record 1 [*]		/NOREQ/REF:RW
+	      RecordACNSEG acnseg1(),	// Account segments 1		/NOREQ/REF:RW
+	      RecordACN acn2,		// Acount record 2 [*]		/NOREQ/REF:RW
+	      RecordACNSEG acnseg2())	// Account segments 2		/NOREQ/REF:RW
+
+	/*
+
+	TRNSET	Section primarily used for processing sets of transactions. 
+		This is typically used for online applications, TTX batch, and 
+		dayend batch postings.
+
+	ARGUMENT NOTES:
+
+	   . ttx()	The transaction object array (keyed by transaction sequence) to
+			be processed by driver.
+		
+	   . TPD	Transaction processing date of transaction being posted by 
+			driver.
+		
+	   . BRCD	Branch Code of user processing set of transactions.
+		
+	   . TRNMODE
+			0 = Batch Transaction
+			1 = Online Transaction (from teller applications)
+			2 = Online (from non-teller applications where overrides are 
+			    automatically overidden)
+			3 = Store and Forward
+			4 = System Generated Transaction
+			5 = Secondary Transaction
+			6 = Future Dated Posting File
+	
+	   . PTRC	Primary trace sequence is passed in when
+	  		TTX.TSEQ is known. This is typically passed in
+	  		from TTX batch processing.
+
+	   . RJ()	Rejection transaction array (keyed by transaction sequence).
+			Created when trnsactions are unable to be processed due to 
+			error or unable to override transactions.
+		
+	   . SPV()	Supervisory override array (keyed by transaction sequence).
+			Created when transactions are overriden by a teller either
+			manually (online) or automatically (batch).
+		
+	   . OVR()	Override array (keyed by account number) can be passed in if
+			needed. Additional overrides may be generated base on business
+			logic during posting.
+			
+	   . OM()	Output array() created during processing to pass specific
+			information back to calling routine for online transactions.
+			
+	   . REJMETIN	Incoming reject method.  If this has a value, set the
+	   		public variable REJMET to it.  Otherwise, will use the
+	   		public variable.  This approach provides a means to
+	   		eventually eliminate the public variable in favor of
+	   		the parameter (preferred mechanism).
+	   		
+	   . TRNINPUT()	Used to provide information to TRNSET for use within
+	   		TRNDRV without needing individual parameters.  Usually
+	   		when the input is for a limited purpose.  Current uses:
+	   		
+	   		  - "isBatch" = 1 - posting is via ball to TRNBATCH
+	   		  - "ReturnFile" = 1 - include exceptions in return file
+	   		  - "skipBalancing" = 1 - Skip multicurrency/balancing
+			      (used when called from batch definitions that 
+			       accumulate GL offsets, and therefore would not 
+			       balance... these batches would have to manage 
+			       their own multicurrency separately)
+	   		  - "updTTX" = 1 - Update TTX (used w/ TRNMODE=2)
+	   		 
+	   . acn1, acn2	Account records for transactions within ttx(). These 
+	   		objects should be passed from dayend batch definitions,
+	   		which normally have account objects already loaded. 
+	   		It is particularly important to pass these objects when
+	   		appplicable, to allow batches to take advantage of the 
+	   		rejection method and multicurrency capabilities of 
+	   		TRNSET, while allowing the active account objects to 
+	   		used, thereby saving valuable processing time (not 
+	   		having to save and re-load the objects), particularly 
+	   		for batches that are also called externally and accept 
+	   		account objects themselves. Note that an array of 
+	   		account objects keyed by CID is the preferred method 
+	   		but due to limitation with FWK30, loading and passing 
+	   		the objects is prohibitively expensive. This should be 
+	   		revisited once FWK40 is released.
+	   		
+	   . acnseg1(),	Account segment records for transactions within ttx().
+	     acnseg2()	See above description for acn1, acn2 for additional 
+	     		information.
+		  
+	RETURNS:
+	
+	   . ER - Logical status indicating success or failure of transaction set
+		
+	*/
+	
+	type public Cache %CACHE()
+	
+	type public Number ER = 0
+	type public Number REJMET
+	type public String RM
+	
+	type Boolean TSETEXIT = false
+	type Number ORIGTM = TRNMODE
+	type String ET
+	type String TRNDRVI(,,)			// Data carried between transactions
+	
+	// ---------- Beg 08/03/09 custom revision ----------
+	kill RJ, SPV
+	// ---------- End 08/03/09 custom revision ----------
+
+	if 'REJMETIN.get().isNull() set REJMET = REJMETIN
+	
+	// Move input into TRNDRVI to avoid public scope variables
+	if (TRNINPUT.data() > 0) do {
+		
+		set TRNDRVI("isBatch") = TRNINPUT("isBatch").get()
+		set TRNDRVI("ReturnFile") = TRNINPUT("ReturnFile").get()
+		set TRNDRVI("skipBalancing") = TRNINPUT("skipBalancing").get()
+		// 08/15/09 - Anchalee Ch.
+		// Added TRNINPUT("updTTX")
+		set TRNDRVI("updTTX") = TRNINPUT("updTTX").get()
+		// End of 08/15/09
+	}
+	
+	#IF CUVAR.SCAUREL
+	type Number RELACCTS()
+
+	if ((TRNMODE = 1) ! (TRNMODE = 2) ! (TRNMODE = 3) ! (TRNMODE = 6)) do {
+
+		type ResultSet rs = Db.select("RECIF", "SCAUR1", "UID = :%UID")
+			 
+		while rs.next() set RELACCTS(rs.getCol("RECIF")) = ""
+	}
+	#ENDIF
+	
+	#IF CUVAR.%MCP&CUVAR.RESPROC if 'LNMDLR.get() do ^ALLWTRAN(.ttxset()) quit:ER
+
+	#IF CUVAR.%MCP
+	/*
+	 For Multi-currency systems, create exchange transactions
+	 for transactions to different currencies. The secondary 
+	 entries in ttx() are the offsetting entries to general
+	 ledger cash offset accounts.
+	*/
+	if 'TRNDRVI("skipBalancing").get() do EXCHOFF^TTXEXT(.ttxset())
+	#ENDIF
+	
+	// ---------- Beg 08/17/09 custom revision ----------
+	type Number SAVPTRC
+	set SAVPTRC = PTRC.get()
+	// ---------- End 08/17/09 custom revision ----------
+
+	while 'TSETEXIT do {
+	
+		type Number SCRPTR
+		
+		/* 
+		   If account is passed in, save the contents. In the event of a 
+		   transaction failure, the account object will be restored to it's
+		   original state.
+		*/
+		type RecordACN acnsave1, acnsave2
+		if acn1.exists() set acnsave1 = acn1.copy()
+		if acn2.exists() set acnsave2 = acn2.copy()
+		
+		#IF (CUVAR.NOSEGMENTS'=1)!($$SEGUSE^BTTOPTMZ(""))
+			type Number SEGMENT = ""
+			type RecordACNSEG acnsegsave1(), acnsegsave2()
+			
+			for  set SEGMENT = acnseg1(SEGMENT).order() quit:SEGMENT.isNull()  set acnsegsave1(SEGMENT) = acnseg1(SEGMENT).copy()
+			
+			set SEGMENT = ""
+			for  set SEGMENT = acnseg2(SEGMENT).order() quit:SEGMENT.isNull()  set acnsegsave2(SEGMENT) = acnseg2(SEGMENT).copy()
+		#ENDIF
+
+		// Transaction Set TP fence
+		do Runtime.start("CS","","SCRPTR")
+	
+		type String HLDALL(,)
+		// ---------- Beg 08/26/09 custom revision ----------
+		kill TRNDRVI("ZFSN")
+		// ---------- End 08/26/09 custom revision ----------
+
+		/*
+		Holds are normally processed on the entire set of transactions 
+		after the set has been processed (see comment above ^CRTHLD 
+		Calls further down in TRNSET), but back-dated transaction sets 
+		are an exception because the information must be taken into 
+		consideration by the back-dated processing.
+		*/
+
+		if (ttxset(1).efd), (ttxset(1).efd < TPD) do { quit:ER
+			do INIT^CRTHLD(.ttxset(), .HLDALL(,))	
+			if ER = 0 do {
+				do UPD^CRTHLD(.ttxset(), .HLDALL(,))	
+				set TRNDRVI("CHECKS") = 2     // Mark complete
+				}
+			
+			if ER do {
+				set TSETEXIT = 1
+				do Runtime.rollback("SCRPTR")
+				
+				// Restore account to original state on error
+				if acnsave1.exists() set acn1 = acnsave1.copy()
+				if acnsave2.exists() set acn2 = acnsave2.copy()
+				
+				#IF (CUVAR.NOSEGMENTS'=1)!($$SEGUSE^BTTOPTMZ(""))
+				
+				// Restore segments to original state on error 
+				do SEGRESET(.acnseg1(), .acnsegsave1())
+				do SEGRESET(.acnseg2(), .acnsegsave2())
+				
+				#ENDIF
+				}
+			}
+			
+		// ---------- Beg 08/17/09 custom revision ----------
+		//set PTRC = PTRC.get()
+		set PTRC = SAVPTRC
+		// ---------- End 08/17/09 custom revision ----------
+
+		// ---------- Beg 08/03/09 custom revision ----------
+		/* While processing a transaction with TRNMODE=2 and it rejects, an RJ array entry is created, and then 
+		   the transaction is rolled back (actually, the whole screen is rolled back) and reprocessed.  With the
+		   rollback, the value or PTRC needs to get set again when TRNMODE=2 and TRNDRVI("updTTX") is used.   
+		*/
+
+		if (PTRC.isNull() ! (TRNMODE = 2 & TRNDRVI("updTTX").get())) do {
+
+			// Skip update 
+			if '$$TTXFILE(TRNMODE) quit
+			if TRNDRVI("isBatch").get() quit
+			if (ttxset(1).efd > %SystemDate) quit
+
+			// Update PTRC and ttx.lpseq
+			set PTRC = $$NXTTRC(TPD, BRCD)
+		}
+		// ---------- End 08/03/09 custom revision ----------
+
+		/*
+		Collate through array ttx(TRNSEQ) and process individual 
+		transactions. Process primary transactions only, not exchange 
+		offsets.
+	
+		If EXEC returns an error (ER=1), abort all updates and start 
+		over. The array RJ(TRNSEQ) will flag transactions to skip over
+		*/
+	
+		type Number TRNSEQ = ""
+
+		// ---------- Beg 08/03/09 custom revision ----------
+		// Load primary transactions into public scope read-only array.  Custom for KTB
+
+		type RecordTTX ZTTX()	//custom array allow posting programs to have access to all transactions in the set.
+		for  set TRNSEQ = ttxset(TRNSEQ).order() quit:TRNSEQ.isNull()  if ((TRNSEQ # 1) = 0) set ZTTX(TRNSEQ) = ttxset(TRNSEQ).copy()
+		// ---------- End 08/03/09 custom revision ----------
+
+		// Primary transactions only
+		for  set TRNSEQ = ttxset(TRNSEQ).order() quit:TRNSEQ.isNull()  if ((TRNSEQ # 1) = 0) do { quit:ER
+		
+			type Number TRNPTR
+			type String TRNPSSTK		// Primary/Secondary stack
+			
+			type RecordTTX TTXOBJS()
+		
+			set ER = 0
+			
+			// Single transaction TP fence
+			do Runtime.start("CS","TRNDRVI,TRNPSSTK,TTXOBJS","TRNPTR")
+			
+			do {
+				// Check for Rejected Sequence - File to Exception 
+				if +RJ(TRNSEQ).get() do FILEEXC(ttxset(TRNSEQ), TPD, BRCD, TRNMODE, TRNSEQ, .PTRC, +REJMET.get(), .TRNDRVI(,,), .SPV(,,,), .RJ(,)) quit
+	
+				type RecordACN acn
+				type RecordACNSEG acnseg()
+	
+				// Process Single transaction from set (use 
+				// applicable account objects if passed in)
+				if acn1.exists(), acn1.cid = ttxset(TRNSEQ).cid do {
+					do EXEC(ttxset(TRNSEQ), .acn1, TPD, BRCD, TRNMODE, TRNSEQ, PTRC, %SystemDate, TPD, .TRNPSSTK, .TTXOBJS(), .SPV(,,,), .OVR(,,), .RJ(,), .OM(), .TRNDRVI(,,), .acnseg1())
+				}
+				else  if acn2.exists(), acn2.cid = ttxset(TRNSEQ).cid do {
+					do EXEC(ttxset(TRNSEQ), .acn2, TPD, BRCD, TRNMODE, TRNSEQ, PTRC, %SystemDate, TPD, .TRNPSSTK, .TTXOBJS(), .SPV(,,,), .OVR(,,), .RJ(,), .OM(), .TRNDRVI(,,), .acnseg2())
+				}
+				else  do EXEC(ttxset(TRNSEQ), .acn, TPD, BRCD, TRNMODE, TRNSEQ, PTRC, %SystemDate, TPD, .TRNPSSTK, .TTXOBJS(), .SPV(,,,), .OVR(,,), .RJ(,), .OM(), .TRNDRVI(,,), .acnseg())
+	
+				// Process transaction error, reject this transaction
+				if ER do { quit
+					
+					type Number SEQ = TRNSEQ \ 1
+					
+					set RJ(SEQ) = ER_"|"_RM.get()
+					
+					if 'ET.get().isNull() set RJ(SEQ).piece("|",4) = ET
+
+					kill ET, RM
+
+					quit:'REJMET.get()
+
+					if (REJMET = 2), ttxset(SEQ).itc1 quit
+
+					// Reject all transactions in ttx array
+
+					type Number seq = ""
+					for  set seq = ttxset(seq).order() quit:seq.isNull()  if '(seq = SEQ) do {
+					
+						set RJ(seq) = "1|BATCH REJECT|1"
+
+						// ---------- Beg 08/03/09 custom revision ----------
+						// kill SPV(seq)
+						// ---------- End 08/03/09 custom revision ----------
+					}
+				}
+				
+				#IF CUVAR.%MCP 
+				if ttxset(TRNSEQ+.01).exists() do {
+					
+					type Number CID = ""
+					
+					/*
+					Usually EXCHOFF^TTXEXT builds 
+					all FX offset transactions and 
+					selects proper G/L for them. In
+					case G/L account is not set, 
+					define it here.
+					*/					
+					
+					if ttxset(TRNSEQ+.01).cid.isNull() do {
+						
+						type String ETC = ttxset(TRNSEQ).etc
+						// Reset CID to transaction suspense
+						if 'ETC.isNull() do {
+							type RecordTRN trn = %CACHE("TRN").getRecord("TRN","ETC = :ttxset(TRNSEQ).etc")
+							set CID = trn.acn
+						}
+												
+						if CID.isNull() do INIT^UMSC
+					}
+						
+					else  set CID = ttxset(TRNSEQ+.01).cid
+					
+					do TTXUPD(.ttxset(TRNSEQ+.01), 4, TRNSEQ+.01, BRCD, PTRC, TPD, .TRNDRVI(,,), .SPV(,,,), .RJ(,), .OM(),1)
+					do FILEDMJ(.ttxset(TRNSEQ+.01), CID, BRCD)
+				}
+				#ENDIF
+			}
+
+			// If we have already rolled back all the transactions 
+			// (%GTM), rollback here will have no effect
+			if ER do Runtime.rollback("TRNPTR") quit
+			
+			// Single Transaction Commit
+			do Runtime.commit()	
+		}
+		
+		if ER do { quit
+			do Runtime.rollback("SCRPTR")
+			
+			// Restore account to original state on error
+			if acnsave1.exists() set acn1 = acnsave1.copy()
+			if acnsave2.exists() set acn2 = acnsave2.copy()
+			
+			#IF (CUVAR.NOSEGMENTS'=1)!($$SEGUSE^BTTOPTMZ(""))
+			
+			// Restore segments to original state on error 
+			do SEGRESET(.acnseg1(), .acnsegsave1())
+			do SEGRESET(.acnseg2(), .acnsegsave2())
+			
+			#ENDIF
+			}
+						
+		/* If we found a transaction that indicated we had to deal with
+		   check or value date holds, process holds.
+				   
+		   If we get an error processing this check information, it is
+		   fatal to the transaction set (ER is set).
+		*/
+		if TRNDRVI("CHECKS").get() = 1 do {
+			
+			type String HLDALL(,)
+					
+			do INIT^CRTHLD(.ttxset(), .HLDALL(,))
+			quit:ER
+			do UPD^CRTHLD(.ttxset(), .HLDALL(,))
+		}
+		
+		// ---------- Beg 08/03/09 custom revision ----------
+		// Call custom data filing utilities (formerly FSN array filers)
+		if TRNDRVI("ZFSN").data() do {
+			type String name = "", pgm
+			
+			for  set name = TRNDRVI("ZFSN",name).order() quit:name.isNull()  do {
+				set pgm = TRNDRVI("ZFSN",name)
+				xecute pgm
+				kill @name
+			}
+		}
+		// ---------- End 08/03/09 custom revision ----------
+
+		set TSETEXIT = true	// Transaction Set Completed
+
+		// If posting failed in non batch (dayend) mode, 
+		// rollback the entire set
+		// 15/08/09 - Anchalee Ch.
+		// Excluded TRNMODE 6 and TRNMODE 2 with TRNDRVI("updTTX") from ER=1
+		if (RJ.data() > 0), (TRNMODE <> 0), (TRNMODE <> 4), (TRNMODE <> 6), '(TRNMODE = 2 & TRNDRVI("updTTX").get()) set ER = 1 
+		// End of 15/08/09
+
+		// Issue SBN msg once we're sure everything will post
+		if 'ER, TRNDRVI("SBNMSG").get(), 'TRNDRVI("isBatch").get(), $$TTXFILE(TRNMODE) set ER = $$TRN^SBNUTL(.ttxset())
+		
+		// If we have already rolled back all the transactions 
+		// (%GTM / %PSL), rollback here will have no effect
+		if ER do { quit
+			do Runtime.rollback("SCRPTR")
+			
+			// Restore account to original state on error
+			if acnsave1.exists() set acn1 = acnsave1.copy()
+			if acnsave2.exists() set acn2 = acnsave2.copy()
+			
+			#IF (CUVAR.NOSEGMENTS'=1)!($$SEGUSE^BTTOPTMZ(""))
+			
+			// Restore segments to original state on error 
+			do SEGRESET(.acnseg1(), .acnsegsave1())
+			do SEGRESET(.acnseg2(), .acnsegsave2())
+			
+			#ENDIF
+			}
+		
+		do Runtime.commit()	// Transaction Set Commit
+		
+		#IF CUVAR.CRCDTHR
+		/* Build CTR array if CTRFLG enabled.  We do this after the
+		   transet is processed since CTRFLG is not known on a 
+		   transaction by transaction basis.
+		*/
+		if TRNDRVI("CTRFLG").get() do CTR^TRNUTL(.ttxset(), .OM())
+		#ENDIF
+	}
+		
+	quit
+
+
+public TRNSINGL(RecordTTX ttx,		// Transaction object [*]	/REF:RW
+		RecordACN acn,		// Account object [*]		/NOREQ/REF:RW
+		Date TPD,		// Processing Date [*]		/NOREQ/DFT=%SystemDate
+		Number BRCD,		// Branch code [*]		
+		Number TRNMODE,		// Transaction mode [*]	
+		String RJ(,),		// Rejected array [*]		/NOREQ/REF:W
+		String SPV(,,,),	// Supervisory array [*]	/NOREQ/REF:W
+		String OVR(,,),		// Override array [*]		/NOREQ/REF:RW
+		Number PTRC,		// Primary trace seq [*]	/NOREQ/DFT=$$NXTTRC(TPD,BRCD)
+		Number TRNSEQ,		// Transaction sequence [*]	/NOREQ/DFT=1
+	        String OM(),		// Output records [*]		/NOREQ/REF:W
+	        RecordACNSEG acnseg())	// Account segments		/NOREQ/REF:RW
+	/*
+	
+	TRNSINGL is primarily used when a single transaction needs to be 
+	processed. This typically is used for secondary transactions and
+	system generated transactions by batch processing.
+	
+	Situations where there are multiple transactions being processed
+	together (e.g., DR/CR) as primary transactions should build a
+	ttx array and call TRNSET, and not do two separate calls to TRNSINGL.
+	
+	IMPORTANT NOTE FOR CALLERS OF TRNSINGL:
+	
+	Since there are mixed reasons for calling this tag, including processing
+	system generated transactions (which are primary) as well as secondary
+	transacations, and because of the need for TTXOBJS, TRNDRVI, and TRNPSSTK
+	to be public (at this point) coming in here, their scope must be managed
+	by callers.  This is done for calls to TRNSET, but calls directly to
+	TRNSINGL for non-secondary transactions must manage their scope.  If
+	adding a call to TRNSINGL that is not for secondary transactions, add
+	the following scope management code:
+	
+	// Manage scope for structures used by TRNSINGL^TRNDRV
+	type RecordTTX TTXOBJS()
+	type String TRNDRVI(,,), TRNPSSTK
+	
+	
+	ARGUMENT NOTES:
+
+	   . ttx	The transaction object to be processed by driver.
+	
+	   . acn	The account object can be passed in if the account has been
+			loaded previously. Otherwise the account will be loaded during
+			processing.
+		
+	   . TPD	Transaction processing date of transaction being posted by 
+			driver.
+		
+	   . BRCD	Branch Code of user processing set of transactions.
+		
+	   . TRNMODE
+			0 = Batch Transaction
+			1 = Online Transaction (from teller applications)
+			2 = Online (from non-teller applications where overrides are 
+			    automatically overidden)
+			3 = Store and Forward
+			4 = System Generated Transaction
+			5 = Secondary Transaction
+			6 = Future Dated Posting File
+	
+	   . RJ()	Rejection transaction array (keyed by transaction sequence).
+		 	Created when transactions are unable to be processed due to 
+		 	error or unable to override transactions.
+		
+	   . SPV()	Supervisory override array (keyed by transaction sequence).
+		 	Created when transactions are overriden by a teller either
+		 	manually (online) or automatically (batch).
+		
+	   . OVR()	Override array (keyed by account number) can be passed in if
+		  	needed. Additional overrides may be generated base on business
+		  	logic during posting.
+			
+	   . PTRC	Primary trace sequence is passed in when
+	  		TTX.TSEQ is known. This is typically passed in
+	  		from TTX batch processing.
+	  	
+	   . TRNSEQ	Sequence number may be passed in to specify a transaction 
+			within a larger set (even though processed individually).
+			Transaction sequence otherwise is defaulted to 1.
+		
+	   . OM()	Output array() created during processing to pass specific
+			information back to calling routine for online transactions.
+			
+	   . acnseg()	The account segment objects can be passed in if they 
+	   		have been loaded previously. Otherwise the segments 
+	   		will be loaded during processing.
+
+	RETURNS:
+	
+	   . ER - Logical status indicating success or failure of single transaction.
+	*/
+
+	type public Number ER = 0
+	type public Date ORIGTJD, ORIGTPD
+	type public String TRNDRVI(,,)			// See notes in EXEC section
+	type public String TRNPSSTK			// See notes in EXEC section
+	
+	type public RecordTTX TTXOBJS()			// See notes in EXEC section
+	
+	type Number CID, SAVOBJHW, SAVPTR, SEQ
+	type String SAVPSSTK
+	
+	if TPD.get().isNull() set TPD = %SystemDate
+	if TRNSEQ.get().isNull() set TRNSEQ = 1
+	
+	set PTRC = PTRC.get()
+	if PTRC.isNull(), 'TRNDRVI("isBatch").get(), $$TTXFILE(TRNMODE) set PTRC = $$NXTTRC($select(ORIGTPD.get():ORIGTPD, 1:TPD), BRCD)
+	
+	/* If account is passed in, save the contents. In the event of a 
+	   transaction failure, the account object will be restored to it's
+	   original state.
+	*/
+	type RecordACN acnsave
+	if acn.exists() set acnsave = acn.copy()
+	
+	#IF (CUVAR.NOSEGMENTS'=1)!($$SEGUSE^BTTOPTMZ(""))
+		type Number SEGMENT = ""
+		type RecordACNSEG acnsegsave()
+		for  set SEGMENT = acnseg(SEGMENT).order() quit:SEGMENT.isNull()  set acnsegsave(SEGMENT) = acnseg(SEGMENT).copy()
+	#ENDIF
+	
+	/* Save current primary/secondary stack and high-water mark on TTXOBJS.
+	   If transaction failure, reset to this stack, and remove any objects
+	   that got added to TTXOBJS.
+	*/
+	set SAVPSSTK = TRNPSSTK.get()
+	set SAVOBJHW = TTXOBJS("").order(-1)
+
+	do Runtime.start("CS", "TRNDRVI,TRNPSSTK,TTXOBJS", "SAVPTR")
+
+	do EXEC(.ttx, .acn, TPD, BRCD, TRNMODE, TRNSEQ, PTRC, ORIGTJD.get(), ORIGTPD.get(), .TRNPSSTK, .TTXOBJS(), .SPV(,,,), .OVR(,,), .RJ(,), .OM(), .TRNDRVI(,,), .acnseg())
+
+	if ER do { quit
+		
+		// If we have already rolled back all the transactions 
+		// (%GTM / %PSL), rollback here will have no effect
+		do Runtime.rollback("SAVPTR")
+
+		// Restore account to original state on error
+		if acnsave.exists() set acn = acnsave.copy()
+	
+		#IF (CUVAR.NOSEGMENTS'=1)!($$SEGUSE^BTTOPTMZ(""))
+		
+		// Restore segments to original state on error 
+		do SEGRESET(.acnseg(), .acnsegsave())
+	
+		#ENDIF
+		
+		// Restore TRNPSSTK and remove extraneous TTXOBJS entries
+		set TRNPSSTK = SAVPSSTK
+		
+		if TRNPSSTK.isNull() kill TTXOBJS, TRNPSSTK quit
+		
+		for  set SAVOBJHW = TTXOBJS(SAVOBJHW).order() quit:SAVOBJHW.isNull()  kill TTXOBJS(SAVOBJHW)
+	}
+
+	do Runtime.commit()
+
+	quit
+
+
+public TRNBATCH(Date TPD,		//Transaction Date
+		Number BRCD,		//Branch Code
+		String %UserID)		//User ID
+	
+	/*
+	  TRNBATCH processes sets of transactions (from TTX table) for a 
+	  particular date, branch and user ID.
+	*/
+
+	type public Number ER, REJMET
+	type public String %FN, RM
+	
+	type String OM(), OVR(), RJ(,), SPV(,,,)
+
+	if TPD.get().isNull() set TPD = %SystemDate
+
+	type Number RECCNT = 0
+	type Number I, JOBMON, ORIGPTRC, PTRC, TSEQ
+	type String FUNCNAME, SRC, TRNINPUT()
+	type String RECID = BRCD_"-"_%UserID_"-"
+	type RecordACN acn1, acn2
+	type RecordACNSEG acnseg1(), acnseg2()
+	
+	set TRNINPUT("isBatch") = 1
+
+	set FUNCNAME = %FN.get()
+	if FUNCNAME.isNull() set FUNCNAME = "TTXPOS"
+	set JOBMON = $$INIT^JOBMON(FUNCNAME)
+
+	type RecordTTXUID ttxuid = Db.getRecord("TTXUID","TJD = :TPD,BRCD = :BRCD,UID = :%UserID",1)
+	set (ORIGPTRC, PTRC) = (ttxuid.lpseq + 1) * 1000
+	set SRC = ttxuid.src
+
+	// Include exceptions in return file
+	if SRC.isNull() set TRNINPUT("ReturnFile") = 0
+	else  do {
+		
+		type RecordCTBLINC ctblinc = Db.getRecord("CTBLINC", "KEY = :SRC", 1)
+		
+		set TRNINPUT("ReturnFile") = ctblinc.ret
+	}
+
+	set ER = 0
+	set RM = ""
+
+	type DbSet ds = Db.selectDbSet("TTX", "TJD = :TPD and BRCD = :BRCD and UID = :%UserID and TSEQ > :PTRC", "TSEQ ASC")
+
+	type RecordTTX ttx()
+
+	while ds.next() do {
+
+		type RecordTTX ttxnext = ds.getRecord("TTX")
+		
+		set TSEQ = ttxnext.tseq
+
+		set RECCNT = RECCNT + 1		
+		if ((RECCNT # 1000) = 0) do UPDATE^JOBMON(JOBMON, RECCNT, RECID_TSEQ)
+
+		// Load next TTX record in this block into ttx array
+		if (((TSEQ \ 1000) * 1000) = PTRC) set ttx(TSEQ#1000) = ttxnext.copy() quit
+
+		// Once get to next block, post prior block, then save
+		// the first record of new block
+
+		if ttx(1).exists() do { 		// Post ttx array
+
+			type Number TSEQ		// Protect variable
+
+			do Runtime.start("BA", ttx)
+
+			set ttxuid.lpseq = PTRC \ 1000	// Increment last posted
+			do ttxuid.bypassSave()
+
+			do TRNSET(.ttx(), TPD, BRCD, 0, PTRC, .RJ(,), .SPV(,,,), .OVR(,,), .OM(), .REJMET, .TRNINPUT(), .acn1, .acnseg1(), .acn2, .acnseg2())
+
+			do Runtime.commit()
+
+			kill ttx
+		}
+
+		set PTRC = (TSEQ \ 1000) * 1000		// Next block
+		set ttx(TSEQ#1000) = ttxnext.copy()
+	}
+	
+        if ttx(1).exists() do {
+ 
+                do Runtime.start("BA")
+ 
+                set ttxuid.lpseq = PTRC \ 1000    // Increment last posted
+                do ttxuid.bypassSave()
+
+		do TRNSET(.ttx(), TPD, BRCD, 0, PTRC, .RJ(,), .SPV(,,,), .OVR(,,), .OM(), .REJMET, .TRNINPUT(), .acn1, .acnseg1(), .acn2, .acnseg2())
+ 
+                do Runtime.commit()
+        }
+	
+	do CLOSE^JOBMON(JOBMON, RECCNT)
+
+	quit	
+
+	
+EXEC(RecordTTX ttx,		// Transaction object		/REF:RW
+     RecordACN acn,		// Account object		/NOREQ/REF:RW
+     Date TPD,			// Teller posting date	
+     Number BRCD,		// Branch code		
+     Number TRNMODE,		// Transaction mode [*]	
+     Number TRNSEQ,		// Transaction sequence	
+     Number PTRC,		// Primary trace seq
+     Date ORIGTJD,		// Original system date
+     Date ORIGTPD,		// Original teller posting date
+     String TRNPSSTK,		// Primary/secondary stack [*]	/REF:RW
+     RecordTTX TTXOBJS(),	// ttx objects [*]		/REF:RW
+     String SPV(,,,),		// Supervisory array		/REF:RW
+     String OVR(,,),		// Override array		/REF:RW
+     String RJ(,),		// Rejected array		/REF:RW
+     String OM(),		// Output array			/REF:W
+     String TRNDRVI(,,),	// Misc info [*]		/REF:RW
+     RecordACNSEG acnseg())	// Account segments		/REF:RW
+
+	/*
+	Process a transaction
+	
+	ARGUMENT NOTES:
+	
+	   . TRNMODE
+		0 = Batch Transaction			
+		1 = Online Transaction (from teller applications)
+		2 = Online Transaction (from non-teller applications where 
+			overrides are automatically overidden)
+		3 = Store and Forward
+		4 = System Generated Transaction
+		5 = Secondary Transaction
+		6 = Future Dated Posting File
+		
+	   .  TRNPSSTK = ,PrimCID,SecCID,SecCID,...
+	   
+	        Carries the "stack" of accounts being processed for the
+	        primary.  In EXEC, we add new account to stack, in TRNFILE
+	        we remove it.  If it's the last of that account in the list,
+	        then we can update journals, else, we save journal context
+	        in TTXOBJS.
+		
+	   .  TTXOBJS(SEQ) = ttx object array, deferred journal context
+	   
+	   	Carries each ttx record used in this section in the order they
+	   	occur if it is necessary to defer the journal updates for the
+	   	particular account.  This order will match the accounts listed
+	   	in TRNPSSTK.  When TRNFILE is called, if the account being
+	   	filed is the last reference to that account on the stack,
+	   	the journals will be filed for that account.  Otherwise the
+	   	journal context will be save in TTXOBJS until that point is
+	   	reached.
+	   	
+	   	Note that this array is also used as a public array in RECALC1.
+		
+	   . TRNDRVI(,,)
+	   
+	        TRNDRV info that may be needed across transactions.  First key
+	        indicates type of info.  All uses should be recorded here:
+	        
+                        - "CHECKS" indicator used by TRNDRV to indicate check status
+                                    0 - No check transactions in set
+                                    1 - At least one check transaction in the set
+                                    2 - Check transactions already processed
+	        	  
+	        	- "CTRFLG" flag used to indicate CUVAR.CRCDTHR processing
+	        	  on this transaction
+	        	  
+	        	- "EFDCHECK" flag used by TRNDRV to indicate that the
+	        	  effective date has already been validated
+	        	  
+	        	- "HISTLST" is set and used by LNPTS1 for creating entries
+	        	  in table HISTLST.  Complexity comes in because these
+	        	  records are filed under primary's histseq, but also
+	        	  include secondary's histseq.  See LNPTS1 for use.
+	        	   
+	        	- "isBatch" flag is set by TRNBATCH and referenced
+	        	   in calls to TTXFILE.
+	        	   
+	        	- "ReturnFile" is set by TRNBATCH to indicate value
+	        	  of ctblinc.ret
+	        	   
+	        	- "SBCHK",SEQ info set and used by EDCHK^SBNUTL
+	        	 
+			- "SBNGENMSG" flag set and used by EDCHK^SBNUTL
+			
+			- "SBNMSG" flag indicates need to call TRN^SBNUTL
+	        
+	        	- "TRNSEQ",SEQ,"TAMT" transaction amount for this sequence,
+	        	  may be needed by fee processing by ^SRVTRN.
+	
+	NOTES:
+	
+	Primary, Secondary, and System Generated
+	
+	   A transaction may be Primary or Secondary - Primary indicates it
+	   is an "initial" transaction - usually entered by a user, and
+	   therefore also updating TTX, or system generated, which does
+	   not update TTX.  A primary transaction may generate secondary
+	   transactions, i.e., transactions as a result of its actions (e.g.,
+	   fees, adjustments, etc.).  Secondaries may generate further
+	   secondaries.  From a transaction processing perspective, the
+	   "first" transaction must be a primary and there can be no
+	   other primaries.  Everything else that is generated as a result
+	   of that primary is a secondary.
+	
+	Values stored in transactions:
+	
+	   Values that may be stored in each transaction (use 
+	   .getStoredValue(literal) to reference them).  They may be set within
+	   TRNDRV, or externally, and used or set within posting programs, but
+	   should be used sparingly, as a means to associate information with
+	   a particular transaction.  Values used should be listed here.
+	   
+	   IMPORTANT NOTE:  If table update date for other tables is included
+	   		    in stored data (e.g., HISTN, DEFDTL, etc.), the
+	   		    stored value "TableUpdates" must be set to 1.  This
+	   		    allows execution of the code to updates these tables
+	   		    without having to check for each indivually.
+	
+	     CheckInfo		carries check information for checks (see CRTCK
+	     			and PBSTSSP)
+	     DEFDTL		carries data for table DEFDTL (see RECALC0)
+	     HISTSB		carries data for table HISTSB (see LNPTSU)
+	     HISTDST		carries data for table HISTDST
+	     HISTLST*		carries data for table HISTLST (see LNPTS1)
+	     HISTN		carries data for table HISTN associated with this
+	     			transaction
+	     LNDELP		carries data for table LNDELP (see LNPTS1)
+	     LNLSDT		carries date for table LNLSDT (see LNPTS1)
+	     NBTR		carries flag for table DAYENDLNNBTR (see LNPTS2)
+	     HISTSLSEG		carries data for table HISTSLSEG (see LNSEG)
+	     isPrimary		1 if primary, 0 if not
+	     noJournal		Execute posting program but don't update journal
+	     			tables
+	     noPostProgram	Skip posting program but update journal tables
+	     SETSTAT		if exists, call SESTSTAT2^LNFUNCS
+	     TableUpdates	1 if there are any sub or related table updates
+	     			carried	in stored values
+	     TranSeq		transation sequence number in ttx (use instead
+	     			of TRNSEQ)
+	     TranMode		transactio mode (use instead of TRNMODE)
+	     XHS16*		HIST.XHS16 info for secondaries (see SRVTRN2)
+
+	   Example: if ttx.getStoredValue("isPrimary") ...
+
+		Shortcuts for TranMode (use instead of ttx.itc7):
+		isPrimary (1 for primary, 0 for secondary)
+		TranMode = 4 for system generated
+		
+	TRNPSSTK, TRNDRVI() and TTXOBJS() scope issues:
+	
+	   TRNDRVI and TTXOBJS are scoped in TRNSET.  They are public in
+	   TRNSINGL since there are currently too many calls that would have
+	   to be modified.
+	
+	RETURNS:
+	
+		ER - Logical status indicating success or failure of transaction
+
+		ET - String representing error type (if applicable)
+		
+		RM - String representing retrun message associated with error
+			(if applicable)
+	*/
+
+	type public Cache %CACHE()
+
+	type public Boolean LNPTSRV
+	type public Number ER = 0
+	type public Number fdovr		// Appears to be set by BCHTTXFD
+	type public Boolean RECALSEG		// Referenced within posting pgms
+	type public String LNMDLR		// Referenced within posting pgms
+	
+	type Boolean isOnLine			// TRNMODE = 1, 2, or 3
+	type Boolean isPrimNotSys = false	// Primary, but not system generated
+	type Boolean PRMBDTLN = false
+	type Date %EffectiveDate, POSTTJD, POSTTPD
+	type Number BEGBAL, CID
+	type Number RETURNED = 0
+	type Number TCK
+	type String ETC
+	
+	catch error {
+		/*
+		 Log all non-database filer errors caught by this catch block, 
+		 then return to the caller (TRNSET or TRNSINGL). It is up to 
+		 the caller to determine the further action in the event of
+		 an error. (In the future, it may be desirable to return
+		 information in ER or RM as to the type of error, but for
+		 now, it's just an error.)
+
+		 Handle %PSL- error as a Profile application (same as %PBS) 
+		 error after manipulating presentation. Currently Profile 
+		 application errors are not processed by this catch block but 
+		 are controlled in the TRNSET section.
+		 
+		 RM will be set with a generic message to indicate which table
+		 the record is not on file for, and not log the error in SCAER. 
+		 Profile Direct will use only the first part of the message.
+		 Examples:
+		 Record Not On File  (%PSL-E-RECNOFL - ACN, EXEC+41^TRNDRV)
+		 Missing required data item PAYEE  
+		 (%PSL-DBFILER - LNAMOAO, vai1+30^LNAMOFL)
+
+		 No overrides are possible for errors, so kill SPV.
+		*/
+		
+		type public Number CID , ER
+		type public String RM
+
+		if error.type.isLike("%%PSL-%") ! (error.type.isLike("%%PBS-%")) do {
+			
+			type String SOURCE = "  ("_error.type_" - "_error.context_", "_error.thrownAt_")"
+			
+			if error.description.isNull() do {
+				type String KEY
+				
+				set KEY = error.type.piece("-",3)
+				if KEY.isNull() quit
+				
+				type RecordSTBLER stbler = Db.getRecord("STBLER","KEY=:KEY",1)
+				set error.description = stbler.rm_" "_stbler.rm2
+			}
+
+			set RM = error.description_" "_CID_SOURCE
+		}
+		else  do ZE^UTLERR
+
+		// ---------- Beg 08/03/09 custom revision ----------
+		// kill SPV(TRNSEQ)
+		// ---------- End 08/03/09 custom revision ----------
+		
+		set ER = 1
+	}
+	
+	if ((TRNMODE > 0) & (TRNMODE < 4)) set isOnLine = true
+	else  set isOnLine = false
+	
+	do ttx.setStoredValue("TranSeq", TRNSEQ)
+	do ttx.setStoredValue("TranMode", TRNMODE)
+	
+	if (TRNMODE <> 5) do {
+		
+		do ttx.setStoredValue("isPrimary", 1)
+		
+		if (TRNMODE <> 4) set isPrimNotSys = true
+	}
+	else  do ttx.setStoredValue("isPrimary", 0)
+	
+	set %EffectiveDate = ttx.efd
+	
+	/* Check Maximum Days Allowed set for back-dated and future-dated
+	   transactions, by Userclass.  Only check for primary transactions,
+	   and only need to check once per transaction set, since all effective
+	   dates must be the same.
+	*/
+	if '%EffectiveDate.isNull(), isPrimNotSys, 'TRNDRVI("EFDCHECK").get(), (isOnLine ! ((TRNMODE = 0) & (CUVAR.TRNCKEFD > 0))) do { quit:ER
+
+		// Remember that we've checked this set so we don't do it again.
+		set TRNDRVI("EFDCHECK") = 1
+		
+		type RecordSCAU0 scau0 = %CACHE("SCAU0").getRecord("SCAU0", "%UserClass")
+
+		// Maximum Days Allowed for Back-Dated Transactions
+		if ((%EffectiveDate + scau0.maxefd) < TPD) do { quit
+			
+			type String DATE = ({Date}(%SystemDate - scau0.maxefd)).toString()
+			type String UCLS = %UserClass
+			
+			// Userclass ~p1 not authorized to effective-date prior to ~p2
+			do Runtime.setErrMSG("TTX", 2899, "UCLS~DATE")
+		}
+
+		// Maximum Days Allowed for Future-Dated Transactions
+		if ((%EffectiveDate - TPD) > scau0.maxft) do { quit
+			
+			type String DATE = ({Date}(%SystemDate + scau0.maxft)).toString()
+			type String UCLS = %UserClass
+			
+			// Userclass ~p1 not authorized to effective date after ~p2		
+			do Runtime.setErrMSG("TTX", 8169, "UCLS~DATE")
+		}
+
+		// Exceeds maximum days for future dated transactions
+		if 'scau0.ovrft.isNull(), ((%EffectiveDate - TPD) > scau0.ovrft) set OVR("*", "OVR", "MAXFT") = ""
+
+		// Exceeds maximum days allowed for EFD transactions
+		if 'scau0.maxwo.isNull(), ((TPD - %EffectiveDate) > scau0.maxwo) set OVR("*", "OVR", "MAXEFD") = ""		  
+	}
+	
+	set CID = ttx.cid
+	set ETC = ttx.etc
+
+	/*
+	POSTTJD and POSTTPD are used to file backdated loan transactions 
+	(including intervening transactions posted by the unwind / reapply 
+	process) to journal files on the true system date, even though they 
+	processed as if the system date was the effective date (this will 
+	have no effect on deposit accounts b/c they are never processed as if 
+	the system date was the effective date).
+	*/
+	if (ORIGTJD.get() > 0) set POSTTJD = ORIGTJD
+	else  set POSTTJD = %SystemDate
+	if (ORIGTPD.get() > 0) set POSTTPD = ORIGTPD
+	else  set POSTTPD = TPD
+	
+	// Support generic debit and credit tran codes
+	if ((ETC = "*DR*") ! (ETC = "*CR*")) do {
+		
+		type String savetc = ETC
+		
+		if 'acn.exists() set acn = Db.getRecord("ACN", "CID = :ttx.cid")
+		
+		type RecordPRODCTL prodctl = %CACHE("PRODCTL").getRecord("PRODCTL", "TYPE=:acn.type")
+		
+		if (ETC = "*DR*") set ETC = prodctl.drtrgp
+		else  set ETC = prodctl.crtrgp
+		
+		// Invalid transaction code ~p1
+		if ETC.isNull() throw Class.new("Error", "%PBS-E-TRNDRV,"_($$^MSG(1498, savetc)))
+		
+		set ttx.etc = ETC		// Change from generic to correct ETC
+	}
+
+	// Invalid transaction code ~p1
+	if ETC.isNull() throw Class.new("Error", "%PBS-E-TRNDRV,"_($$^MSG(1498, ETC)))
+
+	type RecordTRN trn = %CACHE("TRN").getRecord("TRN", "ETC = :ETC", 1)
+	// Invalid transaction code ~p1
+	if trn.getMode()=0 throw Class.new("Error", "%PBS-E-TRNDRV,"_($$^MSG(1498, ETC)))
+	
+	type Number TRNMAX = trn.trmax
+	
+ 	// Amount exceeds transaction code ~p1 maximum of ~p2
+	if 'TRNMAX.isNull(), TRNMAX < ttx.tamt do Runtime.setErrMSG("TTX",4112,"ETC~TRNMAX") quit:ER
+	
+	// File Maintenance transaction - may be to CIF, DEP, or LN.
+	if ETC = "FM" do { quit
+	
+		type String COL, TBL
+
+		do ^TTXFM(ttx.tcmt, .TBL, .COL)
+
+		if TBL = "CIF" do { quit
+
+			type RecordCIF cif = Db.getRecord("CIF", "ACN = :acn.acn")
+			
+			do CIF^TTXFM(.cif, ttx.tcmt, COL)
+		}
+		
+		if 'acn.exists() set acn = Db.getRecord("ACN", "CID = :ttx.cid")
+		
+		set TRNPSSTK = TRNPSSTK.get()_","_CID
+		
+		if acn.cls = "D" do DEP^TTXFM(.acn, ttx.tcmt, COL)
+		if acn.cls = "L" do LN^TTXFM(.acn, ttx.tcmt, COL)
+		
+		do TRNFILE(.ttx, .acn, "", trn, POSTTPD, BRCD, TRNMODE, TRNSEQ, PTRC, .TRNDRVI(,,), .TRNPSSTK, .TTXOBJS(), .SPV(,,,), .OM(), .RJ(,), POSTTJD, .acnseg())
+	}
+	
+	// Determine if Primary, Backdated Loan transaction
+	if (TRNMODE '= 4), (trn.cls = "L") do {
+	
+		// Effective dated transaction -  go through unwind / reapply
+		if %EffectiveDate, %EffectiveDate < %SystemDate set PRMBDTLN = true quit
+		
+		// Error correct / reversals (not part of unwind / reapply) -  
+		// go through unwind / reapply
+		if 'LNPTSRV.get(), (ttx.itc6 ! (ttx.itc12)) set PRMBDTLN = true
+	}
+	
+	/* NOTE there appears to be a disconnect between the checking in
+	   EDCHK^SBNUTL and the checking in TRN^SBNUTL in terms of the
+	   decison to send a message.  If these could be reconciled, it
+	   is likely that "SBNMSG" could be eliminated and only
+	   "SBNGENMSG" used.
+	*/
+	if trn.sbtrn, 'trn.sbtrntyp.isNull() do {
+	
+		do EDCHK^SBNUTL(.trn, .TRNDRVI(,,), TRNSEQ)
+		set TRNDRVI("SBNMSG") = 1
+	}
+	
+	// Build Reg-E TCMT
+	if ttx.tso.isLike("%XFR%") do XFRDSC^EFTFUNCS(.ttx)
+	
+	// Save TAMT, may be needed by subsequent fee transactions
+	set TRNDRVI("TRNSEQ", TRNSEQ, "TAMT") = ttx.tamt
+	
+	// Check for check related or value dated transaction.  On finding,
+	// set up signal to TRNSET to call INIT^CRTHLD (if not already completed).
+	if (TRNDRVI("CHECKS").get() '= 2),((trn.trntyp = 2) ! (trn.trntyp = 3) ! 'ttx.vdt.isNull()) set TRNDRVI("CHECKS") = 1				
+	
+	#IF CUVAR.MXTRLM
+	// Determine if userclass transaction limits are exceeded
+	if isPrimNotSys, (isOnLine ! ((TRNMODE = 0) & (CUVAR.TRNCKLIM > 0))) do {
+	
+		type Number EXCEEDS, MAXCR, MAXDR
+
+		// Try for this tran code group first, otherwise, group "*", otherwise
+		// the no group level
+		set (EXCEEDS, MAXCR, MAXDR) = 0
+		type RecordUTBLMXUCLS2 utblmxucls2 = %CACHE("UTBLMXUCLS2").getRecord("UTBLMXUCLS2", "CRCD=:ttx.crcd AND UCLS=:%UserClass AND GRP=:trn.grp", 1)
+	
+		if (utblmxucls2.getMode() > 0) do {	
+		
+			set MAXDR = utblmxucls2.maxdr
+			set MAXCR = utblmxucls2.maxcr
+		}
+		else  do {
+		
+			type RecordUTBLMXUCLS2 utblmxucls2str = %CACHE("UTBLMXUCLS2").getRecord("UTBLMXUCLS2", "CRCD=:ttx.crcd AND UCLS=:%UserClass AND GRP='*'", 1)
+	
+			if (utblmxucls2str.getMode() > 0) do {	
+		
+				set MAXDR = utblmxucls2str.maxdr
+				set MAXCR = utblmxucls2str.maxcr
+			}
+		
+			else  do {
+	
+				type RecordUTBLMXUCLS1 utblmxucls1 = %CACHE("UTBLMXUCLS1").getRecord("UTBLMXUCLS1", "CRCD=:ttx.crcd AND UCLS=:%UserClass", 1)
+			
+				set MAXDR = utblmxucls1.maxdr
+				set MAXCR = utblmxucls1.maxcr
+			}
+		}
+	
+		if 'ttx.itc1, (ttx.tamt > MAXDR) set EXCEEDS = MAXDR
+		if ttx.itc1, (ttx.tamt > MAXCR) set EXCEEDS = MAXCR
+
+		if (EXCEEDS > 0), (TRNMODE = 1 ! (fdovr.get() = 1)) do {
+			if ("*M" [ trn.cls)) set OVR("*", "OVR", "MXUCLSTR") = EXCEEDS
+			else  set OVR(CID, "OVR", "MXUCLSTR") = EXCEEDS
+			}
+	}
+
+	#ENDIF
+	
+
+	// ---------- Beg 08/03/09 custom revision ----------
+	// Call custom future-dated pre-processor
+	if (ttx.efd > %SystemDate) do ^ZKTBFDT(.acn,.ttx,.trn) quit:ER
+	// ---------- End 08/03/09 custom revision ----------
+
+	// Miscellaneous transaction (*, M or null)
+	if ("*M" [ trn.cls)) do EXECMISC(.ttx, trn, TRNMODE, TRNSEQ, PTRC, BRCD, POSTTPD, ORIGTPD, POSTTJD, .OVR(,,), .SPV(,,,), .OM(), RJ(,), .TRNDRVI(,,), LNPTSRV.get(), RECALSEG.get()) quit
+
+	// If the account object isn't passed in, load it
+	if 'acn.exists() set acn = Db.getRecord("ACN", "CID = :CID")
+
+	#IF (CUVAR.NOSEGMENTS'=1)!($$SEGUSE^BTTOPTMZ(""))
+		// Load segments if applicable and not passed in
+		if acnseg("").order().isNull() do {
+			type Boolean QUIT
+				
+			if acn.cls = "D"  do { quit:QUIT
+				type RecordDEP dep = {RecordDEP}acn
+				if 'dep.segflg set QUIT = true
+				else  set QUIT = false
+				}
+			else  do { quit:QUIT
+				type RecordLN ln = {RecordLN}acn
+				if 'ln.segments set QUIT = true
+				else  set QUIT = false
+				}
+
+			type Number SEGMENT
+			
+		        type ResultSet rs = Db.select("SEGMENT", "ACNSEG", "CID=:acn.cid")
+		        while rs.next() do {
+		        	set SEGMENT = rs.getCol("SEGMENT")
+               			set acnseg(SEGMENT) = Db.getRecord("ACNSEG", "CID=:CID,SEGMENT=:SEGMENT")
+			        }
+			}
+	#ENDIF
+	
+	// Future-dated transaction
+	if (ttx.efd > %SystemDate) do { quit
+
+		if (acn.stat > 0), (acn.stat <> 4) set OVR(CID, "OVR", "STAT"_acn.stat) = ""
+
+		if acn.rflg do ^UFLG(.acn)
+		
+		if OVR.data(), 'LNPTSRV.exists() do ^CRTOVR(.ttx)
+		
+		if (ER = 0) do ^TTXFDT(.ttx, .trn, .OM())
+	}
+	
+	if ttx.itc.isNull() set ttx.itc = trn.itc
+	if ttx.itc.isNull(), ttx.tamt.isNull() quit
+	
+	// Save beginning balance for ENDBAL calculation
+	set BEGBAL = acn.bal
+	
+	// Add account to the stack, unless primary on backdated loan, since
+	// won't do those updates here
+	if 'PRMBDTLN set TRNPSSTK = TRNPSSTK.get()_","_CID
+
+	if (ttx.getStoredValue("isPrimary") = 0) set TRNSEQ = TRNSEQ + .001
+	
+	// Posting program
+	type String PGM = trn.pgm
+
+	// Don't do for Error Correction or Reversal Transaction that is to be
+	// journaled but not processed
+	if (ttx.itc6 ! ttx.itc12), 'ttx.getStoredValue("noPostProgram") do { quit:ER
+
+		type Number HSEQ
+		
+		if 'trn.pgmec.isNull() set PGM = trn.pgmec
+
+		if ttx.itc6, 'ttx.itc7 do EC(.ttx, BRCD, TPD, ORIGTPD, RECALSEG.get()) if ER quit
+		set HSEQ = ttx.tso.getSub("REV","~","#")
+
+		// History sequence number required to process reversal transactions
+		if 'HSEQ do Runtime.setErrMSG("TTX",1183) if ER quit
+
+		type RecordHIST hist = Db.getRecord("HIST","CID = :ttx.cid,TSEQ = :HSEQ")
+		
+		if ttx.itc12,'ttx.itc7 do { quit:ER
+		
+			type Number TRC = ttx.tso.getSub("EC", "~", "#")
+		
+			// Unable to locate transaction in account history
+			if '$$MATCH(.ttx, .hist, BRCD, TRC, 1) do Runtime.setErrMSG("HIST",2793) if ER quit
+			}
+						
+		// Reverse Transaction Amounts
+		set ttx.tamt = $$REVTAMT(hist.tamt)
+	}
+
+	// Invalid transaction code
+	if (trn.grp '= acn.grp) do Runtime.setErrMSG("TTX",1498) if ER quit
+	
+	// Check transaction authorization
+	// If TRNAUT defined for UCLS="*", it means tran code valid for all userclasses
+	if isPrimNotSys, (isOnLine ! ((TRNMODE = 0) & (CUVAR.TRNCKAUTH > 0))), '%CACHE("TRNAUT").isDefined("TRNAUT", "ETC=:ETC,UCLS='*'") do { if ER quit
+
+		type RecordTRNAUT trnaut = %CACHE("TRNAUT").getRecord("TRNAUT", "ETC=:ETC,UCLS=:%UserClass", 1)
+
+
+		if ttx.itc12 = 0 do {
+			// ~p1 passbook transactions not allowed by userclass ~p2
+			if 'trnaut.bnr.extract(1) do Runtime.setErrMSG("TTX", 3064, trn.etc_"~"_%UserClass)
+		}
+		else  do {
+			// ~p1 Reversed transactions not allowed by userclass ~p2
+			if 'trnaut.bnr.extract(3) do Runtime.setErrMSG("TTX", 6583443, trn.etc_"~"_%UserClass)
+		}
+	}
+	
+	// Process closed account - Allow only E/Cs or reversals for current date if acct closed
+	if (acn.stat = 4), 'ttx.etc.isNull(), 'ttx.itc6, ('ttx.itc.isNull() ! (trn.trntyp = 3)) do { quit:ER
+	
+		type String REV = ttx.tso.getSub("REV","~","#")
+	
+		// Account closed
+		if 'ttx.itc12 do Runtime.setErrMSG("TTX",55) quit:ER
+
+		//Account closed
+		if REV.isNull() do Runtime.setErrMSG("TTX",55) quit:ER
+
+		type DbSet ds = Db.selectDbSet("HIST", "CID = :ttx.cid and ITC is not null and (ITC7 = 0 OR ITC7 = 2)", "TSEQ DESC")
+				
+	
+		if ds.next() do {
+		
+			type RecordHIST hist = ds.getRecord("HIST")
+	
+			// Acct stat must be active to reverse prior sys dated closeout
+			if (hist.tjd < %SystemDate), acn.cls = "D" do Runtime.setErrMSG("HIST",2421) quit:ER
+	
+			// Account closed
+			if (REV '= hist.tseq) do Runtime.setErrMSG("HIST",55)
+		}
+	}
+	
+	#IF CUVAR.%MCP
+	if ttx.vdt, (ttx.vdt < %SystemDate), (ttx.efd > ttx.vdt) set %EffectiveDate = ttx.vdt
+	if ttx.crcd.isNull() set ttx.crcd = %SystemCurrency
+
+	// Invalid currency code
+	if (ttx.crcd '= acn.crcd) do Runtime.setErrMSG("TTX", 1293) quit:ER
+	#ENDIF
+
+	#IF CUVAR.%MCP&'CUVAR.EMUCRCD.isNull()
+	if $$EMULIM(ttx.crcd, %UserID) = 1 set OVR("*", "OVR", "EURLIM") = ""
+	#ENDIF
+
+	#IF CUVAR.SCAUREL
+	// Check for related accounts restriction
+	type public Number RELACCTS()
+		
+	if RELACCTS(acn.acn).exists() set OVR(CID,"OVR", "RELATED") = acn.acn
+	#END
+
+	// Execute post-processor
+	// Siripong - 06Jul10 - Begin
+	// #ACCEPT DATE=10/15/02; PGM=Erik Scheetz; CR=unknown
+	// if (TRNMODE = 0), 'trn.ppb.isNull() xecute trn.ppb quit:ER
+	#ACCEPT DATE=10/15/02; PGM=Erik Scheetz; CR=unknown
+	if ((TRNMODE = 0)!(TRNMODE = 2)), 'trn.ppb.isNull() xecute trn.ppb quit:ER
+	// Siripong - 06Jul10 - End
+	
+	// Process transaction if caller does not indicate to skip
+	if 'ttx.getStoredValue("noPostProgram") do { if ER kill OVR quit
+
+		// Optimize most frequently used posting programs by calling directly
+		if PGM.beginsWith("^DEPPO(") do { quit
+			
+			do ^DEPPO(.acn, .ttx, .trn, .acnseg())
+			if ER kill OVR, SPV
+			if '(ttx.itc7 ! (TRNSEQ # 1) ! (TRNMODE = 5) ! (TRNMODE = 4)) do {
+			
+				/*
+				Update non-Sufficient Funds counters
+
+	   			Updates the counters for negative balance, NSF
+	   			and returned items and processes any overrides.
+	   			If an item is flagged as returned, only update
+	   			the returned item counter if the transaction is
+	   			not overridden.
+				*/
+
+				if ER, (TRNMODE = 0), (RETURNED = 1) do RET^DEPNSF(.acn, ttx.tamt) quit
+
+				if (OVR.data() > 0), 'LNPTSRV.exists() do ^CRTOVR(.ttx) quit:ER
+
+				if (acn.bal < 0) do ^DEPNSF(.acn)
+			}
+		}
+		
+		if PGM.beginsWith("^DEPPI(") do ^DEPPI(.acn, .ttx, trn, .acnseg()) quit
+		if PGM.beginsWith("^LNPTS2(") do ^LNPTS2(.acn, .ttx, trn, .acnseg()) quit
+
+		if PGM.isNull() quit
+
+		do @PGM
+	}
+	
+	/*
+	Check overrides for non-secondary (i.e., primary and system-generated) 
+	transactions only. If restrictions are not overridden, return ER
+	*/
+	if OVR.data(), (ttx.itc7 '= 1), (TRNMODE <> 5), 'LNPTSRV.exists() do ^CRTOVR(.ttx) quit:ER
+	
+	// If system generated pseudo-primary transfer - reapply
+	if (TRNSEQ # 1 <> 0), (ttx.itc7 = 2), ttx.tcmt.isLike("%TFR-%") set ttx.tso = ttx.tso.putSub(1,"REAPPLY", "~", "#")
+
+	// Trigger hold processing for value date transaction
+	if (ttx.vdt > $select(%EffectiveDate.isNull():%SystemDate,1:%EffectiveDate)) set TCK = 1
+	
+	do TRNFILE(.ttx, .acn, BEGBAL, trn, POSTTPD, BRCD, TRNMODE, TRNSEQ, PTRC, .TRNDRVI(,,), .TRNPSSTK, .TTXOBJS(), .SPV(,,,), .OM(), .RJ(,), POSTTJD, .acnseg())
+
+	quit
+
+
+EXECMISC(RecordTTX ttx,		// Transaction object		/REF:RW
+	 RecordTRN trn,		// Transaction Code object	
+	 Number TRNMODE,	// Transaction mode		
+	 Number TRNSEQ,		// Transaction sequence		
+	 Number PTRC,		// Primary trace seq
+	 Number BRCD,		// Branch code
+	 Date TPD,		// Teller posting date
+	 Date ORIGTPD,		// Original TPD
+	 Date POSTDATE,		// Posting date	
+	 String OVR(,,),	// Override array		/NOREQ/REF:W
+	 String SPV(,,,),	// Override array
+	 String OM(),		// Output records		/NOREQ/REF:W
+	 String RJ(,),		// Reject array
+	 String TRNDRVI(,,),	// Misc info, per transcation	/NOREQ/REF:RW
+	 Boolean LNPTSRV,
+	 Boolean RECALSEG)
+	 
+	// Process Miscellaneous transaction
+
+	type public Cache %CACHE()
+	
+	type public Number ER
+	
+	// Assignment of %SystemDate is for use by filers, if necessary
+	#ACCEPT Date=05/25/2007; Pgm=RussellDS; CR=27249; Group=Sysvar
+	type Date %SystemDate = POSTDATE
+	
+	if (ttx.efd > %SystemDate) do ^TTXFDT(.ttx, .trn, .OM()) quit
+
+	if (trn.cls = "M") do { if ER quit
+		
+		if ttx.cid.isNull() set ttx.cid = $$GLACN^TRNUTL(.trn, %UserID)
+
+		do GLAD^TTXEXT(ttx.cid)
+	}
+
+	// Siripong - 06Jul10 - Begin
+	// #ACCEPT DATE=10/15/02; PGM=Erik Scheetz; CR=unknown
+	// if (TRNMODE = 0), 'trn.ppb.isNull() xecute trn.ppb if ER quit
+	#ACCEPT DATE=10/15/02; PGM=Erik Scheetz; CR=unknown
+	if ((TRNMODE = 0)!(TRNMODE = 2)), 'trn.ppb.isNull() xecute trn.ppb if ER quit
+	// Siripong - 06Jul10 - End
+
+	#IF CUVAR.%MCP&('CUVAR.EMUCRCD.isNull())
+	if ($$EMULIM(ttx.crcd,%UserID) = 1) set OVR("*", "OVR", "EURLIM") = ""
+	#ENDIF
+
+	if ttx.itc6, 'ttx.getStoredValue("noPostProgram") do { if ER quit
+
+		type String TRC = ttx.tso.getSub("EC", "~", "#")
+
+		// Teller sequence number required to process error-correct 
+		// transactions
+		if TRC.isNull() do Runtime.setErrMSG("TRN",2620) quit
+
+		/*
+		 If coming in from RECALSEG, or if this is a secondary or system
+		 generated offset, the EC value in TSO will have been set correctly. 
+		 There is no reason to scan ttx (ECSCAN) if called from RECALSEG.
+		*/
+		if ('RECALSEG.get())&('ttx.itc7) set TRC = $$ECSCAN(ttx.itc6, TRC, TPD, ORIGTPD)
+
+		// Unable to locate transaction on the HOST
+		if TRC.isNull() do Runtime.setErrMSG("TTX",2794) quit
+		
+		set ttx.tso = ttx.tso.putSub(TRC,"EC","~","#")
+	}
+
+	#IF CUVAR.CRCDTHR
+	
+	/*
+	If cash transaction in on-line or store and forward, check if
+	it exceeds the CUVAR.CRCDTHR Currency Transaction Threshold.
+	*/
+	
+	if ((TRNMODE = 1) ! (TRNMODE = 3)), (trn.trntyp = 1), +ttx.tamt do {
+			
+		type Number CTRAMT = +ttx.tamt
+
+		if 'ttx.sysbase.isNull() set CTRAMT = ttx.sysbase
+			
+		if (CTRAMT '< CUVAR.CRCDTHR) set TRNDRVI("CTRFLG") = true
+	}
+	#ENDIF
+
+	type String PGM = trn.pgm
+	
+	if (ttx.itc6 ! ttx.itc12),'trn.pgmec.isNull() set PGM = trn.pgmec
+	
+	if 'PGM.isNull(), 'ttx.getStoredValue("noPostProgram") do @PGM if ER kill OVR quit
+	
+	if OVR.data(), 'LNPTSRV do ^CRTOVR(.ttx) if ER quit
+
+	do TTXUPD(.ttx, TRNMODE, TRNSEQ, BRCD, PTRC, TPD, .TRNDRVI(,,), .SPV(,,,), .RJ(,), .OM(),1)
+
+	if (ttx.itc6 ! ttx.itc12), 'ttx.getStoredValue("noPostProgram") do {
+        	
+		if RJ(TRNSEQ).data() quit
+		
+		// update TTX records
+		do REVEC(.ttx, trn.cls, TRNSEQ)
+        }
+	
+	// Daily Transaction File, DMJ (DTX)
+	if (trn.cls = "M") do FILEDMJ(.ttx, ttx.cid, BRCD)
+
+	quit
+
+
+FILEEXC(RecordTTX ttx,		// Transaction object		/REF:R
+	Date TPD,		// Teller posting date	
+	Number BRCD,		// Branch code		
+	Number TRNMODE,		// Transaction mode	
+	Number TRNSEQ,		// Transaction sequence	
+	Number PTRC,		// Primary trace seq		/REF:RW
+	Number REJMET,		// Reject method
+	String TRNDRVI(,,),	// Tran driver info
+	String SPV(,,,),	// Supervisory array		/NOREQ/REF:R
+	String RJ(,))		// Reject array			/NOREQ/REF:R
+
+	type public Cache %CACHE()
+
+	type public Number %RET		// Retry Processing Indicator - from various external sources
+	type public String MARTY	// Maximum # of Retries for teller - from various external sources
+	type public String RTSN(,)	// Appears to be set by a number of batches
+
+	type String OTCMT
+
+	if ((TRNMODE = 1) ! (TRNMODE = 5)) quit		//Interactive/sub
+
+	if MARTY.get(), RJ(TRNSEQ).data() do RTY(.ttx, TRNSEQ, MARTY, REJMET, .RTSN(,), .SPV(,,,), .RJ(,))
+
+	set ttx.brcde = BRCD
+	set ttx.trc = (PTRC + TRNSEQ) \ 1
+	set ttx.uidt = %UserID
+
+	// ---------- Beg 08/03/09 custom revision ----------
+	if TRNMODE = 2, TRNDRVI("updTTX").get() do TTXUPD(.ttx, TRNMODE, TRNSEQ, BRCD, PTRC, TPD, .TRNDRVI(,,), .SPV(,,,), .RJ(,), .OM(),1)
+	// ---------- End 08/03/09 custom revision ----------
+
+	type RecordTTX ttxexc = ttx.copy()
+
+	// File reject to history
+	if RJ(TRNSEQ, "HIST").exists() do {
+	
+		type RecordHIST hist = ttx.copy("TIME=TIM,BRCD=BRCDE,UID=UIDT,XHS16=LNERC,BEN=CC")
+
+		set hist.cid = ttx.cid
+		set hist.tseq = Db.nextVal("HIST", "CID = :ttx.cid")
+		set hist.tjd = %SystemDate
+		set hist.itc = ""
+		set hist.etc = ""
+		set hist.tamt = ""
+		set hist.tcmt = RJ(TRNSEQ, "HIST")
+
+		do hist.bypassSave()
+	}
+
+	set ttxexc.tamt = +ttxexc.tamt
+	
+	set OTCMT = ttxexc.tcmt
+	set ttxexc.tcmt = RJ(TRNSEQ).piece("|",2).extract(1,510)
+	
+	if PTRC.isNull() set PTRC = $$NXTTRC(TPD,BRCD)
+
+	type RecordEXC exc = ttx.copy("BEN=CC")
+
+	set exc.tjd = TPD
+	set exc.brcd = BRCD
+	set exc.uid = %UserID
+	set exc.tseq = PTRC+TRNSEQ
+	set exc.tcmt = ttxexc.tcmt	// Reject reason
+	set exc.otcmt = OTCMT		// Original TTX.TCMT
+	set exc.otso = ttxexc.tso
+	set exc.cdt = %CurrentDate
+
+	do exc.bypassSave()
+
+	type String CIDNUM, OVRFLG, OVRSTR
+	
+	set (CIDNUM, OVRFLG, OVRSTR) = ""
+
+	for  set CIDNUM = SPV(TRNSEQ,CIDNUM).order() quit:CIDNUM.isNull()  do {
+		for  set OVRFLG = SPV(TRNSEQ,CIDNUM,OVRFLG).order() quit:OVRFLG.isNull()  do {
+			for  set OVRSTR = SPV(TRNSEQ,CIDNUM,OVRFLG,OVRSTR).order() quit:OVRSTR.isNull()  do {
+
+				type Row x = SPV(TRNSEQ,CIDNUM,OVRFLG,OVRSTR).toRow("CLSOVR,AMT","|")
+				type RecordEXC1 exc1 = Class.new("RecordEXC1")
+
+				set exc1.tjd = TPD
+				set exc1.brcd = BRCD
+				set exc1.uid = %UserID
+				set exc1.tseq = PTRC+TRNSEQ
+				set exc1.cid = CIDNUM
+				set exc1.ovrflg = OVRFLG
+				set exc1.ovr = OVRSTR
+				set exc1.clsovr = x.clsovr
+				set exc1.amt = x.amt
+				do exc1.bypassSave()
+			}
+		}
+	}
+
+	if %RET.get() do {			// File Return
+	
+		type RecordRET ret = Class.new("RecordRET", "TJD=:TPD,BRCD=:BRCD,CID=:ttx.cid,UID=:%UserID")
+		
+		set ret.tseq = PTRC + TRNSEQ
+		set ret.ret = 1
+		set ret.oret = TRNDRVI("ReturnFile").get()
+
+		do ret.save()
+	}
+
+	if ttx.itc.isNull() quit
+
+	// ---------- Beg 08/03/09 custom revision ----------
+	// kill SPV(TRNSEQ)
+	// ---------- Beg 08/03/09 custom revision ----------
+
+	type String TSO = "CID#"_ttx.cid_"~ETC#"_ttxexc.etc
+	#IF (CUVAR.GLCATOPT = 1 & $$VALID^%ZRTNS("ZRGLCAT")) if 'ttx.tso.isNull() set TSO = TSO_"~"_ttx.tso
+	
+	type String ETC
+	if ttxexc.itc1 set ETC = "TSCR"
+	else  set ETC = "TSDR"
+
+	set ttxexc.etc = ETC
+	set ttxexc.tso = TSO
+
+	// ---------- Beg 08/03/09 custom revision ----------
+	// Replace cost center for failed transaction with value in TSO when specified
+	type Number ZREJCC
+	set ZREJCC=$$FIELD^UTSO(ttx.tso,"ZREJCC")
+	if 'ZREJCC.isNull() set ttxexc.cc=+ZREJCC
+	// ---------- End 08/03/09 custom revision ----------
+
+	
+	// Reset CID to transaction suspense
+	type RecordTRN trn = %CACHE("TRN").getRecord("TRN", "ETC = :ttxexc.etc")
+
+	type Number CID = trn.acn
+	if CID.isNull() do INIT^UMSC
+	
+	// ---------- Beg 18/02/10 custom revision ----------
+	// Replace suspense account for failed transaction with value in TSO when specified
+	type Number ZTSDR,ZTSCR
+	set ZTSCR=$$FIELD^UTSO(ttx.tso,"ZTSCR")
+	set ZTSDR=$$FIELD^UTSO(ttx.tso,"ZTSDR")
+	
+	if (ETC="TSCR"),('ZTSCR.isNull()) set CID=+ZTSCR
+	else  if (ETC="TSDR"),('ZTSDR.isNull()) set CID=+ZTSDR
+	// ---------- End 18/02/10 custom revision ----------
+	
+	if ttxexc.cdt.isNull() set ttxexc.cdt = %CurrentDate
+	if ttxexc.tim.isNull() set ttxexc.tim = %CurrentTime
+	
+	do FILEDMJ(.ttxexc, CID, BRCD)
+
+	quit
+
+	
+TRNFILE(RecordTTX ttx,		// Transaction object
+	RecordACN acn,		// Account object			/REF:RW
+	Number BEGBAL,		// Account beginning balance
+	RecordTRN trn,		// TRN object
+	Date TPD,		// Processing date		
+	Number BRCD,		// Branch code			
+	Number TRNMODE,		// Transaction mode		
+	Number TRNSEQ,		// Transaction sequence		
+	Number PTRC,		// Primary trace seq
+	String TRNDRVI(,,),	// Tran Driver info			/REF:RW
+	String TRNPSSTK,	// Primary/secondary stack		/REF:RW
+	RecordTTX TTXOBJS(),	// Deferred ttx objects			/REF:RW
+	String SPV(,,,),	// Supervisory override
+	String OM(),		// Output records
+	String RJ(,),		// Reject array
+	Date POSTDATE,		// Posting date			
+	RecordACNSEG acnseg())	// Account segments			/REF:R
+
+	/* File Transaction Journal Files and update account information
+
+	   This section saves records to transaction journal tables.
+	   If a batch transaction is rejected, an entry will be filed 
+	   to EXC. If a transaction is succesfull, entries will be made
+	   to HIST, SPV1, SPV, DTJFM (for file maintenence) and DTX (for 
+	   DTJ and DMJ records). If transaction attribute set to not journal, 
+	   file to the account and skip journal filing.
+	  
+	   The HIST related journals are updated if there are no remaining
+	   instances of the account on the stack (TRNPSSTK), otherwise, journal
+	   updates are deferred until that point by putting the ttx info into
+	   TTXOBJS().
+	*/
+
+	type public Cache %CACHE()
+	type public Number ER
+	type public Boolean PRMBDTLN
+	
+	type Number CID = acn.cid
+	type String ETC = ttx.etc
+	
+	// Assignment of %SystemDate is for use by filers, if necessary
+	#ACCEPT Date=05/25/2007; Pgm=RussellDS; CR=27249; Group=Sysvar
+	type Date %SystemDate = POSTDATE
+
+	if 'PRMBDTLN do { quit: ttx.getStoredValue("noJournal")
+	
+		// Remove this account number from the stack
+		set TRNPSSTK = TRNPSSTK.piece(",", 1, TRNPSSTK.length(",") - 1)
+	
+		#IF (CUVAR.NOSEGMENTS'=1)!($$SEGUSE^BTTOPTMZ(""))
+			if ttx.getStoredValue("noJournal") do { quit
+				do acn.bypassSave()
+			
+				type Number SEGMENT = ""
+				for  set SEGMENT = acnseg(SEGMENT).order() quit:SEGMENT.isNull()  do acnseg(SEGMENT).bypassSave()
+				}
+		#ELSE
+			if ttx.getStoredValue("noJournal") do acn.bypassSave() quit
+		#ENDIF
+	
+		if 'ttx.getStoredValue("CheckInfo").isNull() do FILE^CRTCK(ttx, ttx.getStoredValue("CheckInfo"))
+		}
+		
+	do TTXUPD(.ttx, TRNMODE, TRNSEQ, BRCD, PTRC, TPD, .TRNDRVI(,,), .SPV(,,,), .RJ(,),.OM(),0)
+	
+	quit:ETC.isNull()
+
+	// Customer contact Last Date
+	if 'PRMBDTLN,trn.pcf.extract(2), 'ttx.itc6, 'ttx.itc12, (ttx.itc7 <> 1) set acn.ccld = %SystemDate
+
+	// Supervisory Overrides
+	if (SPV(TRNSEQ).data() > 0) do {
+
+		type Number CID
+		type String OVR, TYP
+		type Number TEMPPTRC
+		
+		// Make sure a trace number is defined to associate with SPV records
+		set TEMPPTRC = PTRC
+		
+		if TEMPPTRC.isNull() do {
+			// For non-batch tellers, TTXUID is used to set SPV.TSEQ
+			if ('ttx.getStoredValue("TranMode") = 4) set TEMPPTRC = $$NXTTRC(TPD, BRCD) quit
+
+			/* 
+			 For batch tellers, TTXUID is not used.  In this case, the TSEQ value
+			 will be set based on the process ID and the current system time (64 bit).
+			*/
+			
+			else  do {
+				type String TMPTSEQ
+				
+				// First seven digits for process ID
+				set TMPTSEQ = %ProcessID.toString().justify(7,-1,0,1)
+				
+				// Next 10 digits for time.  Only the last 10 digits used since the
+				// first 6 won't change for a batch unless it runs more than 10,000 seconds
+				set TMPTSEQ = TMPTSEQ_$$GETTIM^%ZFUNC().extract(7,16)
+				
+				// Last digit is for sequence (init to zero, TRNSEQ of 1 or 2 will be added)
+				set TMPTSEQ = TMPTSEQ_"0"
+				
+				set TEMPPTRC = TMPTSEQ
+				}
+			}
+		                
+                // Update SPV1 - Supervisory Override Transaction
+              	type RecordSPV1 spv1 = Db.getRecord("SPV1", "TJD=:TPD,BRCD=:BRCD,UID=:%UserID,TSEQ=:(TRNSEQ+TEMPPTRC)", 1)
+		if 'spv1.getMode() do {
+		
+			type RecordSPV1 spv1 = ttx.copy()
+			
+			set spv1.tseq = TRNSEQ + TEMPPTRC
+			do spv1.bypassSave()
+		}
+		
+		// Update SPV - Supervisory Override
+		set (CID, OVR, TYP) = ""
+
+		for  set CID = SPV(TRNSEQ, CID).order() quit:CID.isNull()  do {
+			for  set TYP = SPV(TRNSEQ, CID, TYP).order() quit:TYP.isNull()  do {
+				for  set OVR = SPV(TRNSEQ, CID, TYP, OVR).order() quit:OVR.isNull()  do {
+
+					type Row x = SPV(TRNSEQ, CID, TYP, OVR).toRow("OVRID,VALUE,TCID,GRP,SPVSTAT,OFFIND", "|")
+					type RecordSPV spv = Db.getRecord("SPV", "TJD=:%SystemDate,BRCD=:BRCD,UID=:%UserID,TSEQ=:(TEMPPTRC+TRNSEQ),CID=:CID,TYP=:TYP,OVR=:OVR", 1)
+					if spv.getMode() = 1 quit
+
+					set spv.cid = CID
+					set spv.typ = TYP
+					set spv.ovr = OVR
+					set spv.ovrid = x.ovrid
+					set spv.value = x.value
+					set spv.tcid = x.tcid
+					set spv.grp = x.grp
+					set spv.spvstat = x.spvstat
+					set spv.offind = x.offind
+					
+					do spv.bypassSave()
+				}
+			}
+		}
+	}
+
+	/*
+	Primary backdated loan transactions will be filed when posted, 
+	after unwinding the account in ^LNPTSRV. However, supervisory Override 
+	processing must be done for each transaction, so overrides set in the 
+	reapply portion of backdated transaction processing get processed.
+	*/
+	quit:PRMBDTLN
+	
+	do acn.bypassSave()
+	
+	#IF (CUVAR.NOSEGMENTS'=1)!($$SEGUSE^BTTOPTMZ(""))
+		type Number SEGMENT = ""
+		for  set SEGMENT = acnseg(SEGMENT).order() quit:SEGMENT.isNull()  do acnseg(SEGMENT).bypassSave()
+	#ENDIF
+		
+	// All updates to acn must occur before the following journal section
+	
+	// If this account is still on the stack, save context for now and quit
+	if ({List}TRNPSSTK).contains(CID) do { quit
+		
+		type Number SEQ = TTXOBJS("").order(-1) + 1
+		
+		set TTXOBJS(SEQ) = ttx.copy()
+	}
+        
+	/* We are now filing for this account, so need to do all journal updates.
+	   Apply the update for the transaction we are currently working on,
+	   then step through any entries for the same account that are in TTXOBJS,
+	   as these are delayed updates.  Move through TTXOBJS in reverse order
+	   to get the right journal order.  Delete TTXOBJS records as we use them,
+	   since none should be left for this account once done.
+	*/
+	
+	type Number ENDBAL, histseq, TTXHSEQ, SEQ
+		
+	// Get starting point for hist.tseq value for this account
+	set histseq = (Db.currVal("HIST", "CID = :CID") \ 1) + 1
+	
+	// Poke history sequence into return message - only applies to primaries
+	if OM(TRNSEQ).exists() set OM(TRNSEQ).piece("|", 6) = histseq
+	set TTXHSEQ = histseq
+		
+	set ENDBAL = BEGBAL			// Starting balance
+	
+	// File for this ttx
+	do FILEJRNS(ttx, .acn, histseq, .ENDBAL, .TRNDRVI(,,), .TTXOBJS(), .OM())
+	
+	// Done if no deferred journals.  Otherwise need to process any for
+	// this account.
+	
+	quit:(TTXOBJS.data() '> 0)
+
+	/*
+	TTXOBJS array and HISTDST of each entry in the TTXOBJS array are 
+	processed to file the secondary and tertiary transaction in correct 
+	order in the HIST table.
+	Tertiary transactions are the secondary transaction triggered by 
+	another secondary transaction.
+	Loan transaction and deposit transactions which are not having HISTDST
+	stored values are not affected by first loop.
+
+	First loop process the TTXOBJS in backward to find tertiary transaction
+	and set the stored value TertiarySeqs of TTXOBJS entry of secondary 
+	transaction with all its tertiary transaction sequence with its owner
+	transaction sequence number and to set stored value isTertiary of
+	tertiary with 1 to mark it as tertiary.
+	Second loop skips the process for tertiary transaction by checking
+	flag set in the stored value of isTertiary stored value. These tertiary
+	transactions will processed as part of its owner, after processing the
+	owner.
+
+	For example, let us consider the transaction DW (Primary) -> CHGD 
+	(Secondary) -> DWCTF (Tertiary).
+	After the first loop TertiarySeqs stored value of the transaction CHGD
+	will have the TTXOBJS array index of DWCTF transaction and isTertiary
+	stored value of the DWCTF will be flagged to 1.
+	Second loop skips DWCTF when it picks the record from TTXOBJS array and
+	process the CHGD transaction followed by DWCTF transaction using 
+	sequence available in TertiarySeqs stored value of TTXOBJS entry of CHGD.
+
+	HIST entry will have DW, CHGD and then DWCTF.
+	*/
+	set SEQ = ""
+	for  set SEQ = TTXOBJS(SEQ).order(-1) quit:SEQ.isNull()  if (TTXOBJS(SEQ).cid = CID) do {
+
+		/*
+		Process TTXOBJS array to find tertiary transactions and build 
+		the list of tertiary sequence in the stored value of TTXOBJS.
+		*/
+
+		type String HISTDST, SNGHIST
+		type Number I, NEXTSEQ, TTXSEQ
+		type Boolean DONE = false
+	
+		set HISTDST = TTXOBJS(SEQ).getStoredValue("HISTDST")
+
+		// Quit, if no secondaries for this secondary transaction
+		if HISTDST.isNull() quit
+
+		set TTXSEQ = SEQ
+
+		// Process all secondaries of this secondary transaction
+		for I = 1:1:HISTDST.length(9.char()) do {
+
+			set NEXTSEQ = SEQ
+			set SNGHIST = HISTDST.piece(9.char(),I)
+
+			// Quit, if the tertiary belongs to other account
+			if SNGHIST.piece("|",1) <> CID quit
+
+			for  set NEXTSEQ = TTXOBJS(NEXTSEQ).order(-1) quit:NEXTSEQ.isNull()  if (TTXOBJS(NEXTSEQ).cid = CID) do { quit:DONE
+
+				// Find out the corresponding TTXOBJS sequence
+				if TTXOBJS(NEXTSEQ).etc = SNGHIST.piece("|",3) , (TTXOBJS(NEXTSEQ).tamt = SNGHIST.piece("|",4)) , (TTXOBJS(NEXTSEQ).tso = SNGHIST.piece("|",7)) do {
+
+					// Poke tertiary sequence into its owner
+					if TTXOBJS(SEQ).getStoredValue("TertiarySeqs").isNull() do TTXOBJS(SEQ).setStoredValue("TertiarySeqs", NEXTSEQ_"#"_I)
+					else  do TTXOBJS(SEQ).setStoredValue("TertiarySeqs", TTXOBJS(SEQ).getStoredValue("TertiarySeqs")_"|"_NEXTSEQ_"#"_I)
+
+					// Flag it as tertiary
+					do TTXOBJS(NEXTSEQ).setStoredValue("isTertiary", 1)
+					set DONE = true
+				}
+			}
+		}
+	}
+
+	set SEQ = ""
+	for  set SEQ = TTXOBJS(SEQ).order(1) quit:SEQ.isNull()  if (TTXOBJS(SEQ).cid = CID) do {
+
+		/*
+		Process the TTXOBJS to file the secondary and tertiary 
+		transaction in correct order.
+		*/
+
+		type Number I, PHSEQ, TMPSEQ
+		type String SNGHIST
+
+		/*
+		Skip Tertiary transaction, these are processed after its 
+		own primary transaction.
+		*/
+		if TTXOBJS(SEQ).getStoredValue("isTertiary") quit
+
+		set histseq = histseq + 1
+
+		// Process secondary transaction
+		do FILEJRNS(TTXOBJS(SEQ), .acn, histseq, .ENDBAL, .TRNDRVI(,,), .TTXOBJS(), .OM())
+
+		// Process secondaries to get its HISTDST.DSTSEQ
+		for I = 1:1:ttx.getStoredValue("HISTDST").length(9.char()) do {
+
+			set SNGHIST = ttx.getStoredValue("HISTDST").piece(9.char(),I)
+
+			// Find out the corresponding TTXOBJS sequence
+			if TTXOBJS(SEQ).etc = SNGHIST.piece("|",3) , (TTXOBJS(SEQ).tamt = SNGHIST.piece("|",4)) , (TTXOBJS(SEQ).tso = SNGHIST.piece("|",7)) set TMPSEQ = I
+
+		}
+
+		type RecordHISTDST histdst = Db.getRecord("HISTDST", "CID=:CID,TSEQ=:TTXHSEQ,DSTSEQ=:(TMPSEQ.get() * .01)", 1)
+
+		if histdst.getMode() do {
+			set histdst.rseq = histseq
+			do histdst.bypassSave()
+			}
+
+		// Quit, if no secondaries of this secondary transaction
+		if TTXOBJS(SEQ).getStoredValue("TertiarySeqs").isNull() kill TTXOBJS(SEQ) quit
+
+		set PHSEQ = histseq
+
+		// Process all the secondaries of this secondary transaction
+		for I = 1:1:TTXOBJS(SEQ).getStoredValue("TertiarySeqs").length("|") do {
+
+			type Number TERSEQ
+
+			set histseq = histseq + 1
+			set TERSEQ = TTXOBJS(SEQ).getStoredValue("TertiarySeqs").piece("|",I).piece("#",1)
+
+			// Process tertiary transaction
+			do FILEJRNS(TTXOBJS(TERSEQ), .acn, histseq, .ENDBAL, .TRNDRVI(,,), .TTXOBJS(), .OM())
+
+			set TMPSEQ = TTXOBJS(SEQ).getStoredValue("TertiarySeqs").piece("|",I).piece("#",2) * .01
+			type RecordHISTDST histdst = Db.getRecord("HISTDST", "CID=:CID,TSEQ=:PHSEQ,DSTSEQ=:TMPSEQ", 1)
+
+			if histdst.getMode() do {
+				set histdst.rseq = histseq
+				do histdst.bypassSave()
+				}
+
+			kill TTXOBJS(TERSEQ)
+		}
+
+		// Done with this secondary transaction and its secondaries
+		kill TTXOBJS(SEQ)
+	}
+	
+	quit
+	
+	
+FILEJRNS(RecordTTX ttx,		// ttx record being filed		/REF:RW
+	 RecordACN acn,		// Account record
+	 Number histseq,	// History sequence number
+	 Number ENDBAL,		// Ending balance, after this tran	/REF:RW
+	 String TRNDRVI(,,),	// Tran Driver info			/REF:RW
+	 RecordTTX TTXOBJS(),	// Deferred ttx objects
+	 String OM())		// Output records
+	 
+	type public Cache %CACHE()
+	type Number CID, transeq, TMODE
+	
+	set CID = acn.cid
+	
+	/* Save HistSeq for use by various utilities, e.g, OM^TRNUTL, ^SRVTRN2
+	   NOTE:  This information is not available until AFTER the transaction
+	   has processed and the journals have been filed.  It cannot be
+	   used within transaction processing programs, except for those
+	   functions called within this subroutine.
+	*/
+	do ttx.setStoredValue("HistSeq", histseq)
+	
+	if ttx.itc1 = acn.trb set ENDBAL = ENDBAL - ttx.prin
+	else  set ENDBAL = ENDBAL + ttx.prin
+	if 'ttx.tamt.isNull() set ttx.endbal = ENDBAL
+
+	set TMODE = ttx.getStoredValue("TranMode")
+	if ttx.getStoredValue("isPrimary"),$$TTXFILE(TMODE) do ttx.bypassSave()
+	
+	set transeq = ttx.getStoredValue("TranSeq")
+	
+	// Poke ending balance into return message - only applies to primaries
+	if OM(transeq).exists(), ttx.getStoredValue("isPrimary") set OM(transeq).piece("|", 5) = ENDBAL
+	
+	if (ttx.itc6 ! ttx.itc12), 'ttx.getStoredValue("noPostProgram") do {
+	
+		type Number CKNOEC()
+        	
+		type RecordTRN trn = %CACHE("TRN").getRecord("TRN", "ETC=:ttx.etc")
+		
+		// Create HISTR and CKNOEC() array
+		do REVEC(.ttx, trn.cls, transeq, histseq, .CKNOEC())
+		
+		quit:(acn.cls '= "D")
+		
+		// Update holds-related tables and account fields		
+		if ttx.itc1 do REV^HLDREV(.ttx, .acn) quit
+		
+		if ttx.itc6 do CHREV^HLDREV(.ttx, .acn, .trn)
+		
+		// Check reconciliation process for EC/REV
+		quit:'CKNOEC(transeq).exists()
+		
+		type RecordDEP dep = {RecordDEP}acn
+		
+		if dep.ars do ^ARSUTL("R", dep.cid, CKNOEC(transeq), -ttx.tamt, %SystemDate)
+        }
+			
+	// Check reconciliation processing - not EC/REV
+	if 'ttx.itc1, (acn.cls = "D"), ttx.tso.getSub("CK", "~", "#") do {
+	
+		type RecordDEP dep = {RecordDEP}acn
+		
+		if dep.ars do ^ARSUTL("P", dep.cid, ttx.tso.getSub("CK", "~", "#"), +ttx.tamt, %SystemDate, "", "", histseq)
+	}
+			
+	type RecordHIST hist = ttx.copy("TIME=TIM,BRCD=BRCDE,UID=UIDT,XHS16=LNERC,BEN=CC,TJD=:%SystemDate,TSEQ=:histseq")
+
+	do hist.bypassSave()
+
+	// ---------- Beg 08/03/09 custom revision ----------
+	if acn.cls = "D" do {
+	
+		type RecordDEP dep = {RecordDEP}acn
+		if 'dep.zxhist quit
+	
+		type RecordZXHIST zxhist = Class.new("RecordZXHIST")
+		set zxhist.tjd = %SystemDate
+		set zxhist.cid = ttx.cid
+		set zxhist.brcd = ttx.brcd
+		set zxhist.uid = ttx.uid	
+		set zxhist.trc = ttx.trc
+		set zxhist.tseq = histseq
+		do zxhist.bypassSave()
+	}
+	// ---------- End 08/03/09 custom revision ----------
+	
+	// If there are sub/related-table updates, deal with them
+	if ttx.getStoredValue("TableUpdates") do {
+
+		// Transaction Notes
+		if 'ttx.getStoredValue("HISTN").isNull() do {
+			
+			type RecordHISTN histn = Class.new("RecordHISTN", "CID=:CID,TSEQ=:histseq")
+		
+			set histn.text = ttx.getStoredValue("HISTN")
+		
+			do histn.bypassSave()
+		}
+		
+		// Deposit secondary transactions (HISTDST)
+		if 'ttx.getStoredValue("HISTDST").isNull() do {
+		
+			type Number i, seq
+			type String HISTDST, X
+			
+			set HISTDST = ttx.getStoredValue("HISTDST")
+			
+			set seq = .01
+			for i = 1:1:HISTDST.length(9.char()) do {
+				
+				set X = HISTDST.piece(9.char(), i)
+				
+				quit:X.isNull()
+				
+				type RecordHISTDST histdst = Class.new("RecordHISTDST", "CID=:CID,TSEQ=:histseq,DSTSEQ=:seq")
+				
+				set histdst.acct = X.piece("|", 1)
+				set histdst.itc = X.piece("|", 2)
+				set histdst.etc = X.piece("|", 3)
+				set histdst.tamt = X.piece("|", 4)
+				set histdst.efd = X.piece("|", 5)
+				set histdst.tlo = X.piece("|", 6)
+				set histdst.tso = X.piece("|", 7)
+				set histdst.tcmt = X.piece("|", 8)
+				set histdst.cdt = %CurrentDate
+				set histdst.tim = %CurrentTime 
+				set histdst.brcde = X.piece("|", 11)
+				set histdst.trc = X.piece("|", 12)
+				set histdst.uidt = X.piece("|", 13)
+				set histdst.spr = X.piece("|", 14)
+				set histdst.tsb = X.piece("|", 15)
+				set histdst.lnerc = X.piece("|", 16)
+				set histdst.crcd = X.piece("|", 17)
+				set histdst.rate = X.piece("|", 18)
+				set histdst.vdt = X.piece("|", 19)
+				set histdst.cc = X.piece("|", 20)
+				set histdst.dir = X.piece("|", 21)
+				set histdst.chktyp = X.piece("|", 22)
+				set histdst.endbal = X.piece("|", 23)
+				set histdst.mult = X.piece("|", 24)
+				set histdst.bseamt = X.piece("|", 25)
+				set histdst.custcd = X.piece("|", 26)
+				
+				do histdst.bypassSave()
+				
+				set seq = seq + .01
+			}
+		}
+				
+		// Deposits deferred interest
+		if 'ttx.getStoredValue("DEFDTL").isNull() do {
+	
+			type Date EFDATE
+			type String X
+		
+			set X = ttx.getStoredValue("DEFDTL")
+			set EFDATE = X.piece("|", 1)
+	
+			type RecordDEFDTL defdtl = Db.getRecord("DEFDTL", "CID=:CID,INP=:EFDATE,SEQ=:histseq", 1)
+
+			set defdtl.posint = X.piece("|", 2)
+			set defdtl.negint = X.piece("|", 3)
+			set defdtl.dawa = X.piece("|", 4)
+
+			do defdtl.bypassSave()
+		}
+		
+		// Satisfied bills history
+		if 'ttx.getStoredValue("HISTSB").isNull() do HISTSB^LNPTSU(CID, histseq, ttx.getStoredValue("HISTSB"))
+		
+		// Payments To Delq Loan Accounts
+		if 'ttx.getStoredValue("LNDELP").isNull() do DELPUPD^LNPTS1(CID, histseq, ttx.getStoredValue("LNDELP"))
+		
+		// Loans Sold Daily Transactions
+		if 'ttx.getStoredValue("LNLSDT").isNull() do LNPDTUPD^LNPTS1(CID, histseq, ttx.getStoredValue("LNLSDT"))
+		
+		// History of secondary transactions
+		if ('ttx.getStoredValue("HISTLST").isNull() ! 'ttx.getStoredValue("HISTLST-Sec").isNull()) do HIS4UPD^LNPTS1(histseq, .ttx, .TRNDRVI(,,))
+		
+		// Update acn.stat for loan payoff
+		if 'ttx.getStoredValue("SETSTAT").isNull() do SETSTAT2^LNFUNCS(.acn, .ttx, histseq, ttx.getStoredValue("SETSTAT"), .TTXOBJS())
+		
+		// Update HIST.XHS16 info
+		if ('ttx.getStoredValue("XHS16-Sec").isNull() ! 'ttx.getStoredValue("XHS16-forSec").isNull()) do XHS16UPD^SRVTRN2(histseq, .ttx, .TRNDRVI(,,))
+
+		// Update Negative Balance Transfer Dayend table
+		if 'ttx.getStoredValue("NBTR").isNull() do NBTRUPD^LNPTS2(.acn, .ttx)
+
+		// Update Small Balance Threshold Processing Dayend table
+		if 'ttx.getStoredValue("SBTP").isNull() do SBTPUPD^LNPTS2(.acn)
+				
+		#IF ('CUVAR.NOSEGMENTS!(CUVAR.NOSEGMENTS=3))!($$SEGUSE^BTTOPTMZ("L"))
+		// History Sub-Ledger for Loan Segment
+		if 'ttx.getStoredValue("HISTSLSEG").isNull() do HISTSLSEG^LNSEG(CID, histseq, ttx.getStoredValue("HISTSLSEG"))
+		#ENDIF
+	}
+	
+	// Daily Transaction Journal - File Maintenance (DTJFM)
+	if (ttx.etc = "FM") do { quit
+				
+		type RecordDTJFM dtjfm = ttx.copy("UID = UIDT,BRCD = BRCDE")
+		
+		set dtjfm.tjd = %SystemDate
+		set dtjfm.cls = acn.cls
+		set dtjfm.grp = acn.grp
+		set dtjfm.typ = acn.type
+		set dtjfm.cid = CID
+		set dtjfm.tseq = histseq
+		set dtjfm.cc = acn.cc
+		
+		do dtjfm.bypassSave()
+	}
+
+	// Daily Transaction File, DTJ (DTX)
+
+	type RecordDTX dtx = ttx.copy("TIME=TIM,BRCD=BRCDE,UID=UIDT,XHS16=LNERC,BEN=CC")
+
+	if dtx.brcd.isNull() set dtx.brcd = ttx.brcd
+	if dtx.uid.isNull() set dtx.uid = ttx.uid
+	set dtx.trc = ttx.tseq
+
+	set dtx.spd = %SystemDate
+	set dtx.pid = %ProcessID
+	set dtx.seq = Db.nextVal("DTX", "SPD = :%SystemDate,PID = :%ProcessID")
+
+	// Set Summary Data fields	
+	set dtx.jnlid = "DTJ"
+	set dtx.cid = CID
+	set dtx.cc = acn.cc
+	set dtx.tseq = histseq
+	set dtx.type = acn.type
+	set dtx.glsc = acn.glsc
+
+	do dtx.bypassSave()
+	
+	quit
+	
+
+TTXUPD(RecordTTX ttx,		// Transaction object		/REF:RW
+       Number TRNMODE,		// Transaction mode		
+       Number TRNSEQ,		// Transaction sequence
+       Number BRCD,		// Branch code		
+       Number PTRC,		// Primary trace seq
+       Date TPD,		// Teller Posting Date
+       String TRNDRVI(,,),	// Tran Driver info
+       String SPV(,,,),		// Supervisor override
+       String RJ(,),		// Reject array
+       String OM(),		// Reply message data		/REF:RW	
+       Boolean SAVE)		// Save to disk or not
+
+	// File Chronological journal (TTX)
+	
+	type public Boolean PRMBDTLN
+
+	type String ITC
+	
+	if ttx.trc.isNull() set ttx.trc = (PTRC + TRNSEQ) \ 1
+
+	// Update ttx.itc
+	
+	set ITC = ttx.itc
+	
+	// Transaction overridden
+	if SPV(TRNSEQ).data() set ITC = ITC.insert(1,2,0)
+
+	// System generated (2) or Secondary transaction (1)
+	if TRNMODE = 4 set ITC = ITC.insert(2,7,0)
+	else  if TRNMODE=5 set ITC = ITC.insert(1,7,0)
+
+	// PM transaction. Specify number of PM days
+	if TPD '= %SystemDate set ITC = ITC.insert(TPD-%SystemDate,8,0)
+
+	// Passbook transaction
+	if 'ttx.tso.getSub("PBKBAL", "~", "#").isNull() set ITC = ITC.insert(1,11,0)
+
+	set ttx.itc = ITC
+	
+	set ttx.cdt = %CurrentDate
+	set ttx.tim = %CurrentTime
+
+	set ttx.ident = %Identifier.get()
+
+	set ttx.tjd = TPD
+	set ttx.brcd = BRCD
+	set ttx.brcde = BRCD
+	set ttx.uid = %UserID
+	set ttx.uidt = %UserID
+	set ttx.tseq = (PTRC + TRNSEQ) \ 1
+
+	// If primary transaction, and online or STF or future
+	if 'PRMBDTLN.get(), ('ttx.itc7), 'TRNDRVI("isBatch").get(), $$TTXFILE(TRNMODE) do {
+		
+		do ttx.setMode(0)		// Set insert mode
+		
+		if SAVE.get() do ttx.bypassSave()	// Save now if MISC transaction.  Otherwise save in FILEJRNLS
+
+		// Build message for reply
+		type Row x = "".toRow("ER,RSN,TRC,TAMT,ENDBAL","|")
+
+		set x.ER = RJ(TRNSEQ).get().piece("|",1)
+		set x.rsn = RJ(TRNSEQ).get().piece("|",2)
+		set x.trc = ttx.tseq
+		set x.tamt = ttx.tamt
+		/* NOTES re reply data:
+		     - piece 5 reserved for hist.endbal - see FILEJRNS section
+		     - piece 6 reserved for hist.tseq - see TRNFILE section
+		     - pieces 7 & 8 reserved for CTR information set in CTR^TRNUTL
+		*/
+		
+		set OM(TRNSEQ) = x.toString()
+	}
+
+	quit
+
+
+RTY(RecordTTX ttx,		// Transaction			/REF:RW
+    Number TRNSEQ,		// Transaction sequence
+    Number MARTY,		// 
+    Number REJMET,		// Reject method
+    String RTSN(,),		// Retry reason array
+    String SPV(,,,),		// Supervisor override array
+    String RJ(,))		// Reject array			/REF:RW
+
+	// Retry Processing
+
+	type Boolean RETRY, VALID
+	type Number NOSET = 0
+	type Number NRTY, RTY
+
+	/*
+	If Same Day Retry is being used (RTSN = 1), then all
+	rejected transactions are valid to retry.
+	*/
+
+	if RTSN.get() set RETRY = true
+	
+	else  do {
+
+		/*
+		Batch rejects will default to 'valid for retry'. The
+		transaction that failed (thereby causing the batch
+		rejects) determines the eligibility of the entire
+		transaction set.
+		*/
+		if RJ(TRNSEQ).piece("|",3) set VALID = true
+		else  do {
+			
+			/*
+			A transaction is valid for retry if EVERY override
+			(SPV) has a corresponding entry in the retry reason
+			array (RTSN). If no entries exist in the override
+			array (i.e., $D(SPV(SEQ))<10), the transaction is
+			NOT valid for retry. 
+			*/
+			
+			type String GRP, X, Y, Z
+
+			set VALID = false
+			set (X, Y, Z) = ""
+
+			for  set X = SPV(TRNSEQ,X).order()  quit:X.isNull()  do { quit:'VALID
+				set VALID = true
+				for  set Y = SPV(TRNSEQ,X,Y).order() quit:Y.isNull()  do { quit:'VALID
+					for  set Z = SPV(TRNSEQ,X,Y,Z).order() quit:Z.isNull()  do { quit:'VALID
+						set GRP = SPV(TRNSEQ,X,Y,Z).piece("|",4)
+						if 'RTSN(GRP,Z).exists() set VALID = false
+					}
+				}
+			}
+		}
+
+		set RETRY = VALID
+
+		/*
+		If the transaction is not valid for retry, do not retry
+		ANY transaction in the set (i.e., NOSET = 1) under
+		either of the following conditions:
+
+		1. The batch reject method is 1 (if any transaction
+		rejects, all transactions are rejected). If any
+		transaction is not valid for retry, none are
+		valid.
+
+		2. The batch reject method is 2 (if any debit rejects,
+		all transactions are rejected) and the transaction
+		is a debit. If the debit is not valid for retry,
+		none are valid.
+		*/
+		if 'VALID do {
+			if REJMET = 1 set NOSET = 1
+			if REJMET = 2,'ttx.itc1 set NOSET = 1
+		}
+	}
+		
+	set RTY = ttx.rty
+	set NRTY = ttx.tso.getSub("NRTY", "~", "#")
+
+	if NOSET!(RTY = "*") set VALID = false
+	else  set VALID = RETRY
+
+	if 'VALID set ttx.rty = 0
+	else  if RTY set ttx.rty = RTY-1
+	else  if 'NRTY.isNull() set ttx.rty = NRTY
+	else  set ttx.rty = MARTY
+
+	quit
+
+
+public FILEDMJ(RecordTTX ttx,		// Transaction			/REF:R
+	       Number CID,		// Account number
+	       Number BRCD)		// Branch code
+
+	/*
+	File Miscellaneous journal
+	
+	Also called by UMSC
+	*/
+	
+	type public Cache %CACHE()
+	
+	type RecordDTX dtx = ttx.copy("TIME=TIM,BRCD=BRCDE,UID=UIDT,XHS16=LNERC,BEN=CC")
+
+	if dtx.cdt.isNull() set dtx.cdt = %CurrentDate
+	if dtx.time.isNull() set dtx.time = %CurrentTime
+	if dtx.uid.isNull() set dtx.uid = ttx.uid
+	if dtx.brcd.isNull() set dtx.brcd = ttx.brcd
+	set dtx.trc = ttx.tseq
+
+	set dtx.spd = %SystemDate
+	set dtx.pid = %ProcessID
+	set dtx.seq = Db.nextVal("DTX","SPD = :%SystemDate,PID = :%ProcessID")
+
+	type Number CC = ttx.cc
+	if CC.isNull() do {
+		
+		type RecordTRN trn = %CACHE("TRN").getRecord("TRN","ETC = :ttx.etc")
+		
+		if 'trn.dftcc.isNull() set CC = trn.dftcc
+
+		else  do {
+			type Number XBRCD = ttx.brcde
+			if XBRCD.isNull() set XBRCD = ttx.brcd
+			if XBRCD.isNull() set XBRCD = BRCD
+	
+			type RecordUTBLBRCD rec = %CACHE("UTBLBRCD").getRecord("UTBLBRCD","BRCD = :XBRCD")
+			set CC = rec.ccdef
+		}
+	}
+
+	// Set Summary Data fields	
+	set dtx.jnlid = "DMJ"
+	set dtx.cid = CID
+	set dtx.cc = CC
+
+	do dtx.bypassSave()
+	
+	quit
+
+
+NXTTRC(Date TPD, 		// Teller posting date
+       Number BRCD)		// Branch code
+
+	/*
+	Return next transaction sequence in TTX
+	
+	   This function returns the next teller sequence defined in TTXUID 
+	   AND updates the last posted sequence in TTXUID for the sequence
+	   being returned.
+	*/
+
+	type RecordTTXUID ttxuid = Db.getRecord("TTXUID","TJD = :TPD,BRCD = :BRCD,UID = :%UserID",1)
+	
+	if ttxuid.getMode() = 0 set ttxuid.lpseq = 1
+	else  set ttxuid.lpseq = ttxuid.lpseq+1
+
+	do ttxuid.bypassSave()
+	
+	quit ttxuid.lpseq*1000
+
+
+EC(RecordTTX ttx,		// Transaction				/REF:RW
+   Number BRCD,			// Branch code
+   Date TPD,			// Teller posting date
+   Date ORIGTPD,		// Original TPD
+   Boolean RECALSEG)		// Operating on segment?
+
+	/*
+	Error Correct Transaction
+	
+	   Locate original transaction and update TSO field of the primary
+	   error-correct transaction as follows:
+
+	     a. If the transaction is processed from a REMOTE node, poke the
+	         the value of the HOST teller sequence number into the TSO
+	         sub-field EC.
+
+	     b. Poke the history sequence number into TSO sub-field REV.
+
+	*/
+	
+	type public Number ER
+	
+	type Boolean MATCH = false
+	type Number CID = ttx.cid
+	type Number HSEQ, TRC, X
+
+	set TRC = ttx.tso.getSub("EC", "~", "#")
+
+	// Teller sequence number required to process error-correct 
+	// transactions
+	if TRC.isNull() do Runtime.setErrMSG("TTX", 2620) quit
+
+ 	// If transaction coming from RECALSEG, TRC has already been set to 
+ 	// correct value
+	if 'RECALSEG.get() set TRC = $$ECSCAN(ttx.itc6, TRC, TPD, ORIGTPD)
+
+	// Unable to locate transaction on the HOST
+	if TRC.isNull() do Runtime.setErrMSG("HIST", 2794) quit
+	
+	set ttx.tso = ttx.tso.putSub(TRC, "EC", "~", "#")
+	
+	set HSEQ = ttx.tso.getSub("REV", "~", "#")
+
+	if HSEQ do {
+		
+		type RecordHIST hist = Db.getRecord("HIST", "CID = :CID, TSEQ = :HSEQ", 1)
+		
+		if hist.getMode() set MATCH = $$MATCH(.ttx, .hist, BRCD, TRC, 0)
+	}
+
+	if 'HSEQ  do {
+	
+	// ---------- Beg 08/03/09 custom revision ----------
+		type Boolean ZXHIST = false
+		if Db.isDefined("DEP",":ttx.cid") do {
+			type RecordDEP xdep = Db.getRecord("DEP",":ttx.cid")
+			if xdep.zxhist set ZXHIST = true
+		}
+		if ZXHIST set MATCH = $$FIND^ZHISTFND(ttx.cid,.ttx,.HSEQ) quit:MATCH
+	// ---------- End 08/03/09 custom revision ----------
+
+		type DbSet ds = Db.selectDbSet("HIST","CID = :CID and ITC is not null","TSEQ DESC")
+		
+		while ds.next() do { quit:MATCH ! ER
+			
+			type RecordHIST hist = ds.getRecord()
+			
+			set HSEQ = hist.tseq
+
+			set MATCH = $$MATCH(.ttx, .hist, BRCD, TRC, 0)
+		}
+	}
+
+	if ER quit
+
+	// Unable to locate transaction in account history
+	if 'MATCH do Runtime.setErrMSG("HIST", 2793) quit:ER
+
+	// Poke in history sequence number into TSO field
+	set ttx.tso = ttx.tso.putSub(HSEQ, "REV", "~", "#")
+
+	quit
+
+
+MATCH(RecordTTX	ttx,		// Transaction				/REF:R
+      RecordHIST hist, 		// History record			/REF:R
+      Number BRCD,		// Branch code
+      Number TRC,		// Trace
+      Number REV)		// Reversal indicator
+
+	// Return if matching history record
+
+	type public Number ER
+	
+	type Boolean HIT = false
+	type String HITC = hist.itc
+	
+	do {
+		if (HITC.extract(7) = 1),(ttx.itc7 '= 1) do { quit
+		
+			// Cannot reverse secondary transactions
+			if REV do Runtime.setErrMSG("HIST",309) quit:ER
+		}
+
+		if 'HITC.extract(7),ttx.itc7 quit
+		
+		if (hist.etc '= ttx.etc) quit
+		
+		if ((+hist.tamt + ttx.tamt) '= 0) quit
+		
+		if hist.efd,(hist.efd '= ttx.efd) quit
+		
+		if REV set HIT = true quit
+
+		if (hist.brcd '= BRCD) quit
+		
+		if (hist.trc '= TRC) quit
+		
+		if (hist.uid '= %UserID) quit
+		
+		set HIT = true
+	}
+
+	if HIT do {
+
+		// Transaction already error-corrected
+		if hist.itc6 do Runtime.setErrMSG("HIST",2676) quit:ER
+
+		// Transaction already reversed
+		if hist.itc12 do Runtime.setErrMSG("HIST",3544) quit:ER
+	}
+
+	quit HIT
+
+
+ECSCAN(Boolean ITC6, 			// ttx.itc6			/REF:R
+       Number TRC,			// Trace number
+       Date TPD,			// Teller posting date
+       Date ORIGTPD)			// Original TPD
+
+	// Scan local TTX table for matching sequence
+	
+	type String TSEQ = ""
+	
+	// When called by unwind/reapply processing, the TPD had been reset
+	// and needs to be set equal to the original value
+	if ITC6,(TPD < ORIGTPD.get()) set TPD = ORIGTPD.get()
+
+	type ResultSet rs = Db.select("TSEQ","TTX","TJD = :TPD and BRCD = :BRCD and UID = :%UserID and TRC = :TRC","TSEQ DESC")
+	
+	// Should use TRC if a client-based transaction, and use TSEQ if not
+	if rs.next() do {
+		
+		if %SessionID.exists() set TSEQ = TRC
+		
+		else  set TSEQ = rs.getCol("TSEQ")
+	}
+		
+	quit TSEQ
+	
+	
+REVEC(RecordTTX ttx,		// Transaction object
+      String trncls,		// Transaction class
+      Number transeq,		// Transaction sequence number
+      Number histseq,		// History sequence number
+      Number CKNOEC())		// Data for Account Reconciliation File		/REF:RW
+	    
+ 	/*
+	Transaction E/C and Reversal Utility
+	*/
+
+	type Number HSEQ, TRC 
+
+	set TRC = ttx.tso.getSub("EC", "~", "#")
+
+	// Poke E/C byte into ITC of TTX for the error-corrected transaction
+	if (TRC > 0), ttx.itc6, 'ttx.itc7 do {
+	
+		type RecordTTX ttxec = Db.getRecord("TTX", "TJD=:ttx.tjd,BRCD=:ttx.brcd,UID=:%UserID,TSEQ=:TRC", 1)
+		
+		if 'ttxec.itc.isNull() do {
+		
+			set ttxec.itc = ttxec.itc.insert(1, 6, 0)
+
+			do ttxec.bypassSave()
+		}
+	}
+	
+	// Set up entry in history reversal journal file (HISTR) and build
+	// CKNOEC entries that will be processed by FILEARS^TRNDRV
+	
+	set HSEQ = ttx.tso.getSub("REV", "~", "#")
+	
+	if (HSEQ > 0), (trncls '= "M") do {
+
+		type Number CK
+
+		type RecordHISTR histr = Db.getRecord("HISTR", "CID=:ttx.cid,TSEQ=:HSEQ", 1)
+		
+		if ttx.itc6 set histr.revflg = 1
+		else  if ttx.itc12 set histr.revflg = 2
+		else  set histr.revflg = 0
+
+		set histr.rseq = histseq
+
+		do histr.bypassSave()
+		
+		set CK = ttx.tso.getSub("CK", "~", "#")
+
+		quit:CK.isNull()
+
+		type ResultSet rs = Db.select("TSEQ", "ARS", "CID=:ttx.cid AND CKNO=:CK")
+
+		if rs.next() do {
+			
+			type Number CKNO = ""
+		
+			if (rs.getCol("TSEQ") = HSEQ) set CKNOEC(transeq) = CK
+			else  do {
+
+				type ResultSet rs1 = Db.select("TSEQ,CKNO", "ARS", "CID=:ttx.cid", "CKNO DESC")
+			
+				while rs1.next() if (rs1.getCol("TSEQ") = HSEQ) set CKNO = rs1.getCol("CKNO") quit
+
+				if CKNO.isNull() set CKNO = -1
+			
+				set CKNOEC(transeq) = CKNO
+			}
+		}
+	}
+
+	quit
+	
+
+REVTAMT(String tamt)		// Transaction amount
+
+	// Reverse component transaction amounts
+
+	type Number subamt
+	
+	for subamt=1:1:tamt.length("#") if tamt.piece("#",subamt) set tamt.piece("#",subamt) = -tamt.piece("#",subamt)
+
+	quit tamt
+
+
+	#IF CUVAR.%MCP&'CUVAR.EMUCRCD.isNull()
+EMULIM(String CRCD, 			// ttx.crcd			/REF:R
+       String UID)			// User ID
+
+	/*
+	For tellers limited to EMU, check for non-'IN' currencies
+
+	  RETURNS:
+		$$ - Non-IN currency logical		/TYP=L
+			0 - IN currency
+			1 - Non-IN currency
+	*/
+
+	type public Cache %CACHE()
+
+	type RecordSCAU scau = %CACHE("SCAU").getRecord("SCAU","UID = :UID")
+	if scau.emulim '= 1 quit 0
+	
+	if CRCD.isNull() set CRCD = %SystemCurrency
+	
+	if CRCD = CUVAR.EMUCRCD quit 0
+
+	type RecordCRCD crcd = %CACHE("CRCD").getRecord("CRCD","CO = :%CompanyName,CRCD = :CRCD")
+
+	if crcd.emu '= 1 quit 1
+	
+	quit 0
+	#ENDIF
+	
+public VERSION()
+
+	/* 
+	Return PSL compiler version indicator
+	
+	Provides a means for the PSL postTset method to determine which code
+	to generate. This only needs to change if the PSL code that is 
+	generate changes in ways that affect the interface. For the initial
+	version of TRNDRV, this value must be returned as 2 (the value of 1 
+	indicates that the old transaction processing method TTXP2, will be 
+	used). If later versions of TRNDRV require a change then this 
+	version number should be changed and postTest^UCTS changed 
+	accordingly.
+	*/
+
+	quit 2
+
+	
+TTXFILE(Number TRNMODE)			// Transaction mode
+
+	/*
+	Determine if filing to TTX is required
+
+	NOTE: TTX should not be updated in batch mode - it should be the 
+	original transaction when called from @TTXPOS, for example).  Therefore,
+	if new calls are made to TTXFILE, precede them with
+	'TRNDRVI("isBatch").get(), as per other instances in TRNDRV.
+	*/
+	
+	// If online, STF, or future - file to TTX
+	if ((TRNMODE = 1) ! (TRNMODE = 2) ! (TRNMODE = 3) ! (TRNMODE = 6)) quit 1
+	
+	quit 0
+	
+
+SEGRESET(RecordACNSEG acnseg(),			// Account segments (Processed)		/REQ/REF:RW
+	 RecordACNSEG acnsegsave())		// Account segments (Original)		/REQ/REF:RW
+	 
+	// Restore segments to original state on error 
+	
+	type Number SEGMENT = ""
+	
+	for  set SEGMENT = acnseg(SEGMENT).order(-1) quit:SEGMENT.isNull()  do {
+		if acnsegsave(SEGMENT).exists() set acnseg(SEGMENT) = acnsegsave(SEGMENT).copy()
+		
+		// Kill new segment (if any) created thru the transaction process
+		else  kill acnseg(SEGMENT)
+		}
+	
+	set SEGMENT = ""
+	for  set SEGMENT = acnsegsave(SEGMENT).order() quit:SEGMENT.isNull()  do {
+		
+		// Restore segment deleted (if any) thru the transaction process
+		if 'acnseg(SEGMENT).exists() set acnseg(SEGMENT) = acnsegsave(SEGMENT).copy()
+		}
+	
+	quit
+	

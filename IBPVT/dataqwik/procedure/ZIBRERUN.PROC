@@ -1,0 +1,116 @@
+//DO NOT MODIFY  Proc for Re-Run Scripts|ZIBRERUN|||||||1
+ /*
+	ORIG: Ravipong Chumsai Na Ayuthaya	Oct 14, 2012	
+	DESC: 
+
+---- Comments --------------------------------------------------------
+
+---- Revision History ------------------------------------------------
+
+ ****** Consider using setAuditFlag for all objects in this procedure
+   example :do dep.setAuditFlag(1)
+	
+
+ */
+ 	quit
+ 	
+LN
+ 	type String %READ,%TAB(),TBL(),VFMQ,X,ZSUFFIX
+	type Number ZRET
+	set ZRET=0
+ 	set TBL(0)="Rerun Date"
+	set TBL(1)="New(1)/Exist(2)"
+
+	set %TAB("XTJD")="|10||[SYSDEV,DTJ]TJD|||||D|Rerun Date"
+	set %TAB("ZRUN")="|1|||||||N|New(1)/Exist(2)"
+	set %READ="@@%FN,,,XTJD/REQ,ZRUN/REQ"
+
+	do ^UTLREAD if VFMQ="Q" set %BatchExit=1 quit
+	set XTJD = $$FDAT^%ZM(XTJD,"YEARMMDD")
+	
+	if ZRUN=1 set ZSUFFIX="NEW 1 "_XTJD
+	else set ZSUFFIX="EXIST 2 "_XTJD
+	
+	
+	set ZRET=$$PUTFTP("LN",ZSUFFIX)
+
+ 	
+ 	quit
+ 	
+DEP
+  	type String %READ,%TAB(),TBL(),VFMQ,X,ZSUFFIX
+	type Number ZRET
+	set ZRET=0
+ 	set TBL(0)="Rerun Date"
+	set TBL(1)="New(1)/Exist(2)"
+
+	set %TAB("XTJD")="|10||[SYSDEV,DTJ]TJD|||||D|Rerun Date"
+	set %TAB("ZRUN")="|1|||||||N|New(1)/Exist(2)"
+	set %READ="@@%FN,,,XTJD/REQ,ZRUN/REQ"
+
+	do ^UTLREAD if VFMQ="Q" set %BatchExit=1 quit
+	set XTJD = $$FDAT^%ZM(XTJD,"YEARMMDD")
+	
+	if ZRUN=1 set ZSUFFIX="NEW 1 "_XTJD
+	else set ZSUFFIX="EXIST 2 "_XTJD
+	
+	
+	set ZRET=$$PUTFTP("DEP",ZSUFFIX)
+	
+	quit 
+ 	
+PUTFTP(CLS,ZSUFFIX)
+	
+	/*
+	new SCRIPTDI,ZRESULT
+	
+	set ZRESULT=0
+	
+	write !!!,"Start sending "_FNAME_" to FTP Server, please wait...",!
+	
+	set PROFILEDIR=$$TRNLNM^%ZFUNC("PROFILE_DIR")
+	set SCRIPTDI=$$TRNLNM^%ZFUNC("SCAU_BATCH_SCRIPT")
+	
+	set ZRESULT=$$SYS^%ZFUNC(SCRIPTDI_"/ECS_PUT_D.sh "_PROFILEDIR_" "_FNAME)
+	
+	if 'ZRESULT write !,"Send "_FNAME_" to FTP Server successfully!!"
+	else  write !,"Send "_FNAME_" to FTP Server FAILED!!"
+	*/
+	set PROFILEDIR=$$TRNLNM^%ZFUNC("PROFILE_DIR")
+	set SCRIPTDI=$$TRNLNM^%ZFUNC("SCAU_BATCH_SCRIPT")
+	set SCRIPTDI=SCRIPTDI_"/IB_PUT_RERUN.sh "
+	if CLS="LN" do {
+		 set FNAME="IB_LOAN_ACCHIS_"_ZSUFFIX
+		 //set SCRIPTDI=SCRIPTDI_"/IB_PUT_RERUN.sh "
+	}
+	else do {
+		set FNAME="IB_ACCHIS_"_ZSUFFIX
+		
+	}
+
+	
+	set ZRESULT=$$SYS^%ZFUNC(SCRIPTDI_PROFILEDIR_" "_FNAME)
+	
+	
+	quit ZRESULT
+	
+PUTSW(CLS,ZSUFFIX)
+
+	set PROFILEDIR=$$TRNLNM^%ZFUNC("PROFILE_DIR")
+	set SCRIPTDI=$$TRNLNM^%ZFUNC("SCAU_BATCH_SCRIPT")
+	set SCRIPTDI=SCRIPTDI_"/IB_PUT_RERUN.sh "
+	if CLS="LN" do {
+		 set FNAME="IB_LOAN_ACCHIS_"_ZSUFFIX
+		 //set SCRIPTDI=SCRIPTDI_"/IB_PUT_RERUN.sh "
+	}
+	else do {
+		set FNAME="IB_ACCHIS_"_ZSUFFIX
+		
+	}
+
+	
+	set ZRESULT=$$SYS^%ZFUNC(SCRIPTDI_PROFILEDIR_" "_FNAME)
+	
+	
+	quit ZRESULT
+	quit 

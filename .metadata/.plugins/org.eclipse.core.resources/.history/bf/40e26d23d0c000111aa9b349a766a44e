@@ -1,0 +1,68 @@
+//DO NOT MODIFY  Batch Filter for ACN,CIF extraction|ZBSWEEP||||||ZCONVRPT|PID='ACN' or PID='CID'||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	do SYSVAR^SCADRV0()
+	
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	
+	if PID="ACN" do ACN(SEQ)
+	if PID="CID" do CIF(SEQ)
+	
+	quit
+	
+ACN(CID)
+
+	type String ZGRP 
+	type Number ZTYPE
+	type RecordACN acn = Db.getRecord("ACN","CID=:CID")
+	if acn.cls = "L"  do {
+		do ZCID^ZBCONVCN(CID)
+		set ^ZCMS("CID",CID) = ^ZCONV("CID",CID)
+	}
+	
+	else do {
+		set ZGRP=acn.grp
+		set ZTYPE=acn.type
+		//if $D(^XDTJ(TJD-1,SEQ)) set ^ZCONVEXT("ACNEXT",CID)="" quit
+		if $D(^XDTJ(TJD-1,SEQ)) do { quit
+			do ZCID^ZBCONVCN(CID)
+			set ^ZCMS("CID",CID) = ^ZCONV("CID",CID)
+		}
+		//if $D(^DTJFM(TJD-1,"D",ZGRP,ZTYPE,CID)) set ^ZCONVEXT("ACNEXT",CID)="" quit
+		if $D(^DTJFM(TJD-1,"D",ZGRP,ZTYPE,CID)) do { 
+			do ZCID^ZBCONVCN(CID)
+			set ^ZCMS("CID",CID) = ^ZCONV("CID",CID)
+		}
+	}
+	
+	quit
+	
+CIF(ACN)
+
+	type Date ZTJD
+	type String ZSEQ
+	set ZSEQ=$O(^CIFH(ACN,""),-1)
+	set ZTJD=ZSEQ.piece("|",1)
+	if ZTJD=TJD do {
+		do ZACN^ZBEXTCMS(ACN)
+		set ^ZCMS("ACN",ACN)= ^ZCONV("ACN",ACN)
+	}
+	
+	quit
+	
+---------- THREXIT ------ Section marker

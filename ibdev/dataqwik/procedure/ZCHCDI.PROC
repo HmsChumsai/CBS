@@ -1,0 +1,31 @@
+//DO NOT MODIFY  Procedure For Check UID from ZTLRJGL|ZCHCDI|||||||1
+
+ZCHK(UID)
+
+	set ZUID=UID
+	new ZRESULT
+	set (ZRESULT,EXIT)=0
+	type RecordZUTBLCHUID zchk = Db.getRecord("ZUTBLCHUID","UID=:ZUID",1)
+	if 'zchk.getMode()=0 do {
+	if zchk.CHTYPE="MOB" set ZRESULT=1
+	if zchk.CHTYPE="INT" set ZRESULT=1
+	}
+	/*
+	
+	Type ResultSet rs = Db.select("UID","ZUTBLCHUID","CHTYPE IN ('MOB','INT')")
+	while rs.next() do { quit:EXIT
+		if (rs.getCol(1)=UID) set ZRESULT=1 ,EXIT=1	
+		
+		}
+	*/	
+	quit ZRESULT
+
+ZBOO(ACN)
+
+	set ZBOO=""
+	if Db.isDefined("CIF","ACN=:ACN") do {
+	type RecordCIF cif = Db.getRecord("CIF","ACN=:ACN")
+	set ZBOO	= cif.BOO
+	}
+	
+	quit ZBOO

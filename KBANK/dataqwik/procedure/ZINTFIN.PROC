@@ -1,0 +1,179 @@
+//DO NOT MODIFY  Procedure For RMS,EDATA Extraction|ZINTFIN|||||||1
+	/*
+	 ORIG: 1 - 26/07/2012
+	 DESC: 
+	
+	 ---- Comments --------------------------------------------------------
+	
+	 ---- Revision History ------------------------------------------------
+	
+	 ****** Consider using setAuditFlag for all objects in this procedure
+	   example :do dep.setAuditFlag(1)
+
+	17/09/2012 - Anchalee Ch.
+		     Added EDATAIN section.
+	
+	*/
+	quit
+	
+RMS
+	do SYSVAR^SCADRV0()
+	type Date ZINPDAT
+	set ER=0
+	set ZINPDAT=TJD-1
+	set ZINPDAT=ZINPDAT.toString("YEARMMDD")
+	set ZSJD=(TJD-1)
+	set EXIT=0
+	
+	type IO io =Class.new("IO")
+	//set ZFID=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/PSHRS.EDCMP.RMS1D06.FCD."_ZINPDAT
+	set ZFID=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/RMSIN_"_ZINPDAT
+	
+	
+	do {	
+		do CHKIO(ZFID)
+		if ER=1 set RM =$$^MSG(2799,ZFID) quit
+		set io.fileName =ZFID
+		set io.openParams ="READ"
+		set io.recordSize =1024
+		do io.open()
+		
+		catch error {
+			
+			new ET,RM
+			set ET=error.type
+			set RM=error.description
+			set FROM=error.thrownAt
+			//set RM="ZCOLSAVE Crash"
+			write !,RM
+
+			do ^UTLERR
+		}
+		
+		for  set REC=io.read() { quit:EXIT
+			//if REC["END OF FILE" set EXIT=1 quit
+			type Date SJD,STDT,ENDT
+			type String INTRFACE,KEY,FORMAT
+			
+			set KEY=+(REC.extract(1,10))
+			set INTRFACE="RMS"
+			
+			set STDT=REC.extract(11,16)
+			set ENDT=REC.extract(17,22)
+			
+			set STDT = $$FDAT^%ZM(STDT,"DDMMYY")
+			set ENDT = $$FDAT^%ZM(ENDT,"DDMMYY")
+			set FORMAT=REC.extract(23)
+			
+			if FORMAT.isNull() quit
+			
+			//type RecordZINTFIN zint = Db.getRecord("ZINTFIN","SJD=:ZSJD,INTRFACE=:INTRFACE,KEY=:KEY",1)
+			type RecordZINTFIN zint = Class.new("RecordZINTFIN")
+			set zint.sjd = ZSJD
+			set zint.intrface = INTRFACE
+			set zint.key = KEY
+			set zint.STDT=STDT
+			set zint.ENDT=ENDT
+			set zint.FORMAT=FORMAT
+			
+			do zint.save()
+				
+		}
+		do io.close()
+	}
+	
+	quit
+	
+EDATA
+	do SYSVAR^SCADRV0()
+	type IO io2 =Class.new("IO")
+	type Date ZINPDAT
+	set ER=0
+	set ZINPDAT=TJD-1
+	set ZINPDAT=ZINPDAT.toString("YEARMMDD")
+	set ZSJD=(TJD-1)
+	set EXIT=0
+	
+	//set ZFID2=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/FSA1D712."_ZINPDAT_".txt"
+	set ZFID2=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/EDATAIN_"_ZINPDAT
+	
+	do {
+		do CHKIO(ZFID2)
+		if ER=1 set RM =$$^MSG(2799,ZFID2) quit
+		set io2.fileName =ZFID2
+		set io2.openParams ="READ"
+		set io2.recordSize =1024
+		do io2.open()
+		
+		catch error {
+			
+			new ET,RM
+			set ET=error.type
+			set RM=error.description
+			set FROM=error.thrownAt
+			//set RM="ZCOLSAVE Crash"
+			write !,RM
+
+			do ^UTLERR
+		}
+		
+		for  set REC =io2.read() { quit:EXIT
+			//if REC["END OF FILE" set EXIT=1 quit
+			type Date SJD,STDT,ENDT
+			type String INTRFACE,KEY,FORMAT
+			
+			
+			set INTRFACE="EDATA"
+			set KEY=(REC.extract(1,10))
+			set KEY=+KEY
+			set STDT=REC.extract(11,16)
+			set ENDT=REC.extract(17,22)
+			set STDT = $$FDAT^%ZM(STDT,"DDMMYY")
+			set ENDT = $$FDAT^%ZM(ENDT,"DDMMYY")
+
+			
+			// type RecordZINTFIN zint = Db.getRecord("ZINTFIN","SJD=:ZSJD,INTRFACE=:INTRFACE,KEY=:KEY",1)
+			type RecordZINTFIN zint = Class.new("RecordZINTFIN")
+			set zint.sjd = ZSJD
+			set zint.intrface = INTRFACE
+			set zint.key = KEY
+			set zint.STDT=STDT
+			set zint.ENDT=ENDT
+			set zint.FORMAT="1"
+			
+			do zint.save()
+				
+		}
+		do io2.close()
+	}
+	
+	quit
+	
+CHKIO(X)
+	// CHECK WHETHER THE FILE EXISTS OR NOT
+	set z =$$FILE^%ZOPEN(X,"READ",5)
+	if 'z do {
+		set ER =1
+		set RM =$P(z,"|",2)
+		write !,RM
+	}
+	close X
+
+	quit	
+		
+EDATARUN(Date ZTJD)	//Return eData will run for the given day or not
+
+	type String DAY
+	
+	set DAY=$$DOW^SCADAT(ZTJD)
+	
+	//If not Monday, Wednesday, or Friday then not run
+	if '{List}"Monday,Wednesday,Friday".contains(DAY) quit "D"
+	
+	//If not business date, then not run
+	if 'ZTJD.isBusDate() quit "B"
+	
+	//If last business date of month, then not run
+	if ZTJD=$$LASTBD^ZKBNKUTL(ZTJD) quit "M"
+	
+	quit 1

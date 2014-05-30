@@ -1,0 +1,138 @@
+//DO NOT MODIFY  CBS Messages Interface For GSB-Collatera|ZCBSCMS|||||||1
+
+CIFINQ(String input)
+	/* Created By Ravipong Chumsai Na Ayuthaya 04/10/11 */
+							
+	type public Number ER = 0
+	type public String RM = ""
+	type String custName, custNum, custSurname, custType, header, inqType, output, searchCond, typeValue
+	type String respCode = "0000", respDesc = ""
+	type Number ACN = "", CNT = 0, recordCount = 0,recordCifCount=0
+	type String WHERE=""
+	
+	//set header 		= input.piece("|",1,2)	
+	set SearchFlg 		= input.piece("|",3)	
+	set SearchVal1 		= input.piece("|",4)	
+	set SearchVal2		= input.piece("|",5)	
+	set LastSearchVal 	= input.piece("|",6)	
+	
+	set output =""
+	
+	/* Search for the customer based on customer citizenship card ID, passport number, or
+	   customer number.
+	   
+	   Get the customer number from the database and use that for the main select statement below */
+	
+	
+	// Base search on citizenship ID number
+	if SearchFlg = "N" do {
+		
+		// Search by customer Name
+		if 'SearchVal1.isNull() do {
+			set WHERE = "NAM LIKE '%"_SearchVal1_"%'"
+			if 'SearchVal2.isNull() set WHERE = WHERE_" AND LNM LIKE '%"_SearchVal2_"%'"
+		}
+		if SearchVal1.isNull(),'SearchVal2.isNull() set WHERE = "LNM LIKE '%"_SearchVal2_"%'"
+			
+		
+		else set ER = 1, RM = "Customer Name/Surname required " quit
+		
+		}
+	if SearchFlg = "I" do {
+		
+		// Search by Identification Number
+		if 'SearchVal1.isNull() do {
+			type ResultSet rs = Db.select("ACN","CIF","ZCIZID=:SearchVal1")
+			if 'rs.next() set ER = 1, RM = "Customer Citizenship ID Not Found: "_ SearchVal1 quit
+			set ACN = rs.getCol("ACN")
+			set WHERE = "ACN="_ACN
+			
+		}
+		else set ER = 1, RM = "Customer ID Number required " quit
+		
+	}
+	
+	if SearchFlg = "P" do {
+		
+		// Search by Passport Number
+		if 'SearchVal1.isNull() do {
+			type ResultSet rs = Db.select("ACN","CIF","PASNUM=:SearchVal1")
+			if 'rs.next() set ER = 1, RM = "Passport Number Not Found: "_SearchVal1 quit
+			set ACN = rs.getCol("ACN")
+			set WHERE = "ACN="_ACN
+		}
+		else set ER = 1, RM = "Passpord ID required " quit
+	}	
+	if SearchFlg = "T" do {
+		
+		// Search by Tax ID
+		if 'SearchVal1.isNull() do {
+			type ResultSet rs = Db.select("ACN","CIF","TAXID=:SearchVal1")
+			if 'rs.next() set ER = 1, RM = "Tax ID Not Found: "_SearchVal1 quit
+			set ACN = rs.getCol("ACN")
+			set WHERE = "ACN="_ACN
+		}
+		else set ER = 1, RM = "Customer Name required " quit
+		
+		
+	}
+	
+	do {
+	
+		type String exe()
+		
+		#ACCEPT Date=04/18/2011; Pgm=Pete Chenard; CR=unknown; Group=Dynamic
+		type ResultSet recCount = Db.select("COUNT(ACN)","CIF",WHERE)
+		if recCount.next() set recordCount = recCount.getCol(1)
+	
+	}
+	
+
+		set exit=0
+		set ztmp=""
+		type DbSet ds = Db.selectDbSet("CIF",WHERE)
+		set more="N"
+		set zwait=0
+		set sendFLG=0
+		set zstart=1
+		if 'LastSearchVal.isNull() set zstart=0
+		set i=0
+		while ds.next() do { set more="Y" quit:exit
+		
+		type RecordCIF cif = ds.getRecord()
+		
+				if (LastSearchVal=cif.acn) set zstart=1
+				if (zstart=1) do {								
+				set output.piece("|",1) = cif.acn
+				set output.piece("|",2) = cif.ztitle			
+				set output.piece("|",3) = cif.fname		
+				set output.piece("|",4) = cif.lnm			
+				set output.piece("|",5) = cif.mname			
+				set output.piece("|",7) = cif.ZCIZID			
+				set output.piece("|",9) = cif.taxid
+				if cif.pers=0 do {
+				set output.piece("|",8) = ""
+				set output.piece("|",10) = cif.mad1_cif.mad2_cif.mad3_cif.mad4_cif.mcity_cif.mstate_cif.mzip
+				
+				}
+				if cif.pers=1 do {
+				set output.piece("|",8) = "T"
+				set output.piece("|",10) = cif.zoad1_cif.zoad1_cif.zoad1_cif.zoad1_cif.zocity_cif.zostate_cif.zozip
+				
+				}				
+				
+				if (i=10) set exit=1, zstart = 0 quit 
+					
+				set header.piece("|",3) = cif.acn
+				set ztmp=ztmp_output
+				set i=i+1			
+				
+			}
+	set header.piece("|",1) = 0
+	set header.piece("|",2)	= ""	
+	set header.piece("|",4) = recordCount
+	set header.piece("|",5) = more
+	set output=""
+	set output=header_"|"_ztmp			
+	
+	quit output

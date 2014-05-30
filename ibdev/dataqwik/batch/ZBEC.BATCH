@@ -1,0 +1,49 @@
+//DO NOT MODIFY  Batch For Error Correction Report|ZBEC||||||ZSPV|||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	//set ZTASK="ERRORCORRECT"
+	do RUN(TJD,BRCD,TASK,SEQ)
+	quit
+RUN(TJD,BRCD,TASK,SEQ)
+	
+	type RecordZSPV zspv = Db.getRecord("ZSPV","TJD,BRCD,TASK,SEQ")
+	set ZCID=$P(zspv.text,".",2)
+	set ZCID2=ZCID+999
+	set ZTJD=zspv.TJD
+	set ZBRCD=zspv.BRCD
+	set ZUID=zspv.UID 
+	type DbSet ds = Db.selectDbSet("TTX","TJD=:ZTJD AND BRCD=:ZBRCD AND UID=:ZUID AND TSEQ BETWEEN :ZCID AND :ZCID2")
+	while ds.next()	{
+		set ZSEQ=ds.getRecord().TSEQ
+		//if (ZSEQ<ZCID)!(ZSEQ<(ZCID+999)) quit	
+		type RecordTTX ttx = ds.getRecord()
+		type RecordZEC zec = Db.getRecord("ZEC","TJD,BRCD,ZUID,SEQ",1)
+		
+		set zec.TIME 	= ttx.tim
+		set zec.CID	= ttx.cid
+		set zec.AMT	= ttx.TAMT
+		set zec.ETC	= ttx.ETC
+		set zec.AUTHID	= zspv.OVRID
+		set zec.CMMT	= zspv.CMT
+		
+		do zec.save()
+	}
+	
+	quit
+---------- THREXIT ------ Section marker

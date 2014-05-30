@@ -1,0 +1,283 @@
+//DO NOT MODIFY  Batch Sync For Litigation|ZBCHLITI||||||ZLITIGAT|||100|32000|ZEXTDAT|0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	/*
+	new %TAB,%READ
+	set %TAB("MOEND")="/DES=Month End/REQ/TYP=N/LEN=1"
+	set %READ="@@%FN,,MOEND"
+	do ^UTLREAD if VFMQ="Q" set %BatchExit = 1 quit
+
+	set BOMJD = $$BOMJD^SCADAT(%SystemDate)
+	if (BOMJD=%SystemDate)&(MOEND=0) set %BatchExit = 1 quit
+	if (BOMJD'=%SystemDate)&(MOEND=1) set %BatchExit = 1 quit
+
+	kill ^ZCMS("CID")
+	*/
+	do SYSVAR^SCADRV0()
+	kill ^ZLITIGAT("OUT")
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	do GENACN^ZLSUTIL
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	do Runtime.rollback()
+	if PID="OUT" quit
+	do PROC(SEQ)
+	quit
+
+PROC(ZCID)
+
+	type String ZGRP
+	type Number ZTYPE
+	if 'Db.isDefined("ACN","CID=:ZCID") quit
+	type RecordACN acn = Db.getRecord("ACN","CID=:ZCID")
+	if acn.cls = "L"  do {
+
+		//do ZACN(CID)
+		do ZLN(ZCID)
+
+	}
+
+	else  do {
+		set ZGRP=acn.grp
+		set ZTYPE=acn.type
+		//if $D(^XDTJ(TJD-1,SEQ)) set ^ZCONVEXT("ACNEXT",CID)="" quit
+		if $D(^XDTJ(TJD-1,ZCID)) do { quit
+			//do ZACN(CID)
+			do ZDEP(ZCID)
+
+		}
+		//if $D(^DTJFM(TJD-1,"D",ZGRP,ZTYPE,CID)) set ^ZCONVEXT("ACNEXT",CID)="" quit
+		if $D(^DTJFM(TJD-1,"D",ZGRP,ZTYPE,ZCID)) do {
+			//do ZACN(CID)
+			do ZDEP(ZCID)
+		}
+	}
+
+	quit
+
+ZLN(ZCID)
+
+	type String output
+	set output.piece("|",30)=""
+	type RecordLN ln = Db.getRecord("LN","CID=:ZCID")
+	type String zstatdes,zgrpdes,zacnreldes,zmktdesc,ZFWOSDES,ZLEGFDES
+	set (zstatdes,zgrpdes,zacnreldes,zmktdesc,ZFWOSDES,ZLEGFDES)=""
+	set output.piece("|",1)= ZCID
+	set output.piece("|",2)= ln.boo
+	set output.piece("|",3)= ln.CC
+	set output.piece("|",4)= ln.CRCD
+	set output.piece("|",5)= ln.STAT
+
+	type ResultSet zstatcd = Db.select("DESC","STBLSTATL","STAT=:ln.stat")
+	if zstatcd.next() set zstatdes=zstatcd.getCol(1)
+
+	set output.piece("|",6)= zstatdes
+	set output.piece("|",7)= ln.cls
+	set output.piece("|",8)= ln.type
+
+	set PRODCTLDESC=""
+	type Resultset zproddctl = Db.select("DES","PRODCTL","TYPE=:ln.type")
+	if zproddctl.next() set PRODCTLDESC=zproddctl.getCol(1)
+	set output.piece("|",9)=PRODCTLDESC
+	set output.piece("|",10)= ln.ZMKTCD
+
+	type ResultSet ZMKTCD = Db.select("DESC","ZUTBLMKTCD","GRP=:ln.grp AND SUBT=:ln.subt AND CODE=:ln.ZMKTCD")
+	if ZMKTCD.next() set zmktdesc=ZMKTCD.getCol(1)
+
+	set output.piece("|",11)= zmktdesc
+	set output.piece("|",12)= ln.ACNRELC
+
+	type ResultSet UTBLREL2 = Db.select("DESC","UTBLREL2","GRP=:ln.GRP AND KEY=:ln.ACNRELC")
+	if UTBLREL2.next() set zacnreldes=UTBLREL2.getCol(1)
+
+	set output.piece("|",13)= zacnreldes
+	set output.piece("|",14)= ln.crlmt
+	set output.piece("|",15)= ln.bal
+	set output.piece("|",16) = ln.acr
+	/*
+		if ln.ZDELSTAT=1 set output.piece("|",16) = ln.acr
+
+		else do {
+		type ResultSet lnfee = Db.select("FEEREM","LNFEE","FEETYP='INTREC1' OR FEETYP='INTREC2'")
+		if lnfee.next()  set output.piece("|",16) = lnfee.getCol(1)
+		}
+		*/
+	//set output.piece("|",16)= ln.
+	set output.piece("|",17)= ln.LCHG
+	set output.piece("|",18)= ln.TDUE
+	set output.piece("|",19)= ln.SCHSEQ
+	set output.piece("|",20)= ln.DSEQ
+	set output.piece("|",21)= ln.LPDT.toString("DD/MM/YEAR")
+	set output.piece("|",22)= ln.ZFWOS
+	type ResultSet ZFWOS = Db.select("DESC","ZUTBLWOSTAT","CODE=:ln.ZFWOS")
+	if ZFWOS.next() set ZFWOSDES=ZFWOS.getCol(1)
+	set output.piece("|",23)= ZFWOSDES
+	set output.piece("|",24)= ln.ZRESFLG
+	set output.piece("|",25)= ln.ZLEGF
+	type ResultSet ZLEGF = Db.select("DESC","ZUTBLLEGAL","CODE=:ln.ZLEGF")
+	if ZLEGF.next() set ZLEGFDES=ZLEGF.getCol(1)
+	//set output.piece("|",26)="TESTTEST"
+	set output.piece("|",26)= ZLEGFDES
+	set output.piece("|",27)= ln.subt
+	type ResultSet ZSUBT = Db.select("DESC","UTBLSUBT","GRP=:ln.GRP AND KEY=:ln.subt")
+	if ZSUBT.next() set output.piece("|",28)= ZSUBT.getCol(1)
+	//set output.piece("|",28)= "DUMMMMMMYYYY"
+
+	type RecordACN acn = Db.getRecord("ACN","CID")
+	set (ZCOLLST,ZPCOLLST)=""
+	//type ResultSet rs = Db.select("DES","UTBLCOLLST","OPT=:acn.COLLST")
+	//if rs.next() set ZCOLLST = rs.getCol(1)
+	type ResultSet rs2 = Db.select("DES","UTBLCOLLST","OPT=:acn.COLLST")
+	if rs2.next() set ZCOLLST = rs2.getCol(1)
+	set output.piece("|",29)=acn.COLLST
+	set output.piece("|",30)=ZCOLLST
+
+	set ^ZLITIGAT("OUT",ZCID)=output_" "
+
+	quit
+
+ZDEP(ZCID)
+
+	type String zstatdes,zgrpdes,zacnreldes,output
+	set output.piece("|",30)=""
+	set (zstatdes,zgrpdes,zacnreldes)=""
+	type RecordDEP dep = Db.getRecord("DEP","CID=:ZCID")
+	if dep.zcheckod=0 do {
+
+		set ZMASTER=dep.zmaster
+		if 'ZMASTER.isNull(),ZMASTER'=ZCID quit
+		//if 'ZMASTER.isNull() set output.piece("|",1)=dep.cid
+		//else set output.piece("|",1)=dep.zmaster
+		set output.piece("|",1)=dep.cid
+		set output.piece("|",2)=dep.BOO
+		set output.piece("|",3)=dep.cc
+		set output.piece("|",4)=dep.crcd
+		set output.piece("|",5)=dep.zstatcd
+
+		type ResultSet zstatcd = Db.select("DES","ZUTBLSTATD","ZSTATCD=:dep.zstatcd")
+		if zstatcd.next() set zstatdes=zstatcd.getCol(1)
+
+		set output.piece("|",6)=zstatdes
+		set output.piece("|",7)=dep.cls
+
+		/*
+		type ResultSet STBLGRP = Db.select("DES","STBLGRP","CLS=:dep.CLS AND GRP=:dep.GRP")
+		if STBLGRP.next() set zgrpdes=STBLGRP.getCol(1)
+
+		set output.piece("|",9)=zgrpdes
+		*/
+		set output.piece("|",8)=dep.type
+		set PRODCTLDESC=""
+		type Resultset zproddctl = Db.select("DES","PRODCTL","TYPE=:dep.type")
+		if zproddctl.next() set PRODCTLDESC=zproddctl.getCol(1)
+		set output.piece("|",9)=PRODCTLDESC
+
+		set output.piece("|",10)=dep.acnrelc
+
+		type ResultSet UTBLREL2 = Db.select("DESC","UTBLREL2","GRP=:dep.GRP AND KEY=:dep.ACNRELC")
+		if UTBLREL2.next() set zacnreldes=UTBLREL2.getCol(1)
+
+		set output.piece("|",11)=zacnreldes
+		if dep.zmaster=CID do {
+			set output.piece("|",12)=dep.zbalavl
+			set output.piece("|",13)=dep.zbal
+		}
+		else do {
+			set output.piece("|",12)=dep.BALAVL
+			set output.piece("|",13)=dep.bal
+
+		}
+
+
+	}
+
+	else do {
+		set output.piece("|",1)=ZCID
+		set output.piece("|",2)=dep.BOO
+		set output.piece("|",3)=dep.cc
+		set output.piece("|",4)=dep.crcd
+		set output.piece("|",5)=dep.zstatcd
+
+		set ZSTATDESC=""
+		type Resultset ZUTBLSTATD = Db.select("DES","ZUTBLSTATD","ZSTATCD=:dep.zstatcd")
+		if ZUTBLSTATD.next() set ZSTATDESC=ZUTBLSTATD.getCol(1)
+
+		set output.piece("|",6)=ZSTATDESC
+		set output.piece("|",7)=dep.cls
+		set output.piece("|",8)=dep.type
+
+		set PRODCTLDESC=""
+		type Resultset zproddctl = Db.select("DES","PRODCTL","TYPE=:dep.type")
+		if zproddctl.next() set PRODCTLDESC=zproddctl.getCol(1)
+		set output.piece("|",9)=PRODCTLDESC
+
+		set ZCODE="0010"
+		set output.piece("|",10)= "0010"
+		type ResultSet ZMKTCD = Db.select("DESC","ZUTBLMKTCD","CODE=:ZCODE")
+		set zmktdesc=""
+		if ZMKTCD.next() set zmktdesc=ZMKTCD.getCol(1)
+		set output.piece("|",11)= zmktdesc
+		set output.piece("|",12)= dep.acnrelc
+
+		set ZACNRELCDESC = ""
+		type ResultSet zacnrelc = Db.select("DESC","UTBLREL2","GRP=:dep.grp AND KEY=:dep.ACNRELC")
+		if zacnrelc.next() set ZACNRELCDESC= zacnrelc.getCol(1)
+		set output.piece("|",13) = ZACNRELCDESC
+
+		set output.piece("|",14) = dep.ODLIM
+		if dep.bal<0 set output.piece("|",15)=-dep.bal
+		else set output.piece("|",15)=0
+		write !,"TEST NEGACR"
+		set ZTESTTEST=dep.negacr+dep.NEGACRUN
+		write !,ZTESTTEST
+		set output.piece("|",16) = dep.negacr+dep.NEGACRUN
+
+		set output.piece("|",21) = dep.DTLC.toString("DD/MM/YEAR")
+		set output.piece("|",22) = dep.ZFWOSTAT
+
+		set ZWOSDESC = ""
+		type ResultSet ZWOS = Db.select("DESC","ZUTBLWOSTAT","CODE=:dep.ZFWOSTAT")
+		if ZWOS.next() set ZWOSDESC = ZWOS.getCol(1)
+		set output.piece("|",23) = ZWOSDESC
+		set output.piece("|",24) = dep.ZRSTR
+		set output.piece("|",25) = dep.ZLEGAL
+
+		set ZLEGFDESC = ""
+		type ResultSet ZLEGF = Db.select("DESC","ZUTBLLEGAL","CODE=:dep.ZLEGAL")
+		if ZLEGF.next() set ZLEGFDESC = ZLEGF.getCol(1)
+		set output.piece("|",26) = ZLEGFDESC
+
+
+		set (ZCOLLST,ZPCOLLST)=""
+		type RecordACN acn = Db.getRecord("ACN","CID")
+		//type ResultSet rs = Db.select("DES","UTBLCOLLST","OPT=:acn.COLLST")
+		//if rs.next() set ZCOLLST = rs.getCol(1)
+		type ResultSet rs2 = Db.select("DES","UTBLCOLLST","OPT=:acn.COLLST")
+		if rs2.next() set ZCOLLST = rs2.getCol(1)
+		set output.piece("|",29)=acn.COLLST
+		set output.piece("|",30)=ZCOLLST
+	}
+
+
+	set ^ZLITIGAT("OUT",ZCID)=output_" "
+	quit
+
+
+
+
+---------- THREXIT ------ Section marker

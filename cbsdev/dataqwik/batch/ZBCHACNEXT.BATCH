@@ -1,0 +1,5685 @@
+//DO NOT MODIFY  Deposit Extract|ZACNEXT||||||DEP||6|100|100|BCH16,BCHEOM,BCHEOW,TMPDIR,XTJD,ZTJD,ZBDAT,ZMISMAP,ZMISKEY,ZKONPROD,ZKOYPROD,ZASTMAP|0|10000|10000|10|10|||0||0
+---------- REVHIST ------ Section marker
+
+	Deposit Extract (Replaces batch definition ZBCHDEP)
+	
+	::REMARK:: The batch must be called at begin of day
+	
+	Jun 22, 2011 - Sarochinee R.
+		Modified Code : EOM3 Add Foreign Wash Account Static File. 
+		Modified Code : EOM2 Add Foreign Wash Financial File.
+		
+	May 19, 2011 - Sarochinee R.
+		Modified Code : EOM4 Added Product Short Code Field.
+		
+	Feb 09, 2011 - Sarochinee R.
+		Modified Code : DLY1 & EOM2
+		Set INT-PAID & INT-RECEIVE in DEPFLON & DEPFDEP = zero
+		Modified Code : EOM4
+		Set ITEM-INT-PAID = Blank
+		Modified Code : EOM3
+		Set RELATE-ACCOUNT = Blank
+		
+	Jan 06, 2011 - Sarochinee R.
+		Modified Code : DLY1 & EOM2
+		Change Condition that sent Average Balance on Monthly.
+		
+	Nov 09, 2010 - Sarochinee R.
+		Modified Code : DLY1 Change Ledger Balance from DEP.EODBALCO to DEP.EODBAL
+		
+	Oct 26, 2010 - Sarochinee R.
+		Modified Code : EOM2 Change Ledger Balance from DEP.EODBALCO to DEP.EODBAL
+		
+	Jun 07, 2010 - Wiphak
+		set PAR("SPREAD")=0 before calling CTL^UINDX to exclude SPREAD from rate
+	
+	Jan 08, 2010 - Sarochinee R.
+		Modified EOM3 : Add Last Customer Contact Date (dep.ccld) in DEPACST, FCDACST and WASACST file
+
+	Mar 29, 2010 - Rachod Intraha (Profile Upgrade)
+	 	Modified code to comply with Profile 7.2
+	
+	Oct 20, 2009 - Sarochinee R.
+		Modified EOM3 : Add Restructured Account (dep.zrcid) in DEPACST, FCDACST and WASACST file
+		
+	Sep 18, 2009 - Sarochinee R.
+		Fixed Wash Account that duplicate in WASFDEP and WASFLON
+		
+	Jul 20, 2009 - Sarochinee R.
+		Modified EOM2 : Change Index Value of Current Account from Space to dep.index
+		
+	Apr 29, 2009 - Sarochinee R.
+		Modified EOM2,EOM4 : Added New Index Code Field.
+	
+	Apr 10, 2009 - Sarochinee R.
+		Fixed Wash Account [1220,1221,1222]
+		
+	Mar 11, 2009 - Sarochinee R.
+		- Modified Code for Exclude Product Type 1206,1220,1221,1222
+	
+	Jan 26, 2009 - Sarochinee R.
+		- Modified WACTYPE, Include Product Type 1206 - KTB Prepaid Card that is Wash Account (JO-1004).
+		- Modified EOM5,ACCTTYPE, Exclude Product Type 1206
+	
+	Oct 24, 2008 - Sarochinee R.
+		- Modified EOM2 for adding Average Monthly Interest and Average Monthly Interest Previous Month
+		(JO-0852)
+		- Modified DLY1 for adding Average Monthly Interest Previous Month(JO-0852)
+		
+	Oct 10, 2008 - Sarochinee R.
+		Modified EOM2, Adding Last Salary Paid Date. (JO-0765)
+		
+	Jul 18, 2008 - Rapeepan Y.
+		Modified EOM3, Change sending Committed Line from Logic(Y/N) to 
+		Text(0-Uncommitted,1-Committed,2-Other)
+	May 08, 2008 - Rapeepan Y.
+		Modified EOM4, Change Condition : ITEM PERIOD(DEP.TRM)
+	Feb 26, 2008 - Sarochinee R.
+		Modified DLY1, Change Condition to calculate Interest Rate for Account Type 1202 Settlement Bank
+		by using Ledger Balance field.
+		
+	Feb 04, 2008 - Sarochinee R.
+		Modified DLY1, Added field Government Guarantee Flag .
+	
+	Jan 25, 2008 - Kaewta (#K002)
+	        Modified for Day Term, Long Term B/E (Product type 3011, 3012)
+	Jun 13, 2007 - Kaewta (#K001)
+		Modified for Bill of Exchange
+	Apr 05, 2007 - Rapeepan Y.
+		Change Record length in THB&FCD&WAS file from 410 to 500
+		Modified EOM3 , Added new field : Owner Unit Code,Review Unit Code ,
+			CRTM ID,Referel unit code,Committed line,AO ID,Specialised lending type,
+			Credit Score,Credit Scoring Date at the end of record in THB&FCD&WAS file
+	Apr 04, 2007 - Rapeepan Y.
+		Modified DLY1 , Added new field:Sub District Code,Aumphur Code,
+			Province Code and Country Code at the end of record in
+			THB&Wash file
+	Feb 16, 2007 - Rapeepan Y.
+		Modified DLY1,EOM2 and EOM3 ,Added new file for Wash Account
+		        (type 1201,1204 and 1205 )And Added Linetag WACTYPE for Wash A/C Type	 
+	Jan 15, 2007 - Rapeepan Y.
+		Modified EOM3,Added ZEDUFLG(DEP.ZEDUFLG) for EDU Loan Flag
+	Jan 10, 2007 - Sarochinee R.
+		Modified EOM4, Changed from ICRINT(14,2) to ICRINT(14,5)
+	Dec 13, 2006 - Sarochinee R.
+		Modified MIDRATE, changed from crcd.midrate to crcd.finspot
+	Oct 12, 2006 - Sarochinee R.
+		Modified EOM3, Added ZRES (dep.zresunit) for Response Unit.
+	Oct 10, 2006 - Sarochinee R.
+		Modified EOM3, Change sequence of condition for sending CIF-ID-TYPE & CIF-ID-NUM 
+		By changing from Citizen , Passport , Tax , Juristic  to Citizen, passport , Juristic, tax 
+	Oct 05, 2006 - Duangporn N.
+		Modified code for check field amount
+	Aug 22, 2006 - Sarochinee R.
+		Modified DLY1, Changed condition that send index code In case of no credit limit 
+		and collected balance is positive index code, rate and base rate follows the values in DEP
+	Jul 18, 2006 - Duangporn N.
+		Modified EOM3, added ZBOO for Branch of Ownership	
+	Jun 05, 2006 - Sarochinee R.
+		Modified EOM4, Added a new field Int/Div Paid - Life (dep.ipl) at the end of file.
+	Apr 17, 2006 - Sarochinee R.
+		Modified EOM2,Modified condition that confuse between weekly and monthly.
+		Modified EOM4,Modified condition that confuse between weekly and monthly.
+	Mar 28, 2006 - Teeranuch L.
+		Modified EOM3,
+		added mapping personal consumption code to business code
+	Dec 21, 2005 - Kunvadee V.
+		Modified EOM3,changed the order for sending write off status and write off date.
+	Dec 13, 2005 - Kunvadee V.
+		Modified EOM3,modified sending KTB isic code in account static.
+	Nov 25, 2005 - Kunvadee V.
+		Modified getting balance on the end of month from dep.eodbalco if account was not closed.
+	Nov 21, 2005 - Kunvadee V.
+		Modified EOM4,added account close date for item deposit file.
+	Nov 16, 2005 - Kunvadee V.
+	        Modified EOM4,modified getting interest paid if sub account was closed.  
+	                      If date account closed is not null and not less than maturity date and interest paid is zeros,
+                 	      getting interest paid with previous date of date account closed. 
+	Nov 10, 2005 - Kunvadee V.
+		Modified DLY1, modified sending interest index, interest rate and base rate for saving a/c and current a/c.
+		Modified EOM2,modified sending spaces for interest index if account group is 'DDA'. 
+		             ,modified sending zeros for interest rate and base rate if account group is 'DDA'.        
+	Nov 04, 2005 - Kunvadee V.
+		Modified DLY1,modified condition to getting balance for closed account.
+		             ,modified not sending closed account for daily.
+		Modified EOM2 and EOM4,modified getting balance from dep.bal if account was closed.
+		                      ,modified getting interest rate from dep.sch if account was fixed deposit.
+		                      ,modified not sending closed account for weekly or 16th.
+		Modified TOTDRCR,DLY1,EOM2 and EOM4,modified getting interest received,interest paid,
+	                 total debit amount,total credit amount. If account was closed,get values 
+	                 from HIST by hist.tjd is date account closed.
+	        Modified EOM4,modified to move zeros for positive average balance if account is sub account (item).
+	Oct 31, 2005 - Kunvadee V.
+		Modified EOM4 , Removed incorrect statement.
+	Oct 28, 2005 - Vorawit K.
+		Modified EOM3, changed FORM WDATE = YEARMMDD 
+	Oct 27, 2005 - Vorawit K.
+		Modified EOM2, changed ZSTATCD.blank(2)to ZSTATCD.zero(2)
+	Oct 21, 2005 - Vorawit K.
+		Modified EOM2,EOM4,DLY1 Get all Account and comment Don't Get Close account 
+	Oct 17, 2005 - Vorawit K.
+		Modified EOM2,Added Account,Status,INDEX Code and Filler Fields 
+		Modified EOM3,Added personal,Consumption,NASIC Code,Account Sub Type
+			      Write off Status,Write.Date and Filler Fields	  
+		Modified EOM4,Added Positive average balance,Index and Filler Fields 
+		Modified DLY1,Modified Index,Filler 
+	Oct 12, 2005 - Teeranuch W.
+		Modified DLY1 , Added move dep.zwrois to INTASUSP,if dep.zfwostat=1
+	Sep 28, 2005 - Teeranuch W.
+		Modified FRMTREC, cancelled field dep.zbustype and 
+		added mapping KTB-ISIC code to business code
+	Sep 2, 2005 - Anchalee
+                Modified EOM3, fixed undefined variable zintovgov.
+	Aug 24, 2005 - Anchalee
+		Modified FXTYPE, cancelled NRB type (1103 & 2102).
+		Modified EOM2 and EOM3, cancelled writing NRB account to
+		FCD files.
+	Aug 19, 2005 - Anchalee
+		Modified EOM2 and EOM3, Added writing NRB account to "THB" files.
+	Jul 26, 2005 - Anchalee
+		Modified DLY1, EOM2 and EOM3 to sending balance from collected
+		balance instead of ledger balance at month end.
+	Jul 6, 2005 - Anchalee
+		Cancelled field dep.ztranco from EOM3.
+	Jun 22, 2005 - Anchalee
+		Modified EOM3, added dep.ztranco at the end of file for
+		Non-Foreign account.
+		Modified file length of ioeom3 (from 341 to 343).
+	Jun 17, 2005 - Anchalee
+		Modified code to do not generate files for FX account if 
+		not month end.
+	Jun 16, 2005 - Anchalee
+		Modified EOM3, added Write Off flag (W) to TAMC flag 
+		if dep.zstatcd=11 or dep.zfwostat=1.
+	Jun 01, 2005 - Bancha
+		Check isDefine for linetag LDY3
+		If not Define in table ZUTBLINVP, Process QUIT
+	May 16, 2005 - Anchalee
+		Added section for Non-resident Baht and Foreign Currency type.
+	May 11, 2005 - Anchalee
+		Modified DLY1, sending 0 if Accumulated Suspense Interest
+		(dep.zasint)<0.
+	Mar 23, 2005 - Anchalee
+		Added control file generating.
+		Changed monthly file name to daily file name of EOM2,EOM3,EOM4.
+	Mar 15, 2005 - Anchalee
+		Modified DLY1 and EOM2, plus dep.intsprp to interest rate 
+		calculation if ledger bal is positive but collected bal is 
+		negative.
+	Mar 14, 2005 - Anchalee
+		Added new KTB customer code 231 to BOTTINIT (BOT Report).
+	Mar 10, 2005 - Anchalee
+		Modified DLY1 and EOM2,if ledger balance is positive and
+		collected balance is negative, determine interest rate 
+		from ledger balance.
+	Mar 9, 2005 - Anchalee
+		Modified DLY1 to exclude closed account.
+	Feb 10, 2005 - Anchalee
+		Modified temporary directory from /tmp to 
+		$$TRNLNM^%ZFUNC("SCAU_EXTF_TEMP").
+	Feb 4, 2005 - Anchalee
+		Modified base rate calculation of EOM4.
+	Jan 28, 2005 - Anchalee
+		Modified to extract only Deposit accounts.
+	Jan 19, 2005 - Anchalee
+		Modified DLY1, EOM2, EOM3, and EOM4 reflected to new layout.
+		Added 10000 to Job Monitor Update Interval - Scheduler and
+		Job Monitor Update Interval - Threads for progress showing.
+	Jan 5, 2005 - Anchalee
+		Modified to extract EOM2, EOM3, and EOM4 every 15th.
+	Nov 23, 2004 - Anchalee
+		Modified EOM4 to support sub-account with term in year and
+		convert into month.
+	Nov 15, 2004 - Anchalee
+		Modified calling TOTDRCR when call DLY1 only and verify 
+		account is not CD before calling TOTDRCR and DLY1.
+	Nov 12, 2004 - CHOK
+		Modified that run BOT report on every 16th of the month.
+	Nov 10, 2004 - CHOK
+		Modified section ACCTTYPE to include SPA account that has 
+		DEP.ZSTATCD=9 per P'Ta request.
+	Nov 8, 2004 - CHOK
+		Modified section ACCTTYPE to exclude the account that has product
+		type 1201,1205,1204 has acccount with 4th digit of the account 
+		number is 7.	
+	Nov 3, 2004 - Anchalee
+		Added last salary paid date (dep.zsallpd) to EOD1
+	Oct 26, 2004 - Anchalee
+		Modified temporary global name from start with Z to start 
+		with TMP to avoid using ZTMP region.
+		Reactivate EOM3.
+		Moved EOM5 to ZBCHSLNCLS.
+	Oct 18, 2004 - Anchalee
+		Include account was closed on batch's date in DLY1.
+	Oct 15, 2004 - Anchalee
+		Exclude closed account in EOM4.
+		Exclude account type 1204 with the 4th digit is 4 (Wash A/C)
+		to DLY1, EOM2 and EOM5.
+	Sep 20, 2004 - Anchalee
+		Modified DLY1 and EOM2, excluded sign from fields which 
+		are no sign in layout.
+	Sep 17, 2004 - Anchalee
+		Modified LOAN TYPE mapping to DLY1 and EOM5
+	Sep 16, 2004 - Anchalee
+		Modified ITEM NEG OFF RATE to ITMDEP segtion
+	Sep 8, 2004 - Anchalee
+		Modified DLY1, how to get penalty rate from dep.index
+	Sep 7, 2004 - Anchalee
+		Modified DLY1, how to get penalty rate from dep.prate
+	Sep 2, 2004 - Anchalee
+		Modified DLY1 if Available Limit < 0, send 0
+	Aug 30, 2004 - Anchalee
+		Modified DLY1,EOM2,EOM5 to zlude product type 
+		1201(Money Transfer) and 1205(KTB Suspense Account)
+	Aug 24, 2004 - Kevin Cho
+		Added BOT report.
+	
+	Aug 20, 2004 - Wiphak
+		Modified linetag MISTOT to change file format of ACBAL.
+		Field DRAMT and CRAMT from 12.2 to 16.2
+	
+	Aug 19, 2004 - Anchalee
+		MOdified directory of temporary files from SCAU_SPOOL_EXTF
+		to /tmp.
+	Aug 16, 2004 - Anchalee
+		Added 1 more field at the end of record of EOM4 (Deposit Item)
+	Aug 05, 2004 - Phak	
+		Modified MIS file part to be called only EOM
+	
+	Jul 30, 2004 - Anchalee
+		Deleted monthly frequency from Account Static File (EOM3)
+		and Financial Loan File (DLY1). 
+		Added Weekly frequency to Financial Deposit File (EOM2) and
+		Item Deposit File (EOM4).
+		Added 1 more field to EOM2 thus made record length up to 328.
+		Added 2 more fields to EOM4 thus made record length up to 235.
+	Jul 29, 2004 - Phak
+		Change error log method in KO
+	
+	Jul 26, 2004 - Phak
+		Handle for exceptional case .ZERO exceeds record length for MIS
+	
+	Jul 20, 2004 - Phak
+		Move KO part to ZBCHKOEXT
+	
+	Jul 15, 2004 - Phak
+		Modify KO (calling to DLY2) to run only for branch 777
+	
+	Jun 25, 2004 - Anchalee
+		Modified condition of Record Type and Loan Type in EOM3.
+	Jun 3, 2004 - Anchalee
+		Added product type 1002(Taweepanya) to loan type of 
+		DLY1, EOM3, and EOM5.
+	May 25, 2004 - Wiphak
+		Bug fix for KO and MIS due to .zero problem. 
+	
+	Apr 30, 2004 - Allan Mattson
+		Modified to eliminate the use of temporary globals to
+		store the extract records.  Instead, each thread
+		writes the record directly to a temporary system
+		(flat) file associated with each extract.  The
+		scheduler exit routine (SCHEXIT) then appends
+		the temporary files into a single extract file
+		via a Unix script.
+		
+		Assigned dep.eodbalav to variable EODBALAV in section
+		EXEC; replaced subsequent references to dep.eodbalav
+		with variable EODBALAV in order to avoid computing
+		it's value multiple times.
+		
+		Merged code from batch definition ZBCHMIS022 into this
+		batch definition to avoid multiple passes through the
+		account database.
+		
+		Removed unnecesary isEmpty() methods.
+		
+		Converted M functions $E, $G and $P to PSL methods
+		extract(), get() and piece(), respectively.
+		
+        Apr 20, 2004 - Anchalee
+                Modified getting value of last payment date and last payment
+                priciple amount from set to "" to get from dep.lcdt and
+                dep.lcamt respectively.
+ 		
+	Apr 2, 2004 - Anchalee
+		Account Static - modified getting balance from dep.bal 
+		if account was closed.
+
+	Apr 1, 2004 - Anchalee
+		Financial Deposit and Item Deposit section - modified getting
+		original balance from Original Amount(dep.org) and Scheduled
+		Deposit Amount (dep.schdepa) to Amount of First Deposit
+		(dep.afdep).
+		
+		Modified to instantiate cif record once at EXEC section instead
+		of instantiate in each subroutine to improve performance.
+	Mar 30, 2004 - Anchalee
+		TOTDRCR section - modified interest paid calculation by 
+		adding tax withholding for credit transaction.
+
+	Mar 22, 2004 - Anchalee
+		TOTDRCR section - modified interest paid calculation by
+		not minus tax withholding
+		
+		Added subroutines ACNST, DEPITEM, FINDEP for CRP end-of-month
+		extraction of the following files
+		- Monthly Account Static File (ACNST)
+		- Monthly Deposit Item File (DEPITEM)
+		- Monthly Financial Deposit File (FINDEP)
+		
+		Modified subroutine FINLOAN for end-of-month extraction
+		
+	Mar 10, 2004 - Allan Mattson
+		Modified to file extract data to a common temporary global
+		(^ZEXTRACT(ZTJD,extract_name)).
+		
+		Modified to extract the information previously extracted
+		by batch definition ZBCHSLNCLASS in order to minimize
+		the number of passes through ACN.
+
+		Modified subroutine TOTDRCR to use table HIST instead of
+		DTJ to improve performance.
+		
+		Modified to calculate the prior day total debit and credit
+		amounts once.  Prior to this change, these amounts were
+		calculated in both ZKO and FINLOAN.
+		
+		Modified subroutine FINLOAN to N[ew] variable 'IX'.
+
+	Mar 10, 2004 - Anchalee
+		Modified FINLOAN linetag - Modified length of od limit 
+		from 11(include 2 of decimal) to 14(include 2 of decimal).
+	Mar 3, 2004 - Anchalee
+		Added Monthly Financial Loan for CRP section
+		
+---------- OPEN    ------ Section marker
+
+	set TMPDIR=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/ACNEXT"
+	//set TMPDIR=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/ACN"	// Test
+	set X=$$SYS^%ZFUNC("mkdir -p "_TMPDIR)
+	if X set TMPDIR="/xxx"
+
+---------- SCHINIT ------ Section marker
+
+	/*
+	Initiate variables
+	This batch is called at begin of day
+	BCH16,BCHEOM,BCHEOW,XTJD,ZTJD,DARCLPDT,ZMISKEY,ZMISMAP,ZKONPROD,ZKOYPROD,ZASTMAP are passed to threads
+	*/
+	
+	set FILL=""
+	set vINPUT=""
+	
+	set ZTJD=%SystemDate-1
+	set XTJD=$$DAT^%ZM(ZTJD,"YEARMMDD")
+	
+	
+	set (BCHEOM,BCHEOW,BCH16)=0
+	if ZTJD=$$EOMJD^SCADAT(ZTJD) set BCHEOM=1,ZBDAT=$$BOMJD^SCADAT(ZTJD)
+	if $$UPPER^%ZFUNC($$DOW^SCADAT(ZTJD,1))="FRIDAY" set BCHEOW=1
+	
+	/*
+	type RecordCUVAR cuvar=Db.getRecord("CUVAR")
+	//set DARCLPDT=CUVAR.DARCLPDT
+	set DARCLPDT=cuvar.darclpdt
+	if DARCLPDT="" set DARCLPDT=FILL.blank(8)
+	else  set DARCLPDT=$$DAT^%ZM(DARCLPDT,"YEARMMDD")
+	*/
+	if $$DAY^SCADAT(%SystemDate)=16 set BCH16=1
+	if BCH16 do BOTSINIT
+	if BCHEOM do {
+		// End of month
+		
+		// MIS file
+		type ResultSet rs=Db.select("KEY,PACTTYPE","ZUTBLMISCTL")
+		while rs.next() set ZMISKEY(rs.getCol(1))=rs.getCol(2)
+		
+		type ResultSet rs=Db.select("CACTTYPE,KEY","ZUTBLMISMAP")
+		while rs.next() set ZMISMAP(rs.getCol(1))=rs.getCol(2)
+
+		do BOTSINIT		
+		}
+		
+	
+	/* move KO to ZBCHKOEXT
+	// Populate array for monitored product types
+	type ResultSet rs=Db.select("PRACTYPE,PEACTYPE,CHKODFLG","ZUTBLKOTYMAP")
+	while rs.next() do {
+		// populate 2 arrays. one for normal monitored product, the other is 
+		// for account that has OD only
+		// ZKONPROD stores product type and mapping for normal type
+		// ZKOYPROD stores product type 
+
+	 	if 'rs.getCol(3) set ZKONPROD(rs.getCol(1))=rs.getCol(2)
+	 	else  set ZKOYPROD(rs.getCol(1))=rs.getCol(2)
+	 	}
+	 */
+	 	
+	 // Initialize array for account status mapping
+        type ResultSet rs=Db.select("ZSTATCD,PCSTATCD","ZUTBLSTATD")
+	while rs.next() set ZASTMAP(rs.getCol(1))=rs.getCol(2)
+
+	// Delete tables for functions ZMIS022* and ZMIS023* (used for reporting)
+	do Db.fastDelete("ZMIS022B",)
+	do Db.fastDelete("ZMIS022R",)
+	do Db.fastDelete("ZMIS023R",)			
+
+	// Delete temporary extract files
+	set x=$$SYS^%ZFUNC("rm -f "_TMPDIR_"/tmp_acnext_*.txt")
+
+	// Delete temporary tables (used for extracts that summarize account data)
+	do DELTMP(ZTJD)
+	quit
+
+BOTSINIT
+
+	//BOT
+	set RECTYPE="TAB311"
+	do Db.delete("ZTMPBOTREC","RECTYPE=:RECTYPE")
+	do Db.fastDelete("ZTMPBOT080")
+	do Db.fastDelete("ZTMPBOT310")
+	do Db.fastDelete("ZTMPBOT311")	
+	do Db.fastDelete("ZTMPBOT312")
+	do Db.fastDelete("ZTMPBOT320")
+	do Db.fastDelete("ZTMPBOT330")
+	do Db.fastDelete("ZTMPBOT612")
+
+	// KTB Customer group
+	set CUSTNAME(1)="GOVERNMENT"
+	set CUSTNAME(2)="GOVT. ENTERPRISES"
+	set CUSTNAME(3)="MUNICIPALITIES"
+	set CUSTNAME(4)="COMMERCIAL BANKS"
+	set CUSTNAME(5)="GOVT. SAVING BANK"
+	set CUSTNAME(6)="BANK FOR AGRIC.&CO.,"
+	set CUSTNAME(7)="GOVT. HOUSING BANK"
+	set CUSTNAME(8)="EXPORT-IMPORT BANK"
+	set CUSTNAME(9)="SME BANK OF THAI"
+	set CUSTNAME(10)="FINANCE CO.,"
+	set CUSTNAME(11)="FINANCE+SECURITY CO."
+	set CUSTNAME(12)="SECURITY CO.,"
+	set CUSTNAME(13)="MUTUAL FUND"
+	set CUSTNAME(14)="I.F.C.T."
+	set CUSTNAME(15)="LIFE INSURANCE CO.,"
+	set CUSTNAME(16)="CREDIT FONCIER CO.,"
+	set CUSTNAME(17)="OTHER FINANCE INST."
+	set CUSTNAME(18)="BUSINESS"
+	set CUSTNAME(19)="INDIVIDUAL"
+	set CUSTNAME(20)="NON-PROFIT INSTITUTE"
+	set CUSTNAME(21)="BANK+FIN. IN FOREIGN"
+	set CUSTNAME(22)="OTHER IN FOREIGN"	
+		
+	set CUSTNAM2(1)="SOCIAL SECURITY FUND"
+	set CUSTNAM2(2)="PROVIDENCE FUND"
+	set CUSTNAM2(3)="PENSION FUND"
+	set CUSTNAM2(4)="OTHER WELFARE FUND"		
+	quit
+	
+---------- SCHEXEC ------ Section marker
+
+	set vINPUT=Db.nextKey("BTTACN","vINPUT")	
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	// Summarize MIS data for extract file and ZMIS022* and ZMIS023* reports
+	do MIS(ZTJD)
+
+	// Append temporary files created by threads into a single extract file
+	set dirname=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF") //-- Test 
+	//set dirname=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/ACN"
+	set tmpfile=TMPDIR_"/tmp_acnext_"
+
+	set x=$$SYS^%ZFUNC("cat "_tmpfile_"eod1_* > "_dirname_"/CRP.PROD.BDWCBS.GDGBAK.FLONDLY.GDG")
+	//Feb 16, 2007 - Rapeepan Y. Added for Wash a/c File
+	set x=$$SYS^%ZFUNC("cat "_tmpfile_"eodw1_* > "_dirname_"/WASFLON"_XTJD_".TXT")
+
+	// move KO to ZBCHKOEXT
+	//	set x=$$SYS^%ZFUNC("cat "_tmpfile_"eod2_* > "_$$TRNLNM^%ZFUNC("SCAU_SPOOL_KO")_"/CRP.PROD.BDWCBS.GDGBAK.KODLY.GDG")
+	
+	// End-of-week or half-month or end-of-month
+	if BCHEOW!BCH16!BCHEOM do {
+		// Deposit Thai Baht
+		set x=$$SYS^%ZFUNC("cat "_tmpfile_"eom2_* > "_dirname_"/CRP.PROD.BDWCBS.GDGBAK.FDEPDLY.GDG")
+		//Feb 16, 2007 - Rapeepan Y. Added for Wash a/c File
+		set x=$$SYS^%ZFUNC("cat "_tmpfile_"eomw2_* > "_dirname_"/WASFDEP"_XTJD_".TXT")
+		set x=$$SYS^%ZFUNC("cat "_tmpfile_"eom4_* > "_dirname_"/CRP.PROD.BDWCBS.GDGBAK.ITEMDLY.GDG")
+		
+		// Non-resident Baht and Foreign Currency
+		set x=$$SYS^%ZFUNC("cat "_tmpfile_"fxeom2_* > "_dirname_"/CRP.FCDCBS.GDGBACK.FDEPDLY")
+		set x=$$SYS^%ZFUNC("cat "_tmpfile_"fxeom4_* > "_dirname_"/CRP.FCDCBS.GDGBACK.ITEMDLY")
+		set x=$$SYS^%ZFUNC("cat "_tmpfile_"fxeomw2_* > "_dirname_"/FCDWFDEP"_XTJD_".TXT") //Jun 22, 2011
+		}
+		
+	// Half-month or end-of-month
+	if BCH16!BCHEOM do {
+		// Deposit Thai Baht
+		set x=$$SYS^%ZFUNC("cat "_tmpfile_"eom3_* > "_dirname_"/CRP.PROD.BDWCBS.GDGBAK.ACSTDLY.GDG")
+		//Feb 16, 2007 - Rapeepan Y. Added for Wash a/c File
+		set x=$$SYS^%ZFUNC("cat "_tmpfile_"eomw3_* > "_dirname_"/WASACST"_XTJD_".TXT")
+		// Non-resident Baht and Foreign Currency
+		set x=$$SYS^%ZFUNC("cat "_tmpfile_"fxeom3_* > "_dirname_"/CRP.FCDCBS.GDGBACK.ACSTDLY")
+		set x=$$SYS^%ZFUNC("cat "_tmpfile_"fxeomw3_* > "_dirname_"/FCDWACST"_XTJD_".TXT") //Jun 22, 2011
+
+		do BOTSEXIT
+		}
+	
+	// Write Control File for CRP	
+	do CNTLCNTE("FLON","DEPFLON_CTRL",0)		// Control File (Reconcile Record)
+	//Feb 16, 2007 - Rapeepan Y. Added for Wash a/c Control-File
+	do CNTLCNTE("FLON","WASFLON_CTRL"_XTJD,2)
+	if BCHEOW!BCH16!BCHEOM do {
+		do CNTLCNTE("FDEP","DEPFDEP_CTRL",0)	// Control File (Reconcile Record)
+		//Feb 16, 2007 - Rapeepan Y. Added for Wash a/c Control-File
+		do CNTLCNTE("FDEP","WASFDEP_CTRL"_XTJD,2)
+		do CNTLCNTE("ITEM","DEPITEM_CTRL",0)	// Control File (Reconcile Record)
+	
+		do CNTLCNTE("FDEP","FCDFDEP_CTRL",1)	// Control File (Reconcile Record)
+		// Jun 22, 2011 - Sarochinee R.
+		do CNTLCNTE("FDEP","FCDWFDEP_CTRL"_XTJD,3)
+		
+		do CNTLCNTE("ITEM","FCDITEM_CTRL",1)	// Control File (Reconcile Record)
+	}
+	if BCH16!BCHEOM do {
+		do CNTLCNTE("ACST","DEPACST_CTRL",0)	// Control File (Reconcile Record)
+		//Feb 16, 2007 - Rapeepan Y. Added for Wash a/c Control-File
+		do CNTLCNTE("ACST","WASACST_CTRL"_XTJD,2)
+		do CNTLDTLE("CRP.DEP.CTRLCBS1",0)	// Control File (Reconcile Balance)
+	
+		do CNTLCNTE("ACST","FCDACST_CTRL",1)	// Control File (Reconcile Record)
+		// Jun 22, 2011 - Sarochinee R.
+		do CNTLCNTE("ACST","FCDWACST_CTRL"_XTJD,3)
+		
+		do CNTLDTLE("CRP.FCDCBS.GDGBACK.CTRLCBS",1)	// Control File (Reconcile Balance)
+	}
+
+	//do CNTLEXIT
+	
+	//if BCH16 do BOTSEXIT
+
+	// Delete temporary extract files
+	set x=$$SYS^%ZFUNC("rm -f "_tmpfile_"*.txt")
+
+	// Delete temporary tables (used for extracts that summarize account data)
+	do DELTMP(ZTJD)	
+
+	quit
+	
+CNTLCNTE(FILETYP,FILENAME,FXFLG)	// Control file (reconcile record) to DW
+
+	new CNT,REC
+	
+	type IO io=Class.new("IO")
+	set io.fileName=FILENAME_".TXT"
+	set io.directory=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")
+	//set io.directory=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/ACN"
+	set io.openParams="NEWV/WRITE"
+	set io.recordSize=16
+	do io.open()
+	
+	set CNT=0
+	
+	do Schema.createTable("ZCRPCNTFILE","JOB,FILETYP,FXFLG","CNT","TMPACCNT")
+	type ResultSet rs=Db.select("JOB,CNT","ZCRPCNTFILE","FILETYP=:FILETYP AND FXFLG=:FXFLG")
+	while rs.next() do {
+		set CNT=CNT+rs.getCol(2)
+	}
+	
+	set REC=XTJD_CNT.zero(8)
+	do io.write(REC)
+	
+	do io.close()
+	
+	quit
+	
+CNTLDTLE(FILENAME,FXFLG)	// Control file (reconcile balance) to CRP
+
+	new AVLLMT,CNT,FILETYP,IACSUS,IOTYP,NCREINT,NDEBINT,NEGBAL,NIPAID
+	new NIRCV,ODLIM,OFILE,ORGAMT,PCREINT,PDEBINT,PIPAID,PIRCV,POSBAL
+	new REC,STAT,TOTODLIM,TAVLLMT,TCNT,TIACSUS,TNCREINT,TNDEBINT,TNEGBAL
+	new TNIPAID,TNIRCV,TODLIM,TORGAMT,TPCREINT,TPDEBINT,TPIPAID,TPIRCV
+	new TPOSBAL,TTODLIM,XTYPE
+
+	type IO iot=Class.new("IO")
+	set iot.fileName=FILENAME
+	set iot.directory=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")
+	//set iot.directory=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/ACN"
+	set iot.openParams="NEWV/WRITE"
+	set iot.recordSize=353
+	do iot.open()
+	
+	do Schema.createTable("ZACNEXTCNTRL","JOB,FILETYP,FXFLG,TYPE,STAT","CNT,POSBAL,NEGBAL,TOTODLIM,ODLIM,AVLLMT,PINTPAID,NINTPAID,PINTRCV,NINTRCV,PCREINT,NCREINT,PDEBINT,NDEBINT,INTACSUS,ORGAMT","TMPACCTL")
+	do Schema.createTable("ZACNEXTSUM","FILETYP,TYPE,STAT","CNT,POSBAL,NEGBAL,TOTODLIM,ODLIM,AVLLMT,PINTPAID,NINTPAID,PINTRCV,NINTRCV,PCREINT,NCREINT,PDEBINT,NDEBINT,INTACSUS,ORGAMT","TMPACSUM")
+	type ResultSet rs=Db.select("JOB,FILETYP,TYPE,STAT","ZACNEXTCNTRL","FXFLG=:FXFLG")
+	while rs.next() do {
+		set JOB=rs.getCol(1)
+		set FILETYP=rs.getCol(2)
+		set XTYPE=rs.getCol(3)
+		set STAT=rs.getCol(4)
+		
+		type RecordZACNEXTCNTRL zcntrl=Db.getRecord("ZACNEXTCNTRL","JOB=:JOB,FILETYP=:FILETYP,FXFLG=:FXFLG,TYPE=:XTYPE,STAT=:STAT")
+		if 'Db.isDefined("ZACNEXTSUM","FILETYP=:FILETYP,TYPE=:XTYPE,STAT=:STAT") do {
+			type RecordZACNEXTSUM zsum=Class.new("RecordZACNEXTSUM")
+			set zsum.filetyp=zcntrl.filetyp
+			set zsum.type=zcntrl.type
+			set zsum.stat=zcntrl.stat
+			set zsum.cnt=zcntrl.cnt
+			set zsum.posbal=zcntrl.posbal
+			set zsum.negbal=zcntrl.negbal
+			set zsum.totodlim=zcntrl.totodlim
+			set zsum.odlim=zcntrl.odlim
+			set zsum.avllmt=zcntrl.avllmt
+			set zsum.pintpaid=zcntrl.pintpaid
+			set zsum.nintpaid=zcntrl.nintpaid
+			set zsum.pintrcv=zcntrl.pintrcv
+			set zsum.nintrcv=zcntrl.nintrcv
+			set zsum.pcreint=zcntrl.pcreint
+			set zsum.ncreint=zcntrl.ncreint
+			set zsum.pdebint=zcntrl.pdebint
+			set zsum.ndebint=zcntrl.ndebint
+			set zsum.intacsus=zcntrl.intacsus
+			set zsum.orgamt=zcntrl.orgamt
+			
+			do zsum.bypassSave()
+		}
+		else  do {
+			type RecordZACNEXTSUM zsum=Db.getRecord("ZACNEXTSUM","FILETYP=:FILETYP,TYPE=:XTYPE,STAT=:STAT")
+			set zsum.cnt=zsum.cnt+zcntrl.cnt
+			set zsum.posbal=zsum.posbal+zcntrl.posbal
+			set zsum.negbal=zsum.negbal+zcntrl.negbal
+			set zsum.totodlim=zsum.totodlim+zcntrl.totodlim
+			set zsum.odlim=zsum.odlim+zcntrl.odlim
+			set zsum.avllmt=zsum.avllmt+zcntrl.avllmt
+			set zsum.pintpaid=zsum.pintpaid+zcntrl.pintpaid
+			set zsum.nintpaid=zsum.nintpaid+zcntrl.nintpaid
+			set zsum.pintrcv=zsum.pintrcv+zcntrl.pintrcv
+			set zsum.nintrcv=zsum.nintrcv+zcntrl.nintrcv
+			set zsum.pcreint=zsum.pcreint+zcntrl.pcreint
+			set zsum.ncreint=zsum.ncreint+zcntrl.ncreint
+			set zsum.pdebint=zsum.pdebint+zcntrl.pdebint
+			set zsum.ndebint=zsum.ndebint+zcntrl.ndebint
+			set zsum.intacsus=zsum.intacsus+zcntrl.intacsus
+			set zsum.orgamt=zsum.orgamt+zcntrl.orgamt
+			
+			do zsum.bypassSave()
+		}
+	}
+	
+	set OFILE=""
+	set (TAVLLMT,TCNT,TIACSUS,TNCREINT,TNDEBINT,TNEGBAL)=0
+	set (TNIPAID,TNIRCV,TODLIM,TORGAMT,TPCREINT,TPDEBINT)=0
+	set (TPIPAID,TPIRCV,TPOSBAL,TTODLIM)=0
+	
+	type ResultSet rs=Db.select("FILETYP,TYPE,STAT","ZACNEXTSUM")
+	while rs.next() do {
+		set FILETYP=rs.getCol(1)
+		set XTYPE=rs.getCol(2)
+		set STAT=rs.getCol(3)
+		
+		type RecordZACNEXTSUM zsum=Db.getRecord("ZACNEXTSUM","FILETYP=:FILETYP,TYPE=:XTYPE,STAT=:STAT")
+		if FILETYP'=OFILE do {
+			if OFILE'="" do {
+				set TCNT=TCNT.zero(12)
+				set TPOSBAL=TPOSBAL.zero(22,2,1)
+				set TNEGBAL=TNEGBAL.zero(22,2,1)
+				set TTODLIM=TTODLIM.zero(22,2,1)
+				set TODLIM=TODLIM.zero(22,2,1)
+				set TAVLLMT=TAVLLMT.zero(22,2,1)
+				set TPIPAID=TPIPAID.zero(22,2,1)
+				set TNIPAID=TNIPAID.zero(22,2,1)
+				set TPIRCV=TPIRCV.zero(22,2,1)
+				set TNIRCV=TNIRCV.zero(22,2,1)
+				set TPCREINT=TPCREINT.zero(22,2,1)
+				set TNCREINT=TNCREINT.zero(22,2,1)
+				set TPDEBINT=TPDEBINT.zero(22,2,1)
+				set TNDEBINT=TNDEBINT.zero(22,2,1)
+				set TIACSUS=TIACSUS.zero(22,2,1)
+				set TORGAMT=TORGAMT.zero(22,2,1)
+		
+				set REC="T"_OFILE_FILL.blank(6)_TCNT
+				set REC=REC_TPOSBAL_TNEGBAL_TTODLIM_TODLIM
+				set REC=REC_TAVLLMT_TPIPAID_TNIPAID_TPIRCV
+				set REC=REC_TNIRCV_TPCREINT_TNCREINT_TPDEBINT
+				set REC=REC_TNDEBINT_TIACSUS_TORGAMT
+				
+				do iot.write(REC)
+			}
+			set REC="H"_FILETYP_XTJD_FILL.blank(340) do iot.write(REC)
+			set OFILE=FILETYP
+			set (TAVLLMT,TCNT,TIACSUS,TNCREINT,TNDEBINT,TNEGBAL)=0
+			set (TNIPAID,TNIRCV,TODLIM,TORGAMT,TPCREINT,TPDEBINT)=0
+			set (TPIPAID,TPIRCV,TPOSBAL,TTODLIM)=0
+		}
+		
+		type RecordZACNEXTSUM zsum=Db.getRecord("ZACNEXTSUM","FILETYP=:FILETYP,TYPE=:XTYPE,STAT=:STAT")
+		set CNT=zsum.cnt
+		set POSBAL=zsum.posbal
+		set NEGBAL=zsum.negbal
+		set TOTODLIM=zsum.totodlim
+		set ODLIM=zsum.odlim
+		set AVLLMT=zsum.avllmt
+		set PIPAID=zsum.pintpaid
+		set NIPAID=zsum.nintpaid
+		set PIRCV=zsum.pintrcv
+		set NIRCV=zsum.nintrcv
+		set PCREINT=zsum.pcreint
+		set NCREINT=zsum.ncreint
+		set PDEBINT=zsum.pdebint
+		set NDEBINT=zsum.ndebint
+		set IACSUS=zsum.intacsus
+		set ORGAMT=zsum.orgamt
+		
+		set TCNT=TCNT+CNT
+		set TPOSBAL=TPOSBAL+POSBAL
+		set TNEGBAL=TNEGBAL+NEGBAL
+		set TTODLIM=TTODLIM+TOTODLIM
+		set TODLIM=TODLIM+ODLIM
+		set TAVLLMT=TAVLLMT+AVLLMT
+		set TPIPAID=TPIPAID+PIPAID
+		set TNIPAID=TNIPAID+NIPAID
+		set TPIRCV=TPIRCV+PIRCV
+		set TNIRCV=TNIRCV+NIRCV
+		set TPCREINT=TPCREINT+PCREINT
+		set TNCREINT=TNCREINT+NCREINT
+		set TPDEBINT=TPDEBINT+PDEBINT
+		set TNDEBINT=TNDEBINT+NDEBINT
+		set TIACSUS=TIACSUS+IACSUS
+		set TORGAMT=TORGAMT+ORGAMT
+		
+		set XTYPE=XTYPE.zero(4)
+		set STAT=STAT.zero(2)
+		set CNT=CNT.zero(12)
+		set POSBAL=POSBAL.zero(22,2,1)
+		set NEGBAL=NEGBAL.zero(22,2,1)
+		set TOTODLIM=TOTODLIM.zero(22,2,1)
+		set ODLIM=ODLIM.zero(22,2,1)
+		set AVLLMT=AVLLMT.zero(22,2,1)
+		set PIPAID=PIPAID.zero(22,2,1)
+		set NIPAID=NIPAID.zero(22,2,1)
+		set PIRCV=PIRCV.zero(22,2,1)
+		set NIRCV=NIRCV.zero(22,2,1)
+		set PCREINT=PCREINT.zero(22,2,1)
+		set NCREINT=NCREINT.zero(22,2,1)
+		set PDEBINT=PDEBINT.zero(22,2,1)
+		set NDEBINT=NDEBINT.zero(22,2,1)
+		set IACSUS=IACSUS.zero(22,2,1)
+		set ORGAMT=ORGAMT.zero(22,2,1)
+		
+		set REC="D"_FILETYP_XTYPE_STAT_CNT_POSBAL_NEGBAL_TOTODLIM
+		set REC=REC_ODLIM_AVLLMT_PIPAID_NIPAID_PIRCV_NIRCV_PCREINT
+		set REC=REC_NCREINT_PDEBINT_NDEBINT_IACSUS_ORGAMT
+		
+		do iot.write(REC)
+	}
+	
+	if OFILE'="" do {
+		set TCNT=TCNT.zero(12)
+		set TPOSBAL=TPOSBAL.zero(22,2,1)
+		set TNEGBAL=TNEGBAL.zero(22,2,1)
+		set TTODLIM=TTODLIM.zero(22,2,1)
+		set TODLIM=TODLIM.zero(22,2,1)
+		set TAVLLMT=TAVLLMT.zero(22,2,1)
+		set TPIPAID=TPIPAID.zero(22,2,1)
+		set TNIPAID=TNIPAID.zero(22,2,1)
+		set TPIRCV=TPIRCV.zero(22,2,1)
+		set TNIRCV=TNIRCV.zero(22,2,1)
+		set TPCREINT=TPCREINT.zero(22,2,1)
+		set TNCREINT=TNCREINT.zero(22,2,1)
+		set TPDEBINT=TPDEBINT.zero(22,2,1)
+		set TNDEBINT=TNDEBINT.zero(22,2,1)
+		set TIACSUS=TIACSUS.zero(22,2,1)
+		set TORGAMT=TORGAMT.zero(22,2,1)
+
+		set REC="T"_OFILE_FILL.blank(6)_TCNT
+		set REC=REC_TPOSBAL_TNEGBAL_TTODLIM_TODLIM
+		set REC=REC_TAVLLMT_TPIPAID_TNIPAID_TPIRCV
+		set REC=REC_TNIRCV_TPCREINT_TNCREINT_TPDEBINT
+		set REC=REC_TNDEBINT_TIACSUS_TORGAMT
+		
+		do iot.write(REC)
+	}
+	
+	set IOTYP="RMS"
+	do iot.close()
+	do Db.fastDelete("ZACNEXTCNTRL","FXFLG=:FXFLG")
+	do Db.fastDelete("ZACNEXTSUM")
+	//do Schema.deleteTable("ZACNEXTCNTRL")
+	//do Schema.deleteTable("ZACNEXTSUM") 
+	
+	quit
+	
+BOTSEXIT
+
+	// BOT	
+	new ACCRUECR,ACCTTYPE,BOO,CNT,CRAMT,CRCD,FDFLAG,FILL,LINKCNT,LINKSUM
+	new NEGAMT,NOLNKCNT,NOLNKSUM,PERIOD,POSAMT,RANGENUM,REC,RECTYPE,SEQ,YEARMM,ZCID
+
+	type ResultSet rs001,rs001b,rs001c,rs080a,rs080b,rs080d,rs310a,rs310b,rs310d
+	type ResultSet rs311,rs311a,rs311b,rs311c,rs311d,rs312a,rs312b,rs312d
+	type ResultSet rs320a,rs320b,rs320d,rs330a,rs330b,rs330c,rs330d,rs330e,rs330f
+	type ResultSet rs330g,rs612,rs612b,rs612c
+	type IO extr=Class.new("IO")
+	
+	set FILL=""
+
+	// Setup output file parameters
+	set extr.fileName="BOT."_$$DAT^%ZM(ZTJD,"YEAR.MM.DD")
+	set extr.openParams="NEWV/WRITE"
+        set extr.recordSize=200
+
+	// Open output file for writing
+	do extr.open()
+	
+	// Retrieve TAB001 records and write to extract file
+	set YEARMM=$$DAT^%ZM(ZTJD,"YEARMM")
+	set RECTYPE="TAB001"
+	set rs001=Db.select("DISTINCT BOO,CRCD,ACCTTYPE","ZBOT","RECTYPE=:RECTYPE AND YEARMM=:YEARMM")
+	while rs001.next() do { quit:ER
+		set BOO=rs001.getCol(1)
+		set CRCD=rs001.getCol(2)
+		set ACCTTYPE=rs001.getCol(3)
+
+		set SEQ=1		
+		
+		set rs001b=Db.select("PERIOD","ZBOT","BOO=:BOO and CRCD=:CRCD and ACCTTYPE=:ACCTTYPE and RECTYPE=:RECTYPE AND YEARMM=:YEARMM")	
+		if rs001b.isEmpty() quit
+		while rs001b.next() do {
+			set PERIOD=rs001b.getCol(1)
+			
+			set AMT=0
+			set rs001c=Db.select("AMT","ZBOT","BOO=:BOO and CRCD=:CRCD and ACCTTYPE=:ACCTTYPE and PERIOD=:PERIOD and RECTYPE=:RECTYPE AND YEARMM=:YEARMM")
+			if rs001c.isEmpty() quit
+			while rs001c.next() do {
+				set AMT=$G(AMT)+rs001c.getCol(1)
+				}
+				
+			set REC=BOO.zero(3)_XTJD_"TAB001"
+			set REC=REC_$$RJ^%ZTEXT(CRCD,3)_ACCTTYPE_PERIOD.zero(2)_$C(254)_AMT.zero(18,2,1)_FILL.blank(98)
+						
+			// Replace $C(254) with running sequence number
+			set REC=$P(REC,$C(254),1)_SEQ.zero(10)_$P(REC,$C(254),2)
+			do extr.write(.REC)
+			set SEQ=SEQ+1		
+			}
+		}
+			
+	/*
+	  Cycle through TAB080 subtotals and combine for all process IDs.
+	  Create an extract record for each combined subtotal and write
+	  to the extract file.
+	*/
+
+	//Create dummy record for TAB080 even though no data
+	set rs080d=Db.select("PROCID","ZTMPBOT080")
+	if rs080d.next() set ZPROCID=rs080d.getCol(1)
+	set rs080d=Db.select("DISTINCT FDFLAG,BOO,CRCD,ACCTTYPE,PERIOD","ZTMPBOT080")
+	while rs080d.next() do {
+		set FDFLAG=rs080d.getCol(1)
+		set BOO=rs080d.getCol(2)
+		set CRCD=rs080d.getCol(3)
+		set ACCTTYPE=rs080d.getCol(4)
+		set PERIOD=rs080d.getCol(5)
+		for CNT=1:1:6 do {
+			if Db.isDefined("ZTMPBOT080","FDFLAG,BOO,CRCD,ACCTTYPE,PERIOD,CNT,ZPROCID") quit
+			type RecordZTMPBOT080 zbot080=Class.new("RecordZTMPBOT080")
+			set zbot080.procid=ZPROCID
+			set zbot080.fdflag=rs080d.getCol(1)
+			set zbot080.boo=rs080d.getCol(2)
+			set zbot080.crcd=rs080d.getCol(3)
+			set zbot080.accttype=rs080d.getCol(4)
+			set zbot080.period=rs080d.getCol(5)
+			set zbot080.rangenum=CNT
+			set zbot080.linkcnt=0
+			set zbot080.linksum=0
+			set zbot080.nolnkcnt=0
+			set zbot080.nolnksum=0
+			do zbot080.bypassSave() 					
+			}
+		}
+	
+	set SEQ=1
+	set rs080a=Db.select("DISTINCT FDFLAG,BOO,CRCD,ACCTTYPE,PERIOD,RANGENUM","ZTMPBOT080")
+	while rs080a.next() do {
+	
+		set FDFLAG=rs080a.getCol(1)
+		set BOO=rs080a.getCol(2)
+		set CRCD=rs080a.getCol(3)
+		set ACCTTYPE=rs080a.getCol(4)
+		set PERIOD=rs080a.getCol(5)
+		set RANGENUM=rs080a.getCol(6)
+		
+		if RANGENUM=1 set SEQ=1
+		
+		set (LINKCNT,LINKSUM,NOLNKCNT,NOLNKSUM)=0
+		
+		set rs080b=Db.select("LINKCNT,LINKSUM,NOLNKCNT,NOLNKSUM","ZTMPBOT080","FDFLAG=:FDFLAG AND BOO=:BOO AND CRCD=:CRCD AND ACCTTYPE=:ACCTTYPE AND PERIOD=:PERIOD AND RANGENUM=:RANGENUM")
+		if rs080b.isEmpty() quit
+		while rs080b.next() do {
+			set LINKCNT=LINKCNT+rs080b.getCol(1)
+			set LINKSUM=LINKSUM+rs080b.getCol(2)
+			set NOLNKCNT=NOLNKCNT+rs080b.getCol(3)
+			set NOLNKSUM=NOLNKSUM+rs080b.getCol(4)
+			}
+							
+		// Write record to extract file
+		set REC=BOO.zero(3)_XTJD_"TAB080"
+		set REC=REC_$$RJ^%ZTEXT(CRCD,3)_ACCTTYPE_PERIOD.zero(2)
+		set REC=REC_SEQ.zero(10)_RANGENUM.zero(2)
+		if RANGENUM=1 set START=0,END=100000
+		else  if RANGENUM=2 set START=100000.01,END=200000
+		else  if RANGENUM=3 set START=200000.01,END=500000
+		else  if RANGENUM=4 set START=500000.01,END=1000000
+		else  if RANGENUM=5 set START=1000000.01,END=10000000
+		else  if RANGENUM=6 set START=10000000.01,END=9999999999999999.99
+		set REC=REC_START.zero(18,2,1)_END.zero(18,2,1)
+		set REC=REC_LINKCNT.zero(10)_LINKSUM.zero(18,2,1)
+		set REC=REC_NOLNKCNT.zero(10)_NOLNKSUM.zero(18,2,1)_FILL.blank(22)
+							
+		do extr.write(.REC)
+		set SEQ=SEQ+1							
+							
+		}
+		
+	/*
+	  Cycle through TAB310 subtotals and combine for all process IDs.
+	  Create an extract record for each combined subtotal and write
+	  to the extract file.
+	*/
+
+	//Create dummy record for TAB310 even though no data
+	set rs310d=Db.select("PROCID","ZTMPBOT310")
+	if rs310d.next() set ZPROCID=rs310d.getCol(1)
+	set rs310d=Db.select("DISTINCT FDFLAG,BOO,CRCD,ACCTTYPE,PERIOD,CUSTCODE","ZTMPBOT310")
+	while rs310d.next() do {
+		set FDFLAG=rs310d.getCol(1)
+		set BOO=rs310d.getCol(2)
+		set CRCD=rs310d.getCol(3)
+		set ACCTTYPE=rs310d.getCol(4)
+		set PERIOD=rs310d.getCol(5)
+		for CNT=1:1:23 do {
+			if Db.isDefined("ZTMPBOT310","FDFLAG,BOO,CRCD,ACCTTYPE,PERIOD,CNT,ZPROCID") quit
+			type RecordZTMPBOT310 zbot310=Class.new("RecordZTMPBOT310")
+			set zbot310.procid=ZPROCID
+			set zbot310.fdflag=rs310d.getCol(1)
+			set zbot310.boo=rs310d.getCol(2)
+			set zbot310.crcd=rs310d.getCol(3)
+			set zbot310.accttype=rs310d.getCol(4)
+			set zbot310.period=rs310d.getCol(5)
+			set zbot310.custcode=CNT
+			set zbot310.cramt=0
+			set zbot310.accruecr=0
+			do zbot310.bypassSave() 					
+			}
+		}
+			
+	set RECTYPE="TAB310"
+	set SEQ=1
+	set rs310a=Db.select("DISTINCT FDFLAG,BOO,CRCD,ACCTTYPE,PERIOD,CUSTCODE","ZTMPBOT310")
+	while rs310a.next() do {
+	
+		set FDFLAG=rs310a.getCol(1)
+		set BOO=rs310a.getCol(2)
+		set CRCD=rs310a.getCol(3)
+		set ACCTTYPE=rs310a.getCol(4)
+		set PERIOD=rs310a.getCol(5)
+		set CUSTCODE=rs310a.getCol(6)
+		
+		if +CUSTCODE=1 set SEQ=1
+		
+		set (CRAMT,ACCRUECR)=0
+		set rs310b=Db.select("CRAMT,ACCRUECR","ZTMPBOT310","FDFLAG=:FDFLAG AND BOO=:BOO AND CRCD=:CRCD AND ACCTTYPE=:ACCTTYPE AND PERIOD=:PERIOD AND CUSTCODE=:CUSTCODE")
+		if rs310b.isEmpty() quit
+		while rs310b.next() do {
+			set CRAMT=CRAMT+rs310b.getCol(1)
+			set ACCRUECR=ACCRUECR+rs310b.getCol(2)
+			}
+							
+		// Write record to extract file
+		set REC=BOO.zero(3)_XTJD_"TAB310"
+		set REC=REC_$$RJ^%ZTEXT(CRCD,3)_ACCTTYPE_PERIOD.zero(2)
+		set CUSTNAME=$G(CUSTNAME(+CUSTCODE),"DEFAULT TOTAL")
+		set REC=REC_SEQ.zero(10)_CUSTCODE.zero(2)_CUSTNAME.blank(30)
+		set REC=REC_CRAMT.zero(18,2,1)_ACCRUECR.zero(18,2,1)_FILL.blank(48)
+							
+		do extr.write(.REC)
+		set SEQ=SEQ+1							
+							
+		}
+	
+	// Retrieve TAB311 records and write to extract file
+
+	set rs311=Db.select("DISTINCT BOO","ZTMPBOT311")
+	while rs311.next() do {
+		set BOO=rs311.getCol(1)
+		set SEQ=1		
+		set rs311a=Db.select("DISTINCT FDFLAG,CRCD,ACCTTYPE","ZTMPBOT311")
+		while rs311a.next() do {
+			set SEQ=1
+			set FDFLAG=rs311a.getCol(1)
+			set CRCD=rs311a.getCol(2)
+			set ACCTTYPE=rs311a.getCol(3)
+			
+			set rs311b=Db.select("DISTINCT PERIOD","ZTMPBOT311","BOO=:BOO AND FDFLAG=:FDFLAG AND CRCD=:CRCD AND ACCTTYPE=:ACCTTYPE")
+			while rs311b.next() do {
+				set SEQ=1
+				set PERIOD=rs311b.getCol(1)
+	
+				set rs311c=Db.select("DISTINCT CID,CUSTCODE,TITLE","ZTMPBOT311","FDFLAG=:FDFLAG AND BOO=:BOO AND CRCD=:CRCD AND ACCTTYPE=:ACCTTYPE AND PERIOD=:PERIOD")			
+				if rs311c.isEmpty() quit
+				while rs311c.next() do {
+					set ZCID=rs311c.getCol(1)		
+					set CUSTCODE=rs311c.getCol(2)
+					set TITLE=rs311c.getCol(3)
+					set (POSAMT,NEGAMT)=0
+					set rs311d=Db.select("POSAMT,NEGAMT","ZTMPBOT311","FDFLAG=:FDFLAG AND BOO=:BOO AND CRCD=:CRCD AND ACCTTYPE=:ACCTTYPE AND PERIOD=:PERIOD AND CID=:ZCID")
+					if rs311d.isEmpty() quit
+					while rs311d.next() do {
+						set POSAMT=POSAMT+rs311d.getCol(1)
+						set NEGAMT=NEGAMT+rs311d.getCol(2)
+						}
+												
+					// Write record to extract file
+					set REC=BOO.zero(3)_XTJD_"TAB311"
+					set REC=REC_$$RJ^%ZTEXT(CRCD,3)_ACCTTYPE_PERIOD.zero(2)
+					set REC=REC_SEQ.zero(10)_ZCID.zero(10)_TITLE.blank(20)
+					set REC=REC_NEGAMT.zero(18,2,1)_POSAMT.zero(18,2,1)
+					set REC=REC_CUSTCODE.zero(3)_FILL.blank(47)		
+										
+					do extr.write(.REC)
+					set SEQ=SEQ+1
+					}
+				}
+			}	
+		}
+			
+	/*
+	  Cycle through TAB312 subtotals and combine for all process IDs.
+	  Create an extract record for each combined subtotal and write
+	  to the extract file.
+	*/		
+
+	//Create dummy record for TAB312 even though no data
+	set rs312d=Db.select("PROCID","ZTMPBOT312")
+	if rs312d.next() set ZPROCID=rs312d.getCol(1)
+	set rs312d=Db.select("FDFLAG,BOO,CRCD,ACCTTYPE,PERIOD,CUSTCODE","ZTMPBOT312")
+	while rs312d.next() do {
+		set FDFLAG=rs312d.getCol(1)
+		set BOO=rs312d.getCol(2)
+		set CRCD=rs312d.getCol(3)
+		set ACCTTYPE=rs312d.getCol(4)
+		set PERIOD=rs312d.getCol(5)
+		for CNT=1:1:4 do {
+			if Db.isDefined("ZTMPBOT312","FDFLAG,BOO,CRCD,ACCTTYPE,PERIOD,CNT,ZPROCID") quit
+			type RecordZTMPBOT312 zbot312=Class.new("RecordZTMPBOT312")
+			set zbot312.procid=ZPROCID
+			set zbot312.fdflag=rs312d.getCol(1)
+			set zbot312.boo=rs312d.getCol(2)
+			set zbot312.crcd=rs312d.getCol(3)
+			set zbot312.accttype=rs312d.getCol(4)
+			set zbot312.period=rs312d.getCol(5)
+			set zbot312.custcode=CNT
+			set zbot312.cramt=0
+			do zbot312.bypassSave() 					
+			}
+		}
+	
+	set SEQ=1
+	set rs312a=Db.select("DISTINCT FDFLAG,BOO,CRCD,ACCTTYPE,PERIOD,CUSTCODE","ZTMPBOT312")
+	while rs312a.next() do {
+	
+		set FDFLAG=rs312a.getCol(1)
+		set BOO=rs312a.getCol(2)
+		set CRCD=rs312a.getCol(3)
+		set ACCTTYPE=rs312a.getCol(4)
+		set PERIOD=rs312a.getCol(5)
+		set CUSTCODE=rs312a.getCol(6)
+
+		if +CUSTCODE=1 set SEQ=1
+		
+		set CRAMT=0
+		set rs312b=Db.select("CRAMT","ZTMPBOT312","FDFLAG=:FDFLAG AND BOO=:BOO AND CRCD=:CRCD AND ACCTTYPE=:ACCTTYPE AND PERIOD=:PERIOD AND CUSTCODE=:CUSTCODE")
+		if rs312b.isEmpty() quit
+		while rs312b.next() set CRAMT=CRAMT+rs312b.getCol(1)
+							
+		// Write record to extract file
+		set REC=BOO.zero(3)_XTJD_"TAB312"
+		set REC=REC_$$RJ^%ZTEXT(CRCD,3)_ACCTTYPE_PERIOD.zero(2)
+		set CUSTNAME=$G(CUSTNAM2(+CUSTCODE),"")
+		set REC=REC_SEQ.zero(10)_CUSTCODE.zero(2)_CUSTNAME.blank(30)
+		set REC=REC_CRAMT.zero(18,2,1)_FILL.blank(66)
+							
+		do extr.write(.REC)
+		set SEQ=SEQ+1							
+		}
+
+	/*
+	  Cycle through TAB320 subtotals and combine for all process IDs.
+	  Create an extract record for each combined subtotal and write
+	  to the extract file.
+	*/		
+
+	//Create dummy record for TAB320 even though no data
+	set rs320d=Db.select("PROCID","ZTMPBOT320")
+	if rs320d.next() set ZPROCID=rs320d.getCol(1)
+	set rs320d=Db.select("BOO,CRCD,ACCTTYPE,CUSTCODE","ZTMPBOT320")
+	while rs320d.next() do {
+		set BOO=rs320d.getCol(1)
+		set CRCD=rs320d.getCol(2)
+		set ACCTTYPE=rs320d.getCol(3)
+		for CNT=1:1:23 do {
+			if Db.isDefined("ZTMPBOT320","BOO,CRCD,ACCTTYPE,CNT,ZPROCID") quit
+			type RecordZTMPBOT320 zbot320=Class.new("RecordZTMPBOT320")
+			set zbot320.procid=ZPROCID
+			set zbot320.boo=rs320d.getCol(1)
+			set zbot320.crcd=rs320d.getCol(2)
+			set zbot320.accttype=rs320d.getCol(3)
+			set zbot320.custcode=CNT
+			set zbot320.cramt=0
+			do zbot320.bypassSave() 					
+			}
+		}
+			
+	set SEQ=1
+	set rs320a=Db.select("DISTINCT BOO,CRCD,ACCTTYPE,CUSTCODE","ZTMPBOT320")
+	while rs320a.next() do {
+	
+		set BOO=rs320a.getCol(1)
+		set CRCD=rs320a.getCol(2)
+		set ACCTTYPE=rs320a.getCol(3)
+		set CUSTCODE=rs320a.getCol(4)
+		
+		if +CUSTCODE=1 set SEQ=1
+
+		set CRAMT=0
+		set rs320b=Db.select("CRAMT","ZTMPBOT320","BOO=:BOO AND CRCD=:CRCD AND ACCTTYPE=:ACCTTYPE AND CUSTCODE=:CUSTCODE")
+		while rs320b.next() set CRAMT=CRAMT+rs320b.getCol(1)
+
+		if CRAMT<0 set CRAMT=CRAMT*(-1)
+									
+		// Write record to extract file
+		set REC=BOO.zero(3)_XTJD_"TAB320"
+		set REC=REC_$$RJ^%ZTEXT(CRCD,3)_ACCTTYPE_"00"
+		set CUSTNAME=$G(CUSTNAME(+CUSTCODE),"DEFAULT TOTAL")
+		set REC=REC_SEQ.zero(10)_CUSTCODE.zero(2)_CUSTNAME.blank(30)
+		set REC=REC_CRAMT.zero(18,2,1)_FILL.blank(66)
+					
+		do extr.write(.REC)
+		set SEQ=SEQ+1							
+		}				
+	
+	/*
+	  Cycle through TAB330 subtotals and combine for all process IDs.
+	  Create an extract record for each combined subtotal and write
+	  to the extract file.
+	*/
+	//Create dummy record for TAB330 even though no data
+	
+	set rs330c=Db.select("PROCID","ZTMPBOT330")
+	if rs330c.next() set ZPROCID=rs330c.getCol(1)
+				
+	set rs330a=Db.select("DISTINCT BRCD","UTBLBRCD","BRCD<1000")
+	if rs330a.isEmpty() quit
+	if rs330a.next() do {
+		set BOO=rs330a.getCol(1)			
+		set rs330b=Db.select("DISTINCT GRP1,GRP2,GRP3","ZUTBLBUSTYPE")
+		while rs330b.next() do {
+			set GRP1=+rs330b.getCol(1)
+			set GRP2=+rs330b.getCol(2)
+			set GRP3=+rs330b.getCol(3)
+			set rs330c=Db.select("DISTINCT CRCD,ACCTTYPE","ZTMPBOT330")
+			if rs330c.isEmpty() quit
+			while rs330c.next() do {
+				set CRCD=rs330c.getCol(1)
+				set ACCTTYPE=rs330c.getCol(2)
+				if Db.isDefined("ZTMPBOT330","PROCID=:ZPROCID,BOO=:BOO,CRCD=:CRCD,ACCTTYPE=:ACCTTYPE,GRP1=:GRP1,GRP2=:GRP2,GRP3=:GRP3") quit
+				type RecordZTMPBOT330 zbot330=Class.new("RecordZTMPBOT330")
+				set zbot330.procid=ZPROCID
+				set zbot330.boo=BOO
+				set zbot330.crcd=CRCD
+				set zbot330.accttype=ACCTTYPE
+				set zbot330.grp1=GRP1
+				set zbot330.grp2=GRP2
+				set zbot330.grp3=GRP3
+				set zbot330.cramt=0
+				do zbot330.bypassSave() 					
+				}
+			}
+		}
+	
+	set rs330d=Db.select("DISTINCT BOO,CRCD,ACCTTYPE","ZTMPBOT330")
+	while rs330d.next() do {
+		set BOO=rs330d.getCol(1)
+		set CRCD=rs330d.getCol(2)
+		set ACCTTYPE=rs330d.getCol(3)
+		set SEQ=1
+		set rs330e=Db.select("DISTINCT GRP1,GRP2,GRP3","ZTMPBOT330","BOO=:BOO AND CRCD=:CRCD AND ACCTTYPE=:ACCTTYPE")
+		while rs330e.next() do {		
+			set GRP1=rs330e.getCol(1)			
+			set GRP2=rs330e.getCol(2)
+			set GRP3=rs330e.getCol(3)
+			set CRAMT=0			
+			set rs330f=Db.select("CRAMT","ZTMPBOT330","BOO=:BOO AND CRCD=:CRCD AND ACCTTYPE=:ACCTTYPE AND GRP1=:GRP1 AND GRP2=:GRP2 AND GRP3=:GRP3")
+			while rs330f.next() set CRAMT=CRAMT+rs330f.getCol(1)
+
+			if CRAMT<0 set CRAMT=CRAMT*(-1)
+										
+			// Write record to extract file
+			set REC=BOO.zero(3)_XTJD_"TAB330"
+			set REC=REC_$$RJ^%ZTEXT(CRCD,3)_ACCTTYPE_"00"
+			set REC=REC_SEQ.zero(10)_GRP1.zero(2)_GRP2.zero(2)_GRP3.zero(2)
+			set REC=REC_CRAMT.zero(18,2,1)_FILL.blank(92)
+						
+			do extr.write(.REC)
+			set SEQ=SEQ+1
+			}	
+		}				
+	
+	/*
+	  Cycle through TAB612 subtotals and combine for all process IDs.
+	  Create an extract record for each combined subtotal and write
+	  to the extract file.
+	*/
+	
+	//do Schema.createTable("ZTMPBOT612","PROCID,BOO,CRCD,ACCTTYPE,PERIOD,IRN","CRAMT,PERIOD1,COUNT","ZTMP612")	
+	set rs612=Db.select("DISTINCT BOO,CRCD,ACCTTYPE,PERIOD","ZTMPBOT612")
+	while rs612.next() do {
+	
+		set BOO=rs612.getCol(1)
+		set CRCD=rs612.getCol(2)
+		set ACCTTYPE=rs612.getCol(3)
+		set PERIOD=rs612.getCol(4)
+		set SEQ=1
+
+		set rs612b=Db.select("DISTINCT IRN","ZTMPBOT612","BOO=:BOO AND CRCD=:CRCD AND ACCTTYPE=:ACCTTYPE AND PERIOD=:PERIOD")
+		while rs612b.next() do {				
+			set IRN=rs612b.getCol(1)
+			set (COUNT,CRAMT)=0			
+			set rs612c=Db.select("PERIOD1,COUNT,CRAMT","ZTMPBOT612","BOO=:BOO AND CRCD=:CRCD AND ACCTTYPE=:ACCTTYPE AND PERIOD=:PERIOD AND IRN=:IRN")
+			while rs612c.next() do {
+				set PERIOD1=rs612c.getCol(1)
+				set COUNT=COUNT+rs612c.getCol(2)		
+				set CRAMT=CRAMT+rs612c.getCol(3)
+				}									
+			// Write record to extract file
+			set REC=BOO.zero(3)_XTJD_"TAB612"
+			set REC=REC_$$RJ^%ZTEXT(CRCD,3)_ACCTTYPE_PERIOD.zero(2)
+			set REC=REC_SEQ.zero(10)_PERIOD1.zero(2)_IRN.zero(6,2,1)
+			set REC=REC_COUNT.zero(10)_CRAMT.zero(18,2,1)_FILL.blank(80)
+						
+			do extr.write(.REC)
+			set SEQ=SEQ+1
+
+			}
+		}
+				
+	// Close extract file
+	do extr.close()
+	
+	// Remove table schemas for temporary tables
+	//do Schema.deleteTable("ZTMPBOT080")
+	//do Schema.deleteTable("ZTMPBOT310")
+	//do Schema.deleteTable("ZTMPBOT312")
+	//do Schema.deleteTable("ZTMPBOT320")
+	//do Schema.deleteTable("ZTMPBOT330")
+	//do Schema.deleteTable("ZTMPBOT612")		
+	quit
+
+---------- THRINIT ------ Section marker
+
+	set FILL=""
+	
+	do FXTYPE
+	//Feb 16, 2007 - Rapeepan Y. ,Wash Account Type
+	do WACTYPE
+	
+	do MIDRATE
+
+	if BCH16 do BOTTINIT
+	
+	if BCHEOM do {
+		new BRCD,KEY
+		type ResultSet rs=Db.select("BRCD","ZUTBLBRCD","BRCD NOT >10000")
+		while rs.next() do {
+			set BRCD=+rs.getCol(1)
+	
+			set KEY=""
+			for  set KEY=ZMISKEY(KEY).order() quit:KEY=""  do {
+	
+				do Schema.createTable("ZEXTMIS","TJD,EXT,JOB,BRCD,KEY","DRCNT,DRAMT,CRCNT,CRAMT","TMPEXTF")
+	
+				type RecordZEXTMIS zextmis=Class.new("RecordZEXTMIS")
+				set zextmis.tjd=ZTJD
+				set zextmis.ext="MIS"
+				set zextmis.job=%ProcessID
+				set zextmis.brcd=BRCD
+				set zextmis.key=KEY
+	
+				set zextmis.drcnt=0
+				set zextmis.dramt=0
+				set zextmis.crcnt=0
+				set zextmis.cramt=0
+				do zextmis.bypassSave()
+				
+				//do Schema.deleteTable("ZEXTMIS")
+				}
+			}
+		do BOTTINIT
+		}
+	quit	
+
+BOTTINIT
+
+	//BOT
+	set ATMCARD("CLASSICATM")=1
+	set ATMCARD("CLASSICINS")=1
+	set ATMCARD("ED")=0
+	set ATMCARD("FI")=0
+	set ATMCARD("GOLD ATM")=1
+	set ATMCARD("GOLD INS")=1
+	set ATMCARD("IPAC CARD")=1
+	set ATMCARD("IPVE CARD")=1
+	set ATMCARD("PB")=0
+	set ATMCARD("SUP CARD")=1
+	set ATMCARD("TB")=0
+	set ATMCARD("VE-CHULA")=1
+	set ATMCARD("VE-INSURE")=1
+	set ATMCARD("VE-MODERN")=1
+	set ATMCARD("VE-NORMAL")=1
+	set ATMCARD("VE-PIN-M")=1
+	set ATMCARD("VE-PIN-N")=1
+	set ATMCARD("VE-STAFF-M")=1
+	set ATMCARD("VE-STAFF-N")=1
+
+	set (CUSTGRP(11),CUSTGRP(12),CUSTGRP(13),CUSTGRP(14),CUSTGRP(15),CUSTGRP(16),CUSTGRP(17),CUSTGRP(18))=1
+	set (CUSTGRP(19),CUSTGRP(501))=1
+	set (CUSTGRP(21),CUSTGRP(22),CUSTGRP(23),CUSTGRP(24),CUSTGRP(25),CUSTGRP(27),CUSTGRP(28),CUSTGRP(29))=2
+	set (CUSTGRP(31),CUSTGRP(32),CUSTGRP(33),CUSTGRP(34),CUSTGRP(36))=3
+	set CUSTGRP(311)=4
+	set CUSTGRP(312)=5
+	set CUSTGRP(313)=6
+	set CUSTGRP(314)=7			
+	set CUSTGRP(315)=8
+	set CUSTGRP(316)=9
+	set (CUSTGRP(321),CUSTGRP(326))=10
+	set CUSTGRP(324)=11
+	set CUSTGRP(322)=12
+	set CUSTGRP(327)=13
+	set CUSTGRP(325)=14
+	set CUSTGRP(333)=15
+	set CUSTGRP(323)=16
+	set (CUSTGRP(351),CUSTGRP(352),CUSTGRP(353),CUSTGRP(346),CUSTGRP(347),CUSTGRP(348),CUSTGRP(349))=17
+	set (CUSTGRP(342),CUSTGRP(361))=17
+	set (CUSTGRP(212),CUSTGRP(213),CUSTGRP(214),CUSTGRP(215),CUSTGRP(216),CUSTGRP(217))=18
+	set (CUSTGRP(218),CUSTGRP(331),CUSTGRP(332),CUSTGRP(26),CUSTGRP(35))=18
+	set (CUSTGRP(211),CUSTGRP(221),CUSTGRP(229))=19
+	set (CUSTGRP(101),CUSTGRP(102),CUSTGRP(103),CUSTGRP(104),CUSTGRP(105),CUSTGRP(106),CUSTGRP(107))=20
+	set (CUSTGRP(108),CUSTGRP(109),CUSTGRP(110),CUSTGRP(111),CUSTGRP(112))=20
+	set (CUSTGRP(401),CUSTGRP(402))=21
+	set (CUSTGRP(222),CUSTGRP(223),CUSTGRP(224),CUSTGRP(225),CUSTGRP(226),CUSTGRP(227),CUSTGRP(228),CUSTGRP(231))=22
+	
+	set CUSTGRP2(362)=1
+	set CUSTGRP2(363)=2
+	set CUSTGRP2(364)=3
+	set CUSTGRP2(365)=4
+	quit
+	
+MIDRATE
+
+	//Dec 13, 2006 - Sarochinee R.
+	//Modified MIDRATE, changed from crcd.midrate to crcd.finspot
+	type ResultSet rs=Db.select("CRCD,FINSPOT","CRCD","CO='KTB'")
+	while rs.next() set MIDRATE(rs.getCol(1))=rs.getCol(2)
+
+	quit
+	
+FXTYPE	// Get all Non-resident Baht and Foreign Currency product type
+
+	// Non-resident Baht
+	//set FXTYPE(1103)=1
+	//set FXTYPE(2102)=1
+	
+	// Foreign Currency
+	set FXTYPE(1101)=1
+	set FXTYPE(2101)=1
+	set FXTYPE(3101)=1
+	
+	// Jun 22, 2011 - Sarochinee R.
+	// Modified Code : EOM3 Add Foreign Wash Account Static File. 
+	// Foreign Wash
+	set FXTYPE(1104)=1
+	
+	// FX Demand Draft
+	set FXTYPE(1102)=0
+	
+
+	quit
+	
+WACTYPE  
+	//Feb 16, 2007 - Rapeepan Y. ,Wash Account Type
+	//if (XTYPE=1201) quit
+	//if (XTYPE=1205) quit
+	//if (XTYPE=1204),($E(XCID.zero(12),6)=7) quit
+	
+	set WACTYPE(1201)=1
+	set WACTYPE(1205)=1
+	set WACTYPE(1204)=2
+	
+	//Jan 26, 2009 - Sarochinee R.
+	//Modified WACTYPE, Include Product Type 1206 - KTB Prepaid Card that is Wash Account (JO-1004).
+	set WACTYPE(1206)=1
+	//Apr 10, 2009 - Sarochinee R.
+	//Fixed Wash Account [1220,1221,1222]
+	set WACTYPE(1220)=1
+	set WACTYPE(1221)=1
+	set WACTYPE(1222)=1
+	
+	quit
+
+---------- THREXEC ------ Section marker
+
+	/*
+	May 16, 2005 - Anchalee
+	Added codes for Foreign Currency Account.
+	*/
+
+	new bttacn,bttbeg,bttcnt,bttend,bttlst,bttseq,cid,filseq,newcnt
+
+	set bttseq=vINPUT
+	set filseq=bttseq.zero(5)
+
+	type IO ioeod1=Class.new("IO")
+	// type IO ioeod2=Class.new("IO")
+	//Feb 16, 2007 - Rapeepan Y. Added for Wash a/c File
+	type IO ioeodw1=Class.new("IO")
+
+	// THB CUrrency
+	//type IO ioeom1=Class.new("IO")
+	type IO ioeom2=Class.new("IO")
+	type IO ioeom3=Class.new("IO")
+	type IO ioeom4=Class.new("IO")
+	//type IO ioeom5=Class.new("IO")
+	
+	//Wash A/C ,Feb 16, 2007 - Rapeepan Y. Added for Wash a/c File
+	type IO ioeomw2=Class.new("IO")
+	type IO ioeomw3=Class.new("IO")
+	
+	// Foreign Currency
+	type IO iofxeom2=Class.new("IO")
+	type IO iofxeom3=Class.new("IO")
+	type IO iofxeom4=Class.new("IO")
+	
+	// Jun 22, 2011 - Sarochinee R.
+	// Wash Account Foreign Currency 
+	type IO iofxeomw2=Class.new("IO")
+	type IO iofxeomw3=Class.new("IO")
+	
+	
+	// **********************************************************
+	// Financial- Loan
+	// **********************************************************
+
+	set ioeod1.directory=TMPDIR	//"/tmp"
+	set ioeod1.fileName="tmp_acnext_eod1_"_filseq_".txt"
+	set ioeod1.openParams="NEWV/WRITE"
+	//Oct 21,2005 Modified By Vorawit 487->550  
+	set ioeod1.recordSize=550
+	do ioeod1.open()
+
+	//Feb 16, 2007 - Rapeepan Y. Added for Wash a/c File
+	// **********************************************************
+	// Financial- Loan : Wash A/C
+	// **********************************************************
+	set ioeodw1.directory=TMPDIR	//"/tmp"
+	set ioeodw1.fileName="tmp_acnext_eodw1_"_filseq_".txt"
+	set ioeodw1.openParams="NEWV/WRITE"
+	//Oct 21,2005 Modified By Vorawit 487->550  
+	set ioeodw1.recordSize=550
+	do ioeodw1.open()
+
+
+	/* move KO to ZBCHKOEXT
+	// **********************************************************
+	// KO
+	// **********************************************************
+
+	set ioeod2.directory=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")
+	set ioeod2.fileName="tmp_extract_eod2_"_filseq_".txt"
+	set ioeod2.openParams="NEWV/WRITE"
+	set ioeod2.recordSize=280
+	do ioeod2.open()
+	
+	*/
+	
+	/*	
+	Jul 29, 2004 - Anchalee
+	Moved financial deposit and item deposit from end-of-month section
+	to end-of-week reflected to the weeking frequency adding
+	*/
+	// ==========================================================
+	//			END-OF-WEEK FILES
+	// ==========================================================
+	
+	if BCHEOW!BCH16!BCHEOM do {
+		// **************************************************
+		// Financial Deposit
+		// **************************************************
+		/*
+		Jul 29, 2004 - Anchalee
+		Modified record size from 320 up to 328
+		*/
+		
+		set ioeom2.directory=TMPDIR	//"/tmp"
+		set ioeom2.fileName="tmp_acnext_eom2_"_filseq_".txt"
+		set ioeom2.openParams="NEWV/WRITE"
+		//Oct 21,2005 Modified By Vorawit 334->400
+		set ioeom2.recordSize=400	
+		do ioeom2.open()
+		
+		//Feb 16, 2007 - Rapeepan Y. Added for Wash a/c File
+		set ioeomw2.directory=TMPDIR	//"/tmp"
+		set ioeomw2.fileName="tmp_acnext_eomw2_"_filseq_".txt"
+		set ioeomw2.openParams="NEWV/WRITE"
+		//Oct 21,2005 Modified By Vorawit 334->400
+		set ioeomw2.recordSize=400	
+		do ioeomw2.open()
+		
+		// **************************************************
+		// Deposit Item
+		// **************************************************
+	
+		set ioeom4.directory=TMPDIR	//"/tmp"
+		set ioeom4.fileName="tmp_acnext_eom4_"_filseq_".txt"
+		set ioeom4.openParams="NEWV/WRITE"
+		//Oct 21,2005 Modified By Vorawit 235->300
+		set ioeom4.recordSize=300	//240
+		do ioeom4.open()
+		//}
+		
+		// **************************************************
+		// FX Financial Deposit
+		// **************************************************
+		set iofxeom2.directory=TMPDIR
+		set iofxeom2.fileName="tmp_acnext_fxeom2_"_filseq_".txt"
+		set iofxeom2.openParams="NEWV/WRITE"
+		//Oct 21,2005 Modified By Vorawit 334->400
+		set iofxeom2.recordSize=400
+		do iofxeom2.open()
+		
+		// Jun 22, 2011 - Sarochinee R.
+		// **************************************************
+		// FX Financial Deposit [Wash Account]
+		// **************************************************
+		set iofxeomw2.directory=TMPDIR
+		set iofxeomw2.fileName="tmp_acnext_fxeomw2_"_filseq_".txt"
+		set iofxeomw2.openParams="NEWV/WRITE"
+		set iofxeomw2.recordSize=400
+		do iofxeomw2.open()
+		// End Jun 22, 2011 - Sarochinee R.
+		
+		// **************************************************
+		// FX Deposit Item
+		// **************************************************
+		set iofxeom4.directory=TMPDIR
+		set iofxeom4.fileName="tmp_acnext_fxeom4_"_filseq_".txt"
+		set iofxeom4.openParams="NEWV/WRITE"
+		//Oct 21,2005 Modified By Vorawit 235->300
+		set iofxeom4.recordSize=300
+		do iofxeom4.open()
+	}
+	// ==========================================================
+	//			END-OF-MONTH FILES
+	// ==========================================================
+	if BCH16!BCHEOM do {
+		// **************************************************
+		// Account Static
+		// **************************************************	
+	
+		set ioeom3.directory=TMPDIR	//"/tmp"
+		set ioeom3.fileName="tmp_acnext_eom3_"_filseq_".txt"
+		set ioeom3.openParams="NEWV/WRITE"
+		//Oct 21,2005 Modified By Vorawit 345->410
+		set ioeom3.recordSize=500		//410 ,Apr 05, 2007 - Rapeepan Y.
+		do ioeom3.open()
+		
+		//Feb 16, 2007 - Rapeepan Y. Added for Wash a/c File
+		set ioeomw3.directory=TMPDIR	//"/tmp"
+		set ioeomw3.fileName="tmp_acnext_eomw3_"_filseq_".txt"
+		set ioeomw3.openParams="NEWV/WRITE"
+		//Oct 21,2005 Modified By Vorawit 345->410
+		set ioeomw3.recordSize=500		//410 ,Apr 05, 2007 - Rapeepan Y.
+		do ioeomw3.open()		
+		
+		// **************************************************
+		// FX Account Static
+		// **************************************************
+		set iofxeom3.directory=TMPDIR
+		set iofxeom3.fileName="tmp_acnext_fxeom3_"_filseq_".txt"
+		set iofxeom3.openParams="NEWV/WRITE"
+		//Oct 21,2005 Modified By Vorawit 345->410
+		set iofxeom3.recordSize=500		//410 ,Apr 05, 2007 - Rapeepan Y.
+		do iofxeom3.open()
+		
+		// **************************************************
+		// FX Account Static [ Wash Account]
+		// **************************************************
+		set iofxeomw3.directory=TMPDIR
+		set iofxeomw3.fileName="tmp_acnext_fxeomw3_"_filseq_".txt"
+		set iofxeomw3.openParams="NEWV/WRITE"
+		set iofxeomw3.recordSize=500		
+		do iofxeomw3.open()
+		
+		/*
+		Jul 29, 2004 - Anchalee
+		Deleted monthly financial loan and account static files 
+		reflected to the changes of file frequency.
+		
+		
+		// **************************************************
+		// Loan Classification
+		// **************************************************	
+	
+		set ioeom5.directory=TMPDIR	//"/tmp"
+		set ioeom5.fileName="tmp_acnext_eom5_"_filseq_".txt"
+		set ioeom5.openParams="NEWV/WRITE"
+		set ioeom5.recordSize=140
+		do ioeom5.open()
+		*/
+	}
+		
+	// ==================================================
+
+
+	type RecordBTTACN bttacn=Db.getRecord("BTTACN","SEQ=:bttseq")
+	set bttbeg=bttacn.beg
+	set bttend=bttacn.end
+	set bttcnt=bttacn.cnt
+
+	set bttlst=bttend if bttlst="" set bttlst=1E18
+
+	set cid=bttbeg
+	for newcnt=0:1 set cid=$O(^XCLSACN("D",cid)) q:cid=""!(cid>bttlst)  do vPROC(cid)
+	//for newcnt=0:1 set cid=Db.nextKey("DEP","cid") q:cid=""!(cid>bttlst)  do vPROC(cid)
+
+	do ioeod1.close()
+	// do ioeod2.close()
+	//Feb 16, 2007 - Rapeepan Y. Added for Wash a/c File
+	do ioeodw1.close()
+
+	if BCHEOW!BCH16!BCHEOM do {
+		do ioeom2.close()
+		//Feb 16, 2007 - Rapeepan Y. Added for Wash a/c File
+		do ioeomw2.close()
+		do ioeom4.close()
+		
+		do iofxeom2.close()
+		do iofxeomw2.close()	// Jun 22, 2011 - Sarochinee R.
+		do iofxeom4.close()
+		}
+	if BCH16!BCHEOM do {
+		do ioeom3.close()
+		//Feb 16, 2007 - Rapeepan Y. Added for Wash a/c File
+		do ioeomw3.close()
+		do iofxeom3.close()
+		do iofxeomw3.close() // Jun 22, 2011 - Sarochinee R.
+		}
+	quit
+	
+
+---------- EXEC    ------ Section marker
+
+	
+
+	// TP not required; disabled for performance reasons
+	trollback
+
+	new ACN,EODBALAV,FXFLG,INTPAID,INTRCV,IX,TCRLIMIT,TPRINCR,TPRINDR
+	
+	//Oct 05, 2006 - Duangporn N.
+	//Modified for check field amount add Variable for field if error
+	new XBDATE,ZPK2	
+	set XBDATE=%SystemDate-1
+	set ZPK2="-"
+	
+	// Line Tag EOM3 
+	new NORGAMT	
+	set NORGAMT="Amount of first deposit"
+	
+	// Line Tag DLY1
+	new NBRATE,NINTRAT,NXBAL,NAVLBAL,NXODLIM,NZCLTOT,NAVLLIMIT,NMANHLD
+	new NTCRAMT,NTDRAMT,NINTPAID,NINTRCV,NACRINT,NADRINT,NCRINT,NDRINT
+	new NINTASUSP,NZAVINT,NINTLIFE,NNEGIPY,NNEGIPL,NPRATE,NPAMT,NLPAYAMT
+	new NAVGBALN,NAVGBALP,NZACCRPRM,NMAXACR	
+	set NBRATE="BASE-RATE"
+	set NINTRAT="INTEREST RATE"
+	set NXBAL="LEDGER BALANCE"
+	set NAVLBAL="AVAILABLE-BALANCE"
+	set NXODLIM="OVERDRAFT LIMIT"
+	set NZCLTOT="TOTAL-OD-LIMIT"
+	set NAVLLIMIT="AVAIL-LIMIT"
+	set NMANHLD="MANUAL HOLD"
+	set NTCRAMT="TOTAL-CREDIT-AMT"
+	set NTDRAMT="TOTAL-DEBIT-AMT"
+	set NINTPAID="INT-PAID"
+	set NINTRCV="INT-RCV"
+	set NACRINT="ACCRUED-CREDIT-INTEREST"
+	set NADRINT="ACCRUED-DEBIT-INTEREST"
+	set NCRINT="CREDIT-INTEREST"
+	set NDRINT="DEBIT-INTEREST/INT-SUSP"
+	set NINTASUSP="INT-ACCUM-SUSP/INT-NON-BOOK"
+	set NZAVINT="Average Interest"
+	set NINTLIFE="INT-PAID-LIFE"
+	set NNEGIPY="NEG-INT-PRIOR-YEAR"
+	set NNEGIPL="NEG-INT-LIFE"
+	set NPRATE="PENALTY RATE"
+	set NPAMT="PENALTY-AMOUNT"
+	set NLPAYAMT="LAST-PYMNT-PRIN-AMT"
+	set NABALNEG="AVG-BALANCE-NEGATIVE" 
+	set NABALPOS="AVG-BALANCE-POSITIVE"
+	set NZACCRPRM="Accrued Princ"
+	set NMAXACR="MAX BALANCE"
+	
+	// Line Tag EOM2
+	new NBASERAT,NINTRAT,NXBAL,NINTPAID,NINTRCV,NACRINT,NADRINT,NCRINT
+	new NDRINT,NHLDAMT,NTCRAMT,NTDRAMT,NAVGBALN,NAVGBALP,NAVLBAL,NINTPY
+	new NINTLIFE,NNEGIPY,NNEGIPL,CRCDBAL	
+	set NBASERAT="BASE-RATE"
+	set NINTRAT="INTEREST RATE"
+	set NXBAL="LEDGER-BALANCE"
+	set NINTPAID="INT-PAID"
+	set NINTRCV="INT-RCV"
+	set NACRINT="ACCRUED-CREDIT-INTEREST"
+	set NADRINT="ACCRUED-DEBIT-INTEREST"
+	set NCRINT="CREDIT-INTEREST"
+	set NDRINT="DEBIT-INTEREST"
+	set NHLDAMT="MANUAL-HOLD"
+	set NTCRAMT="TOTAL-CREDIT-AMT"
+	set NTDRAMT="TOTAL-DEBIT-AMT"
+	set NAVGBALN="AVG-BALANCE-NEGATIVE"
+	set NAVGBALP="AVG-BALANCE-POSITIVE"
+	set NAVLBAL="AVAILABLE-BALANCE"
+	set NINTPY="INT-PRIOR-YEAR"
+	set NINTLIFE="INT-PAID-LIFE"
+	set NNEGIPY="NEG-INT-PRIOR-YEAR"
+	set NNEGIPL="NEG-INT-PRIOR-YEAR"
+	set NCRCDBAL="LEDGER-BALANCE-CURRENCY"
+	
+	//Line Tag EOM4
+	new NIPRIN,NIBRATE,NINORATE,NIORATE,NIBONRATE,NITRATE,NICRINT
+	new NIORIGBAL,NINTPAID,NTAXPAID,NMANHOLD,NZPABALP,NINTLIFE,NCRCDBAL
+	set NIPRIN="ITEM PRINCIPLE"
+	set NIBRATE="ITEM BASE RATE"
+	set NINORATE="ITEM NEG OFF RATE"
+	set NIORATE="ITEM OFFSET RATE"
+	set NIBONRATE="ITEM BONUS RATE"
+	set NITRATE="ITEM TOTAL RATE"
+	set NICRINT="ITEM CREDIT INTEREST"
+	set NIORIGBAL="ITEM-ORIG-AMT"
+	set NINTPAID="ITEM-INT-PAID"
+	set NTAXPAID="ITEM-TAX-PAID"
+	set NMANHOLD="MANUAL HOLD"
+	set NZPABALP="Positive average balance"
+	set NINTLIFE="INT-PAID-LIFE"	
+	set NCRCDBAL="ITEM PRINCIPLE_CURRENCY"
+	
+	if 'Db.isDefined("ACN","CID=:CID") set ER=1,RM=$$^MSG(1295) do EXC quit // Test 12/07/2011
+	type RecordACN acn=Db.getRecord("ACN","CID=:CID")
+	set ACN=acn.acn
+	
+	if 'Db.isDefined("CIF","ACN=:ACN") set ER=1,RM=$$^MSG(1295) do EXC quit // Test 12/07/2011
+	type RecordCIF cif=Db.getRecord("CIF","ACN=:ACN")
+	
+	if $D(FXTYPE(acn.type)) set FXFLG=1
+	else  set FXFLG=0
+	
+	//Feb 16, 2007 - Rapeepan Y.
+	// Exclude FX Demand Draft Account
+	//if FXFLG,'FXTYPE(acn.type) quit
+	if (FXFLG=1),'FXTYPE(acn.type) quit
+	
+	//Feb 16, 2007 - Rapeepan Y.
+	//Added FXFLG=2 for Wash Account
+	if $D(WACTYPE(acn.type)) do {
+		if (WACTYPE(acn.type)=1) set FXFLG=2
+		if (WACTYPE(acn.type)=2),($E(CID.zero(12),6)=7) set FXFLG=2
+	}	 
+	
+	
+	//Mar 11, 2009 - Sarochinee R.
+	//Modified Code for Exclude Product Type 1206,1220,1221,1222
+	//if 'Db.isDefined("DEP","CID=:CID") quit
+	//type RecordDEP dep=Db.getRecord("DEP","CID=:CID")
+	
+	//Apr 10, 2009 - Sarochinee R.
+	//Fixed Wash Account [1220,1221,1222]
+	// list Product type same as 1206	
+	//if dep.zgrp1206="Y" set FXFLG=2
+	//if (dep.zgrp1206) set FXFLG=2
+	
+	
+	if acn.cls="D" do {
+		set acn={RecordDEP}acn
+
+		set EODBALAV=acn.eodbalav
+		set TCRLIMIT=acn.zcltot			// Total credit limit
+
+		// Daily extracts
+		if acn.grp'="CD" do {
+			// Calculate total debit/credit amounts for PRIN; interest paid/received
+			//do TOTDRCR(ZTJD,CID,.TPRINDR,.TPRINCR,.INTPAID,.INTRCV)
+			
+			// Daily Financial - Loan
+			//do DLY1(acn,cif,TPRINDR,TPRINCR,INTPAID,INTRCV,EODBALAV,TCRLIMIT)
+			// Exclude Non-resident Baht and Foreign Currency account
+			//Feb 14, 2007 - Rapeepan Y. Added FXFLG=2(Wash a/c) to DLY1
+			//if 'FXFLG do DLY1(acn,cif,EODBALAV,TCRLIMIT)
+			if (FXFLG=0)!(FXFLG=2) do DLY1(acn,cif,EODBALAV,TCRLIMIT,FXFLG)
+			}
+		
+		// move KO out to ZBCHKOEXT
+		// if acn.boo=777 do DLY2(acn,cif,TTAMTDR,TTAMTCR,EODBALAV)	// KO Extract
+		
+		
+		do DLY3(acn,cif,EODBALAV)					// MIS Extract
+		
+		// End-of-week (Friday) or end-of-month extracts
+		if BCHEOW!BCH16!BCHEOM do {
+			do EOM2(acn,cif,EODBALAV,TCRLIMIT,FXFLG)		// Financial - Deposit
+			if acn.grp="CD" do EOM4(acn,FXFLG)			// Deposit Item
+			}
+		
+		// Every 15th or end-of-month extracts
+		if BCH16!BCHEOM do {
+			do EOM3(acn,cif,TCRLIMIT,FXFLG)				// Account Static
+			//do EOM5(acn,TCRLIMIT)					// Loan Classification
+			if 'FXFLG do BOT(acn,cif)			
+			}
+		//if BCH16 do BOT(acn,cif)
+		}
+
+	else  do {
+		set acn={RecordLN}acn
+		// Reserved for future loan extracts
+		}
+	quit
+	
+   //Feb 16, 2007 - Rapeepan Y.,Added FXFLG	
+   //DLY1(RecordDEP dep,RecordCIF cif,EODBALAV,ZCLTOT)	// Daily Financial - Loan
+DLY1(RecordDEP dep,RecordCIF cif,EODBALAV,ZCLTOT,FXFLG)	// Daily Financial - Loan
+	/*
+	Jul 29, 2004 - Anchalee
+		Deleted end-of-month file writing
+	*/
+	
+	new ABALNEG,ABALPOS,ACRINT,ADRAMT,AVLBAL,AVLLIMIT,AVLSIGN,BALCOL
+	new BALSIGN,BRATE,CRINT,CRINTS,CRINTCD,DRINT,DRINTS,GLSC,INDEX
+	new INTASUSP,INTLIFE,INTLIFES,INTPAID,INTPAIDS,INTPY,INTPYS,INTRAT
+	new INTRCV,INTRCVS,IX,LPAYAMT,LPAYDT,LSTTRDT,LTYPE,MANHLD,MAXACR
+	new NEGIPL,NEGIPLS,NEGIPY,NEGIPYS,PAMT,PCODE,PFLAG,REC,XBAL,XCC
+	new XCID,XCLS,XCRCD,XODLIM,XTYPE,TCRAMT,TDRAMT,ZACCRPRM,ZARRPUR
+	new ZAVINT,ZINTREC,ZSALLPD,ZSTATCD
+	
+	//Apr 04, 2007 - Rapeepan Y.
+	new ZBSDISCD,ZBCITYCD,ZBPROV,ZBCNTRY
+	
+	//Feb 04, 2008 - Sarochinee R.
+	new ZGOVFLG	
+	
+	//Oct 24, 2008 - Sarochinee R.
+	//Modified DLY1 for adding Average Monthly Interest and Average Monthly Interest Previous Month(JO-0852)
+	new ZAVINTP,NZAVINTP
+	set NZAVINTP="Average Interest Previous Month"
+	
+	//Oct 05, 2006 - Duangporn N.
+	//Modified for check field amount add Variable for field if error
+	new PRATE
+	new NBRATE,NINTRAT,NXBAL,NAVLBAL,NXODLIM,NZCLTOT,NAVLLIMIT,NMANHLD
+	new NTCRAMT,NTDRAMT,NINTPAID,NINTRCV,NACRINT,NADRINT,NCRINT,NDRINT
+	new NINTASUSP,NZAVINT,NINTLIFE,NNEGIPY,NNEGIPL,NPRATE,NPAMT,NLPAYAMT
+	new NAVGBALN,NAVGBALP,NZACCRPRM,NMAXACR,ZPK2,NABALNEG,NABALPOS
+	set ZPK2="-"
+	set NBRATE="BASE-RATE"
+	set NINTRAT="INTEREST RATE"
+	set NXBAL="LEDGER BALANCE"
+	set NAVLBAL="AVAILABLE-BALANCE"
+	set NXODLIM="OVERDRAFT LIMIT"
+	set NZCLTOT="TOTAL-OD-LIMIT"
+	set NAVLLIMIT="AVAIL-LIMIT"
+	set NMANHLD="MANUAL HOLD"
+	set NTCRAMT="TOTAL-CREDIT-AMT"
+	set NTDRAMT="TOTAL-DEBIT-AMT"
+	set NINTPAID="INT-PAID"
+	set NINTRCV="INT-RCV"
+	set NACRINT="ACCRUED-CREDIT-INTEREST"
+	set NADRINT="ACCRUED-DEBIT-INTEREST"
+	set NCRINT="CREDIT-INTEREST"
+	set NDRINT="DEBIT-INTEREST/INT-SUSP"
+	set NINTASUSP="INT-ACCUM-SUSP/INT-NON-BOOK"
+	set NZAVINT="Average Interest"
+	set NINTLIFE="INT-PAID-LIFE"
+	set NNEGIPY="NEG-INT-PRIOR-YEAR"
+	set NNEGIPL="NEG-INT-LIFE"
+	set NPRATE="PENALTY RATE"
+	set NPAMT="PENALTY-AMOUNT"
+	set NLPAYAMT="LAST-PYMNT-PRIN-AMT"
+	set NABALNEG="AVG-BALANCE-NEGATIVE" 
+	set NABALPOS="AVG-BALANCE-POSITIVE"
+	set NZACCRPRM="Accrued Princ"
+	set NMAXACR="MAX BALANCE"
+	
+	type Public IO ioeod1
+	//Feb 16, 2007 - Rapeepan Y. Added for Wash A/C file
+	type Public IO ioeodw1
+	//type Public IO ioeom1
+
+	// Send only opened account and account was closed yesterday
+	//if (dep.zstatcd=4) quit
+	
+	/* 
+	  Nov 04,2005 - Kunvadee V.
+	         Modified not sending closed account for daily.
+	*/
+	if 'BCHEOM,(dep.zstatcd=4) quit
+		
+	/* 
+	Oct 21,2005
+	Send all account
+	Modified By Vorawit K.
+	*/
+	if BCHEOM,(dep.zstatcd=4),(dep.dtc<ZBDAT) quit
+	/*
+	 Include only accounts in Product Group DDA and SAV
+	 which Ledger Balance < 0 or Total Overdraft Limit > 0.
+	*/
+	set XCID=dep.cid
+	set XGRP=dep.grp
+	set XTYPE=dep.type
+	/*
+	Nov 15, 2004 - Anchalee
+		Moved product group checking to EXEC section (before call 
+		this line tag.
+	*/
+	//if XGRP'="DDA",XGRP'="SAV" quit
+	
+	// Exclude account owned by KTB
+	//Feb 14, 2007 - Rapeepan Y. , Include account owned by KTB for file Wash Account
+	//if (XTYPE=1201) quit
+	//if (XTYPE=1205) quit
+	//if (XTYPE=1204),($E(XCID.zero(12),6)=7) quit
+	
+	set ZSTATCD=dep.zstatcd
+	
+	/* 
+	 Dec 2, 2003 - Anchalee
+	 Modified getting value from dep.bal to dep.eodbal
+	*/
+	
+	/*
+	 Nov 04, 2005 - Kunvadee V.
+	         Modified condition to getting balance for closed account.
+	*/
+	
+	//if (ZSTATCD=4),(dep.dtc=ZTJD) do {
+	
+	//------------------------ Feb 26, 2008 - Sarochinee R.----------------------------
+	//Change Condition to calculate Interest Rate for Account Type 1202 Settlement Bank
+	//by using Ledger Balance field.
+	
+	if (ZSTATCD=4) do {
+		set XBAL=dep.bal
+		//set BALCOL=dep.balcol
+		set BALCOL=$S(XTYPE=1202:dep.bal,1:dep.balcol)		
+		set AVLBAL=dep.balavl
+		}
+	else  do {
+		
+		//Nov 09, 2010 - Sarochinee R.
+		//Modified Code : DLY1 Change Ledger Balance from DEP.EODBALCO to DEP.EODBAL
+		//if BCHEOM set XBAL=$S(XTYPE=1202:dep.eodbal,1:dep.eodbalco)
+		if BCHEOM set XBAL=$S(XTYPE=1202:dep.eodbal,1:dep.eodbal)
+		else  set XBAL=dep.eodbal
+		//set BALCOL=dep.eodbalco
+		set BALCOL=$S(XTYPE=1202:dep.bal,1:dep.eodbalco)	
+		set AVLBAL=EODBALAV
+		}
+	if '((XBAL<0)!(ZCLTOT>0)) quit	//XBAL'<0 quit
+	
+	//------------------------ End Feb 26, 2008 --------------------------------------
+	
+	// Calculate total debit/credit amounts for PRIN; interest paid/received
+	
+	/* 
+	Nov 04, 2005 - Kunvadee V.
+	        Modified getting interest received,interest paid,
+	        total debit amount,total credit amount. 
+	        If account was closed,get values from HIST by hist.tjd is date account closed.
+	*/
+	
+	
+	// Feb 09, 2011 - Sarochinee R.
+	//do TOTDRCR(ZTJD,XCID,.TDRAMT,.TCRAMT,.INTPAID,.INTRCV)
+	//do TOTDRCR(ZTJD,XCID,ZSTATCD,dep.dtc,.TDRAMT,.TCRAMT,.INTPAID,.INTRCV) 
+	do TOTDRCR2(ZTJD,XCID,ZSTATCD,dep.dtc,.TDRAMT,.TCRAMT)
+	// Feb 09, 2011 - Sarochinee R.
+	
+	/*
+	Jul 29, 2004 - Anchalee
+		Changed branch code field to cost center
+	*/
+	set XCC=dep.cc
+
+	/*
+	Sep 17, 2004 - Anchalee
+		Modified loan type mapping to consider from account group by
+		-Product group "DDA" except product type 1301, set to 0010
+		-Product type 1301, set to 7002
+		-Product group "SAV", set to 7001
+	Jul 29, 2004 - Anchalee
+		Deleted criteria balance<0 to identify loan type because every
+		financial loan record must has loan type.
+	Jun 3, 2004 - Anchalee
+		Added product type 1002(Taweepanya) to loan type */
+	set LTYPE=""
+	do {
+		if XTYPE=1301 set LTYPE=7002 quit	// Circle Loan Credit Card
+		if XGRP="DDA" set LTYPE="0010" quit	// O/D & Taweepanya
+		if XGRP="SAV" set LTYPE=7001		// Circle Loan
+		}
+
+
+	if dep.zsallpd'="" set ZSALLPD=$$DAT^%ZM(dep.zsallpd,"YEARMMDD")
+	else  set ZSALLPD=FILL.blank(8)
+ 
+	// Credit Interest Code
+        /*
+         CR-INT-CODE
+         CIF.ZKTBCCODE + CIF.ZPOSCD
+        */
+
+        //type RecordCIF cif=Db.getRecord("CIF","ACN=:dep.acn")
+        set CRINTCD=cif.zktbccode_+cif.zposcd
+
+	set XODLIM=dep.odlim		// Overdraft Limit
+		
+	/*
+	 Base Rate
+	 The rate to be populated should be the rate either in the index
+	 or rate schedule linked to the account as of the batch date.
+	 
+	 23 Dec, 2003 - Anchalee
+	 Get Base Rate from CTL^UINDX by passing dep.index and dep.eodbalco
+	 to calculate.
+	*/
+	
+	/*
+	 Nov 09, 2005 - Kunvadee V.
+	         Modified sending spaces for interest index if account group is 'DDA'. 
+	*/
+	set INDEX=dep.index
+	
+	
+	//set BALCOL=dep.eodbalco		// Prior Day Ending Collected Balance
+	/*
+	Mar 10, 2005 - Anchalee
+	If ledger balance is positive and collected balance is negative,
+	determine interest rate from ledger balance.
+	*/
+	
+	/*
+	 Nov 10, 2005 - Kunvadee V.
+	     Modified sending interest index, interest rate and base rate for saving a/c and current a/c.
+	*/
+	
+	/*
+	if (XBAL'<0),(BALCOL<0) do {
+		do CTL^UINDX(INDEX,ZTJD,XBAL)
+		set BRATE=RATE-dep.intsprp	// Interest Rate
+		set INTRAT=RATE+dep.intspr	// Base Rate
+	}
+	else  do {
+		do CTL^UINDX(INDEX,ZTJD,BALCOL)
+        	set BRATE=RATE
+	       	set INTRAT=dep.irn              // Interest Rate
+	}
+	*/
+	
+	new ZCLEXC,ZODINDEX,ZODRATE,PENINDEX
+	set (ZCLEXC,ZODRATE)=0 
+	set (ZODINDEX,PENINDEX)=FILL
+	set (INTRAT,BRATE)=0
+	
+	if (BALCOL<0) do {
+	      
+	       // Find maximum penalty rate
+	       type ResultSet rsindex1=Db.select("RATE","INDEX1","INDEX=:INDEX AND RMIN='-99999999999999.99'")
+	       if 'rsindex1.isEmpty() do {
+	            if rsindex1.next() set PENINDEX=rsindex1.getCol(1)
+
+		    	//type RecordACN acn=Db.getRecord("ACN","CID=:dep.cid")
+	            //do CTL^UINDX(PENINDEX,ZTJD,XBAL)
+				type String PAR()
+		    	set PAR("INDEX") = PENINDEX
+		    	
+		    	// Wiphak  07/06/2010
+		    	// exclude SPREAD from rate
+		    	set PAR("SPREAD")=0
+		    	
+		    	do CTL^UINDX(.dep,ZTJD,XBAL,.PAR)
+
+	            if RATE="" set RATE=0
+	            set (INTRAT,BRATE)=RATE
+		}
+	
+	
+		// Get sub limit record
+		type ResultSet rsodtier=Db.select("CLEXC,RATE,RATECMP","ZODTIER","CID=:XCID","SEQ DESC")
+		if 'rsodtier.isEmpty() do {
+			if rsodtier.next() do {
+				// Court order flag
+				set ZCLEXC=rsodtier.getCol(1)
+				// Credit limit interest index
+				set ZODINDEX=rsodtier.getCol(2)	
+				// Computed credit limit interest rate
+				set ZODRATE=rsodtier.getCol(3)	
+			}
+		}
+	
+	}
+	
+	// In case of no credit limit and collected balance is negative,
+	// index code is blank and rate and base rate follows the maximum of penalty rate.
+	if (XODLIM=0),(BALCOL<0) set INDEX=FILL 
+	
+	// In case of credit limit is not less than zeros and collected balance is negative and court order flag is ture,
+	// index code, rate and base rate follows sub limit tier. 
+	if (XODLIM'=0),(BALCOL<0),(ZCLEXC) set INDEX=ZODINDEX set (INTRAT,BRATE)=ZODRATE
+	
+	// In case of credit limit is not less than zeros and collected balance is negative and court order flag is false,
+	// if current account,index code is blank and rate and base rate follows sub limit tier. 
+	// if saving account, index code, rate and base rate follows the values in DEP table.
+	if (XODLIM'=0),(BALCOL<0),('ZCLEXC) do {
+                if (XGRP="DDA") set INDEX=FILL set (INTRAT,BRATE)=ZODRATE quit
+                if (XGRP="SAV") do {
+                	//do CTL^UINDX(INDEX,ZTJD,BALCOL)
+                	type String PAR()
+                	set PAR("INDEX") = INDEX
+                	
+		    	// Wiphak  07/06/2010
+		    	// exclude SPREAD from rate
+		    	set PAR("SPREAD")=0                	
+                	
+                	do CTL^UINDX(.dep,ZTJD,BALCOL,.PAR)
+                	      
+	       		set BRATE=RATE
+	       		set INTRAT=dep.irn 	
+                }	    
+	}
+	
+	// In case of credit limit is not less than zeros and collected balance is positive and current account,
+	// index code is blank and rate and base rate are zeros. 
+	if (XODLIM'=0),(BALCOL'<0),(XGRP="DDA") set INDEX=FILL set (INTRAT,BRATE)=0
+	
+	// In case of credit limit is greater than zeros and collected balance is negative and saving account,
+	// index code, rate and base rate follows the values in DEP.
+	if (XODLIM'=0),(BALCOL'<0),(XGRP="SAV") do {
+			//do CTL^UINDX(INDEX,ZTJD,BALCOL)
+			type String PAR()
+			set PAR("INDEX") = INDEX
+			
+		    	// Wiphak  07/06/2010
+		    	// exclude SPREAD from rate
+		    	set PAR("SPREAD")=0
+		    	
+			do CTL^UINDX(.dep,ZTJD,BALCOL,.PAR)
+			
+	       	set BRATE=RATE
+	       	set INTRAT=dep.irn 
+	}
+	
+	// Aug 22, 2006 - Sarochinee R.
+	// Changed condition that send index code In case of no credit limit and collected balance is positive,
+	// index code, rate and base rate follows the values in DEP.
+	// not send index code is blank and rate and base rate are zeros. 
+	
+	//if (XODLIM=0),(BALCOL'<0) set INDEX=FILL set (INTRAT,BRATE)=0
+	if (XODLIM=0),(BALCOL'<0) do {
+			//do CTL^UINDX(INDEX,ZTJD,BALCOL)
+			type String PAR()
+			set PAR("INDEX") = INDEX
+			
+		    	// Wiphak  07/06/2010
+		    	// exclude SPREAD from rate
+		    	set PAR("SPREAD")=0
+		    				
+			do CTL^UINDX(.dep,ZTJD,BALCOL,.PAR)
+						
+	       	set BRATE=RATE
+	       	set INTRAT=dep.irn 
+	}
+	// End Aug 22, 2006 - Sarochinee R.
+	
+	set XCRCD=dep.crcd		// Currency Code
+
+	/* 
+	Dec 2, 2003 - Anchalee
+	Changed getting value from dep.balavl to dep.eodbalav
+	*/
+
+	//set AVLBAL=EODBALAV	// Prior Day Ending Available Balance
+	if AVLBAL<0 set AVLSIGN="-",AVLBAL=-AVLBAL
+	else  set AVLSIGN="+"
+	
+	/* 
+	Sep 2, 2004 - Anchalee
+	If Available Limit < 0, send 0
+	
+	Aug 3, 2004 - Anchalee
+	Modified Available Limit calculation method to
+	- If dep.eodbal<0 send dep.odlim+dep.eodbal
+	- If dep.eodbal>=0 send dep.odlim
+	
+	Feb 20, 2004 - Anchalee
+	Modified Available Limit calculation method from 
+	dep.odlim - dep.eodbal --> dep.odlim + dep.eodbal
+	If dep.odlim+dep.eodbal<0, send 0.
+	*/
+	
+	set AVLLIMIT=$S(XBAL<0:XODLIM+XBAL,1:XODLIM)	// Available Limit
+	if AVLLIMIT<0 set AVLLIMIT=0
+
+	/*
+	Feb 16, 2003 - Anchalee
+	Changed getting value from dep.eodhldam to dep.hldamt
+	
+	Dec 2, 2003 - Anchalee
+	Changed getting value from dep.hldamt to dep.eodhldam
+	*/
+
+	set MANHLD=dep.hldamt		// Manual Hold
+
+	/*
+	 Feb 24, 2004 - Anchalee
+	 - Changed getting total debit and total credit from calling
+	 INIT^UAVB to summary from DTJ.
+	 - Changed how to calculate interest paid and interest received.
+	 
+	 Determine total daily credits and debits to each account
+	 A call to INIT^UAVB is used to calculate these fields.  The
+	 date values for start and end date are the date specified
+	 when running this batch process.  The total daily credits
+	 will be piece 8 of the UAVB(1) array.  The total daily debits
+	 will be piece 9 of the UAVB(1) array.
+	*/
+
+	set ACRINT=dep.posacr		// Accrued Credit Interest
+	set ADRINT=dep.negacr+dep.negacrun	// Accrued Debit Interest
+	//if ADRINT<0 set ADRINT=-ADRINT
+	set CRINT=dep.iytd		// Credit Interest
+	set DRINT=dep.negiytd		// Debit Interest / INT-SUSP
+	// Modified Oct 12, 2005 - Teeranuch W.
+	//set INTASUSP=dep.zasint		// Accumulated Suspense Interest
+	if dep.zfwostat set INTASUSP=dep.zwrois  
+	else  set INTASUSP=dep.zasint  
+	// End Oct 12, 2005
+	/*
+	May 11, 2005 - Anchalee
+	Modified sending 0 if Accumulated Suspense Interest(dep.zasint)<0.
+	*/
+	if INTASUSP<0 set INTASUSP=0
+
+	// Last Fianancial Transaction Date
+	if dep.tld'="" set LSTTRDT=$$DAT^%ZM(dep.tld,"YEARMMDD")
+	else  set LSTTRDT=FILL.blank(8)
+
+	/* Feb 4, 2004 - Anchalee
+	   Modified Penalty flag. Identify penalty flag from dep.deldt */
+
+	// Penalty Start Date (Delinquency Date)
+	if dep.deldt'="" set PFLAG="Y",PSTDT=$$DAT^%ZM(dep.deldt,"YEARMMDD")
+	else  set PFLAG="N",PSTDT=FILL.blank(8)
+	
+	/*
+	Dec 9, 2004 - Anchalee
+	Modified getting penalty amount from dep.negacrun
+	Sep 8, 2004 - Anchalee
+	Modified getting penalty rate from dep.index
+	Sep 7, 2004 - Anchalee
+	Modified getting penalty rate from dep.prate
+	*/
+	//do CTL^UINDX(dep.index,ZTJD,-99999999999999.99) 
+	type String PAR()
+	set PAR("INDEX") = dep.index
+	
+    	// Wiphak  07/06/2010
+    	// exclude SPREAD from rate
+    	set PAR("SPREAD")=0
+	
+	do CTL^UINDX(.dep,ZTJD,-99999999999999.99,.PAR)
+	
+	set PRATE=RATE	// Penalty Rate
+	set PAMT=dep.negacrun			// Penalty Amount
+
+	/* 
+	Apr 20, 2004 - Anchalee
+	Modified getting value for last payment date and last payment 
+	priciple amount from set to "" to get from dep.lcdt and dep.lcamt
+	respectively.
+	*/
+
+	// Last credit transaction date for O/D and CL
+	if dep.lcdt'="" set LPAYDT=$$DAT^%ZM(dep.lcdt,"YEARMMDD")
+	else  set LPAYDT=FILL.blank(8)
+
+	set LPAYAMT=dep.lcamt		// Last payment prin-amt
+	
+	/* Jan 06, 2010 - Sarochinee R.
+	   Modified Code : DLY1 & EOM2
+	   Change Condition that sent Average Balance on Monthly.
+	   
+	// Send Average Neg/Pos Balance Prior Month only end-of-month
+	if BCHEOM do {
+		set ABALNEG=dep.znabalp	// Average Neg Balance Prior Month
+		set ABALPOS=dep.zpabalp	// Average Pos Balance Prior Month
+		}
+	else  set (ABALNEG,ABALPOS)=0
+	*/
+	set (ABALNEG,ABALPOS)=0
+	
+	if BCHEOM do {
+		if (ZSTATCD=4) do {
+			set ZDAY=$$DAY^SCADAT(ZTJD)
+			set ABALNEG=dep.znbdbal/ZDAY
+			set ABALPOS=dep.zpbdbal/ZDAY
+		} 
+		else  do {
+			set ABALNEG=dep.znabalp	// Average Neg Balance Prior Month
+			set ABALPOS=dep.zpabalp	// Average Pos Balance Prior Month
+		}
+	}
+	else  set (ABALNEG,ABALPOS)=0
+	/* End Jan 06, 2010 */
+	
+	set ZAVINT=+dep.zavint		// Average Interest
+	/* set ZINTREC=+dep.zintrec	// Accum. Int. Rcv.
+	if ZINTREC<0 set ZINTREC=-ZINTREC */
+
+	// Accrued Principal
+	set ZACCRPRM=XBAL-XODLIM-dep.zintrec
+	if ZACCRPRM<0 set ZACCRPRM=0
+
+	set XCID=XCID.zero(12)
+	set XTYPE=XTYPE.zero(4)
+	set XCC=XCC.zero(6)
+	set LTYPE=LTYPE.blank(4)
+	set CRINTCD=CRINTCD.blank(4)
+	//set BRATE=BRATE.zero(7,5,1)
+	//set INTRAT=INTRAT.zero(7,5,1)
+	set BRATE=$$ZPZERO(BRATE,7,5,XCID,ZPK2,NBRATE)
+	set INTRAT=$$ZPZERO(INTRAT,7,5,XCID,ZPK2,NINTRAT)
+	set XCRCD=XCRCD.blank(3)
+
+	// Control File
+	//Feb 16, 2007 - Rapeepan Y.
+	//do CNTLCNT(%ProcessID,"FLON",0)
+	
+	//set (INTPAID,INTRCV)=0	// Feb 09, 2011 - Sarochinee
+	
+	do CNTLCNT(%ProcessID,"FLON",FXFLG)
+	if BCH16!BCHEOM do TOTFILE(%ProcessID,"FLON",0,XTYPE,dep.zstatcd,XBAL,ZCLTOT,XODLIM,AVLLIMIT,0,0,CRINT,DRINT,INTASUSP,0)
+	//if BCH16!BCHEOM do TOTFILE(%ProcessID,"FLON",0,XTYPE,dep.zstatcd,XBAL,ZCLTOT,XODLIM,AVLLIMIT,INTPAID,INTRCV,CRINT,DRINT,INTASUSP,0)
+
+	if XBAL<0 set BALSIGN="-",XBAL=-XBAL
+	else  set BALSIGN="+"
+	
+	// Feb 09, 2011 - Sarochinee
+	/*
+	if INTPAID<0 set INTPAIDS="-",INTPAID=-INTPAID
+	else  set INTPAIDS="+"
+	
+	if INTRCV<0 set INTRCVS="-",INTRCV=-INTRCV
+	else  set INTRCVS="+"
+	*/
+	set INTPAIDS="+"
+	set INTRCVS="+"
+	//set INTPAIDS=FILL.blank(1)
+	//set INTRCVS=FILL.blank(1)
+	// Feb 09, 2011 - Sarochinee
+	
+	if CRINT<0 set CRINTS="-",CRINT=-CRINT
+	else  set CRINTS="+"
+	
+	if DRINT<0 set DRINTS="-",DRINT=-DRINT
+	else  set DRINTS="+"
+	
+	/*
+	Aug 3, 2004 - Anchalee
+		Send Maximum Balance to Accrue without sign
+	*/	
+	set MAXACR=$S(dep.maxacr<0:-dep.maxacr,1:dep.maxacr)
+	//set MAXACR=MAXACR.zero(17,2,1)		
+	set MAXACR=$$ZPZERO(MAXACR,17,2,XCID,ZPK2,NMAXACR)	
+	
+	set GLSC=dep.glsc
+	set GLSC=GLSC.blank(4)
+	
+	/* Feb 19, 2004 - Anchalee
+	   Added a new field Int/Div Paid - Life (dep.ipl) at the end of file
+	*/
+	set INTLIFE=dep.ipl
+	if INTLIFE<0 set INTLIFES="-",INTLIFE=-INTLIFE
+	else  set INTLIFES="+"
+	
+	/* Feb 24, 2004 - Anchalee
+	   Added 3 fields which are 
+	   DEP.IPY - Int/Div Paid Prior Financial Year
+	   DEP.NEGIPY - Negative Interest Pr Financial Year
+	   DEP.NEGIPL - Negative interest Life
+	*/
+	set INTPY=dep.ipy
+	if INTPY<0 set INTPYS="-",INTPY=-INTPY
+	else  set INTPYS="+"
+	
+	set NEGIPY=dep.negipy
+	if NEGIPY<0 set NEGIPYS="-",NEGIPY=-NEGIPY
+	else  set NEGIPYS="+"
+	
+	set NEGIPL=dep.negipl
+	if NEGIPL<0 set NEGIPLS="-",NEGIPL=-NEGIPL
+	else  set NEGIPLS="+"
+	
+	set ZARRPUR=dep.zarrpur
+	set ZARRPUR=ZARRPUR.blank(6)
+	set ZSTATCD=ZSTATCD.zero(2)
+	
+	//Apr 04, 2007 - Rapeepan Y.
+	//Added field
+	set ZBSDISCD=dep.zbsdiscd		//Sub District Code
+	set ZBCITYCD=dep.zbcitycd		//Aumphur Code
+	set ZBPROV=dep.zbprov			//Province Code
+	set ZBCNTRY=dep.zbcntry			//Country Code
+	
+	//Feb 04, 2008 - Sarochinee R.
+	//Modified DLY1, Added field Government Guarantee Flag .
+	set ZGOVFLG=""
+	set ZGOVFLG=ZGOVFLG.blank(1)	//Government Guarantee Flag
+	
+	//Oct 24, 2008 - Sarochinee R.
+	//Modified DLY1 for adding Average Monthly Interest and Average Monthly Interest Previous Month(JO-0852)
+	set ZAVINTP=dep.zavintp		// Average Monthly Interest Previous Month
+	
+	//set XBAL=XBAL.zero(14,2,1)
+	//set AVLBAL=AVLBAL.zero(14,2,1)
+	//set XODLIM=XODLIM.zero(14,2,1)
+	//set ZCLTOT=ZCLTOT.zero(14,2,1)
+	//set AVLLIMIT=AVLLIMIT.zero(14,2,1)
+	//set MANHLD=MANHLD.zero(14,2,1)
+	//set TCRAMT=TCRAMT.zero(14,2,1)
+	//set TDRAMT=TDRAMT.zero(14,2,1)
+	//set INTPAID=INTPAID.zero(14,2,1)
+	//set INTRCV=INTRCV.zero(14,2,1)
+	//set ACRINT=ACRINT.zero(14,5,1)
+	//set ADRINT=ADRINT.zero(14,5,1)
+	//set CRINT=CRINT.zero(14,2,1)
+	//set DRINT=DRINT.zero(11,2,1)
+	//set INTASUSP=INTASUSP.zero(14,5,1)
+	//set ZAVINT=ZAVINT.zero(14,2,1)
+	//set INTLIFE=INTLIFE.zero(14,2,1)
+	//set NEGIPY=NEGIPY.zero(14,2,1)
+	//set NEGIPL=NEGIPL.zero(14,2,1)
+	//set PRATE=PRATE.zero(7,5,1)
+	//set PAMT=PAMT.zero(18,2,1)
+	//set LPAYAMT=LPAYAMT.zero(14,2,1)
+	//set ABALNEG=ABALNEG.zero(14,2,1)
+	//set ABALPOS=ABALPOS.zero(14,2,1)
+	//set ZACCRPRM=ZACCRPRM.zero(14,2,1)
+	
+	// Sep 13, 2006 - Duangporn / Modified for check field amount			
+
+	set XBAL=$$ZPZERO(XBAL,14,2,XCID,ZPK2,NXBAL)
+	set AVLBAL=$$ZPZERO(AVLBAL,14,2,XCID,ZPK2,NAVLBAL)
+	set XODLIM=$$ZPZERO(XODLIM,14,2,XCID,ZPK2,NXODLIM)
+	set ZCLTOT=$$ZPZERO(ZCLTOT,14,2,XCID,ZPK2,NZCLTOT)
+	set AVLLIMIT=$$ZPZERO(AVLLIMIT,14,2,XCID,ZPK2,NAVLLIMIT)
+	set MANHLD=$$ZPZERO(MANHLD,14,2,XCID,ZPK2,NMANHLD)	
+	set TCRAMT=$$ZPZERO(TCRAMT,14,2,XCID,ZPK2,NTCRAMT)	
+	set TDRAMT=$$ZPZERO(TDRAMT,14,2,XCID,ZPK2,NTDRAMT)
+	// Feb 09, 2011 - Sarochinee R.
+	/*
+	set INTPAID=$$ZPZERO(INTPAID,14,2,XCID,ZPK2,NINTPAID)
+	set INTRCV=$$ZPZERO(INTRCV,14,2,XCID,ZPK2,NINTRCV)
+	*/
+	set (INTPAID,INTRCV)=0
+	set INTPAID=INTPAID.zero(14)
+	set INTRCV=INTRCV.zero(14)	
+	// Feb 09, 2011 - Sarochinee R.
+	
+	set ACRINT=$$ZPZERO(ACRINT,14,5,XCID,ZPK2,NACRINT)	
+	set ADRINT=$$ZPZERO(ADRINT,14,5,XCID,ZPK2,NADRINT)
+	set CRINT=$$ZPZERO(CRINT,14,2,XCID,ZPK2,NCRINT)
+	set DRINT=$$ZPZERO(DRINT,11,2,XCID,ZPK2,NDRINT)
+	set INTASUSP=$$ZPZERO(INTASUSP,14,5,XCID,ZPK2,NINTASUSP)	
+	set PRATE=$$ZPZERO(PRATE,7,5,XCID,ZPK2,NPRATE)
+	set PAMT=$$ZPZERO(PAMT,18,2,XCID,ZPK2,NPAMT)
+	set LPAYAMT=$$ZPZERO(LPAYAMT,14,2,XCID,ZPK2,NLPAYAMT)
+	set ABALNEG=$$ZPZERO(ABALNEG,14,2,XCID,ZPK2,NABALNEG)
+	set ABALPOS=$$ZPZERO(ABALPOS,14,2,XCID,ZPK2,NABALPOS)
+	set ZAVINT=$$ZPZERO(ZAVINT,14,2,XCID,ZPK2,NZAVINT)	
+	set ZACCRPRM=$$ZPZERO(ZACCRPRM,14,2,XCID,ZPK2,NZACCRPRM)
+	set INTLIFE=$$ZPZERO(INTLIFE,14,2,XCID,ZPK2,NINTLIFE)
+	set INTPY=INTPY.zero(14,2,1)
+	set NEGIPY=$$ZPZERO(NEGIPY,14,2,XCID,ZPK2,NNEGIPY)
+	set NEGIPL=$$ZPZERO(NEGIPL,14,2,XCID,ZPK2,NNEGIPL)	
+	
+	//Oct 24, 2008 - Sarochinee R.
+	//Modified DLY1 for adding Average Monthly Interest Previous Month(JO-0852)
+	set ZAVINTP=$$ZPZERO(ZAVINTP,14,2,XCID,ZPK2,NZAVINTP)	
+		
+	/*
+	Oct 17, 2005 Modified INDEX by Vorawit K. 
+	*/
+	set INDEX=INDEX.blank(6)
+	
+	//Apr 04, 2007 - Rapeepan Y.
+	set ZBSDISCD=ZBSDISCD.blank(4)		
+	set ZBCITYCD=ZBCITYCD.zero(2)		
+	set ZBPROV=ZBPROV.zero(2)			
+	set ZBCNTRY=ZBCNTRY.blank(2)		
+	
+	set REC="DF"_XTJD_XTYPE_XCID_ZSTATCD_ZSALLPD_XCC
+	set REC=REC_LTYPE_CRINTCD_BRATE_INTRAT_XCRCD_BALSIGN_XBAL
+	set REC=REC_AVLSIGN_AVLBAL_XODLIM_ZCLTOT_AVLLIMIT_MANHLD
+	set REC=REC_TCRAMT_TDRAMT_INTPAIDS_INTPAID_INTRCVS_INTRCV
+	//set REC=REC_TCRAMT_TDRAMT_FILL.blank(1)_FILL.blank(14)_FILL.blank(1)_FILL.blank(14)
+	
+	set REC=REC_ACRINT_ADRINT_CRINTS_CRINT_DRINTS_DRINT_INTASUSP
+	set REC=REC_ZAVINT_INTPYS_INTPY_INTLIFES_INTLIFE_NEGIPYS_NEGIPY
+	set REC=REC_NEGIPLS_NEGIPL_LSTTRDT_PFLAG_PSTDT_PRATE_PAMT_LPAYDT
+	set REC=REC_LPAYAMT_ABALNEG_ABALPOS_ZACCRPRM_MAXACR_GLSC_ZARRPUR
+        //Oct 21,2005 Modified By Vorawit 
+	//Apr 04, 2007 - Rapeepan Y.
+	//set REC=REC_INDEX_FILL.blank(57)
+	//set REC=REC_INDEX_ZBSDISCD_ZBCITYCD_ZBPROV_ZBCNTRY_FILL.blank(47)
+	
+	//Feb 04, 2008 - Sarochinee R.
+	//set REC=REC_INDEX_ZBSDISCD_ZBCITYCD_ZBPROV_ZBCNTRY_ZGOVFLG_FILL.blank(46)
+	//Oct 24, 2008 - Sarochinee R.
+	set REC=REC_INDEX_ZBSDISCD_ZBCITYCD_ZBPROV_ZBCNTRY_ZGOVFLG_ZAVINTP_FILL.blank(32)
+	
+	//Feb 16, 2007 - Rapeepan Y.,Added Check flag for write new file of Wash A/C 
+	if FXFLG=0 do ioeod1.write(REC)
+	else  do ioeodw1.write(REC)  //FXFLG=2
+	
+	quit
+	
+
+DLY2(RecordDEP dep,RecordCIF cif,ZDRTOT,ZCRTOT,EODBALAV)
+	
+	new ZCID,ZSTAT,ZTYPE,ZBAL,ZAVL,ZHTR,ZACTYPE,ZOUT,ZBOO,ZDIFSAL,ZHC1,ZHC2
+	new ZHCODE1,ZHCODE2,ZHCODE3,ZHCODE4,ZHCTMP,ZSTDTTMP,ZEXDTTMP,ZSTATCD,ZLDGSG,ZAVSG
+	new ZFXHLD,ZCRINT,ZDRINT,ZACCUMI,ZTOTOD,ZLPINT,ZOPDATE,ZREC,ZTLD,ZSALFLG,ZKCCODE,ZBUSTYPE,ZODLIM
+	
+	type Public IO ioeod2
+
+	set ZCID=dep.cid
+	set ZOUT=0
+	
+	/*
+	CHECK CONDITION FOR KO EXTRACTION
+	
+	1. ACCOUNT MUST BELONG TO BRANCH in ZUTBLKOBRCD
+	2. ACCOUNT STATUS MUST NOT BE 
+
+		2.1   1 - UNCLAIMED 	
+		2.2   2 - MISSCELLANEOUS INCOME 
+		2.3   4 - CLOSED (have to confirm)
+	
+	3. Account must be either "Current Account" or "Saving account with OD"
+	4. For "Saving accoun with OD", which OD does the requirement need?
+	   current OD or include expired OD.
+	*/
+
+	set ZSTAT=dep.zstatcd
+	if (ZSTAT=1)!(ZSTAT=2)!(ZSTAT=4) quit
+
+	set ZSTATCD=ZASTMAP(ZSTAT).get()
+	set ZSTATCD=ZSTATCD.zero(2)
+	
+	/*
+	Determine if the account is the type KO wants or not
+	array ZKONPROD stores current account,array ZKOYPROD
+	stores saving account, program has to check whether 
+	the account has OD or not.
+	*/
+
+	set ZTYPE=dep.type	
+	set ZODLIM=dep.odlim
+		
+	/*
+	If product type is valid in array ZKONPROD, program will process the record
+	if product type is valid in array ZKOYPROD, program will check if the 
+	account has OD or not. if product is not valid in neither ZKONPROD nor
+	ZKOYPROD, thread will quit
+	*/
+	
+	if '$D(ZKONPROD(ZTYPE)) do { quit:ZOUT
+		if '$D(ZKOYPROD(ZTYPE)) set ZOUT=1 quit
+		
+		/*
+		At this line, product type is defined in ZKOYPROD.
+		Program has to check whether the account has OD or not.
+		If account currently has OD, we can determine whether the accout
+		has OD or not by checking DEP.ODLIM>0
+		
+		If account had OD (expired already), we can check from DEP.zcltot>0
+		it's up to the requirement which field the program has to check		
+		it's not necessary to check expiration date
+		*/
+		
+		// new ZODEXP
+		// set ZODEXP=dep.odexp
+
+		if ZODLIM'>0 set ZOUT=1 quit
+		set ZACTYPE=ZKOYPROD(ZTYPE)
+		}
+		
+	else  set ZACTYPE=ZKONPROD(ZTYPE)
+	
+	/*
+	ZUTBLKOTYMAP stores monitored product type only
+	there are 2 types of product type Profile has
+	to monitor:
+
+	1. Product type monitored
+	2. Product type monitored if an account has OD
+	*/
+
+	// if the account has restriction (called "HOLD" in TANDEM)
+	set (ZHCODE1,ZHCODE2,ZHCODE3,ZHCODE4)="  "
+	
+	if dep.rflg do {
+		set ZHC1="01"
+		set ZHC2="02"
+
+		// type ResultSet rsrflg=Db.select("RFLG","RFLG","CID=:ZCID AND (STDT is null or (STDT<:ZTJD) or (STDT=:ZTJD)) AND (EXDT is null or (EXDT>:ZTJD) or (EXDT=:ZTJD)) AND ((RFLG=:ZHC1) OR (RFLG=:ZHC2))")
+		type ResultSet rsrflg=Db.select("RFLG,STDT,EXDT","RFLG","CID=:ZCID")
+		while rsrflg.next() do {
+			set ZHCTMP=rsrflg.getCol(1)
+			if ZHCTMP'=ZHC1,ZHCTMP'=ZHC2 quit
+						
+			set ZSTDTTMP=rsrflg.getCol(2)
+			set ZEXDTTMP=rsrflg.getCol(3)
+			
+			if ZSTDTTMP'="",ZSTDTTMP>ZTJD quit
+			if ZEXDTTMP'="",ZEXDTTMP<ZTJD quit
+
+			if ZHCODE1="  " set ZHCODE1=ZHCTMP quit
+			if ZHCODE2="  " set ZHCODE2=ZHCTMP quit
+			if ZHCODE3="  " set ZHCODE3=ZHCTMP quit
+			if ZHCODE4="  " set ZHCODE4=ZHCTMP quit
+			}
+		}
+		
+	set ZBAL=dep.eodbal
+	if ZBAL<0 set ZLDGSG="-"
+	else  set ZLDGSG="+"
+	set ZBAL=$TR(ZBAL,"-")
+	set ZBAL=ZBAL.zero(18,2,1)
+	set ZAVL=EODBALAV
+	if ZAVL<0 set ZAVSG="-"
+	else  set ZAVSG="+"
+	set ZAVL=$TR(ZAVL,"-")
+	set ZAVL=ZAVL.zero(18,2,1)
+	
+	set ZFXHLD=dep.eodhldam
+	set ZFXHLD=ZFXHLD.zero(18,2,1)
+	set ZCRINT=dep.posacr
+	set ZCRINT=ZCRINT.zero(18,2,1)
+	set ZDRINT=dep.negacr
+	set ZDRINT=ZDRINT.zero(18,2,1)
+	set ZACCUMI=dep.zasint
+	set ZACCUMI=ZACCUMI.zero(18,2,1)
+	set ZODLIM=ZODLIM.zero(18,2,1)
+	set ZTOTOD=dep.zcltot
+	set ZTOTOD=ZTOTOD.zero(18,2,1)
+	set ZLPINT=dep.znpint1
+	set ZLPINT=ZLPINT.zero(18,2,1)
+	set ZOPDATE=$$DAT^%ZM(dep.odt,"YEARMMDD")
+	if ZOPDATE=""!(ZOPDATE=-1) set ZOPDATE="00000000"
+	set ZTLD=$$DAT^%ZM(dep.tld,"YEARMMDD")
+	if ZTLD=""!(ZTLD=-1) set ZTLD="00000000"
+
+	set ZDIFSAL=ZTJD-dep.zsallpd
+	
+	// If there's no salary to the account more that a month, we will set salary flag to 'N'
+	if ZDIFSAL>32 set ZSALFLG="N"
+	else  set ZSALFLG="Y"
+	
+	set ZKCCODE=cif.zktbccode
+	set ZKCCODE=ZKCCODE.zero(3)
+	set ZBUSTYPE=dep.zbustype
+	set ZBUSTYPE=ZBUSTYPE.zero(5)
+	
+	new ZTITLE,ZNAM1,ZMAD1,ZMAD2,ZMAD3,ZMAD4,ZHPH,ZMZIP,ZFIL
+
+	set ZTITLE=cif.ztitle
+	set ZTITLE=ZTITLE.blank(10)
+	set ZNAM1=cif.nam
+	set ZNAM1=ZNAM1.blank(50)
+	set ZMAD1=cif.mad1
+	set ZMAD2=cif.mad2
+	set ZMAD3=cif.mad3
+	set ZMAD4=cif.mad4
+	
+	set ZMAD1=ZMAD1.blank(40)
+	set ZMAD2=ZMAD2.blank(40)	
+	set ZMAD3=ZMAD3.blank(40)
+	set ZMAD4=ZMAD4.blank(40)	
+	
+	set ZHPH=cif.hph
+	set ZMZIP=cif.mzip
+	
+	set ZHPH=ZHPH.blank(20)
+	set ZMZIP=ZMZIP.blank(10)
+
+	set ZCRTOT=ZCRTOT.zero(18,2,1)
+	set ZDRTOT=ZDRTOT.zero(18,2,1)
+	set ZACTYPE=ZACTYPE.zero(2)	
+	set ZCID=ZCID.zero(10)
+
+      	set ZFIL=""
+      	set ZFIL=ZFIL.blank(24)
+
+	set ZREC="M"_XTJD_ZCID_ZACTYPE_ZSTATCD_ZHCODE1_ZHCODE2_ZHCODE3_ZHCODE4_ZLDGSG_ZBAL
+      	set ZREC=ZREC_ZAVSG_ZAVL_ZFXHLD_ZCRINT_ZDRINT_ZACCUMI_ZODLIM_ZTOTOD_ZLPINT_ZOPDATE_ZTLD
+      	set ZREC=ZREC_ZSALFLG_ZKCCODE_ZBUSTYPE_ZCRTOT_ZDRTOT_ZFIL
+	if $L(ZREC)>280 set RM=$$^MSG(3037,"KO type M reocrd",280) do EXC quit
+	do ioeod2.write(ZREC)   	
+
+	set ZFIL=""
+	set ZFIL=ZFIL.blank(9)
+	if ZREC.length()>280 set RM=$$^MSG(3037,"KO type S reocrd",280) do EXC quit
+	set ZREC="S"_XTJD_ZCID_ZACTYPE_ZTITLE_ZNAM1_ZMAD1_ZMAD2_ZMAD3_ZMAD4_ZHPH_ZMZIP_ZFIL
+	
+	do ioeod2.write(ZREC)
+	quit
+
+	
+DLY3(RecordDEP dep,RecordCIF cif,EODBALAV)	// Daily MIS Extract
+	
+	new BAL,BOO,GROUP,GRP,LTYPE,TRM,TYPE,ZIPC,ZKEY
+
+	set TYPE=dep.type
+	set BOO=dep.boo
+	set GRP=dep.grp
+	set BAL=dep.bal
+	set TRM=dep.trm 
+
+
+	// MIS file for EOM only
+	if BCHEOM do {
+		if dep.zstatcd=0 do {
+		
+			// Check if product type in MIS scope or not
+			if '$D(ZMISMAP(TYPE)) quit
+			set ZKEY=ZMISMAP(TYPE)
+		
+			do Schema.createTable("ZEXTMIS","TJD,EXT,JOB,BRCD,KEY","DRCNT,DRAMT,CRCNT,CRAMT","TMPEXTF")
+	
+			type RecordZEXTMIS zextmis=Db.getRecord("ZEXTMIS","TJD=:ZTJD,EXT='MIS',JOB=%ProcessID,BRCD=:BOO,KEY=:ZKEY")
+	
+			if EODBALAV<0 do {
+				set zextmis.dramt=zextmis.dramt+EODBALAV
+				set zextmis.drcnt=zextmis.drcnt+1
+				}
+			
+			else  do {
+				set zextmis.cramt=zextmis.cramt+EODBALAV
+				set zextmis.crcnt=zextmis.crcnt+1
+				}
+	
+			do zextmis.bypassSave()
+	
+			//do Schema.deleteTable("ZEXTMIS")
+			}
+		}
+
+	// **********************************************************
+	// ZMIS022* and ZMIS023* report data
+	// **********************************************************
+
+	// Init group = 4(other)
+	set GROUP=4
+ 
+	set ZIPC=cif.zipc
+
+	if ZIPC'="" do {
+		if 'Db.isDefined("ZUTBLINVP","IPCODE=:ZIPC") quit
+		type RecordZUTBLINVP invp=Db.getRecord("ZUTBLINVP","IPCODE=:ZIPC")
+		if invp.grpcode'="" set GROUP=invp.grpcode
+		}
+
+	do {
+		if TYPE=3301 set LTYPE="SPA" quit
+		if TYPE=3005 set LTYPE="3005" quit
+		if TYPE=3006 set LTYPE="3006" quit
+		// #K001 - Start
+		if TYPE=3010 set LTYPE="3010" quit
+		//#K001- End
+		// #K002 - Start
+		if TYPE=3011 set LTYPE="3011" quit
+		if TYPE=3012 set LTYPE="3012" quit
+		//#K002- End
+		
+		if GRP="SAV" set LTYPE="SAV" quit
+		if GRP="DDA" set LTYPE="DDA" quit
+		if GRP="CD"  set LTYPE="FIX" quit
+		set LTYPE="OTHR"
+		}
+ 	
+	if TRM="" set TRM="0"
+ 
+ 	if 'Db.isDefined("ZMIS022B","BOO=:BOO,TYPE=:LTYPE,GROUP=:GROUP,TRM=:TRM,JOBID=:%ProcessID") set ER=1,RM=$$^MSG(1295) do EXC quit
+	type RecordZMIS022B mis022b=Db.getRecord("ZMIS022B","BOO=:BOO,TYPE=:LTYPE,GROUP=:GROUP,TRM=:TRM,JOBID=:%ProcessID") 
+
+	if BAL<0 do {
+		set mis022b.debita=mis022b.debita+BAL
+		set mis022b.debitc=mis022b.debitc+1
+		}
+
+	else  do {
+		set mis022b.credita=mis022b.credita+BAL
+		set mis022b.creditc=mis022b.creditc+1
+		}
+
+	do mis022b.bypassSave()
+	quit
+
+	
+EOM2(RecordDEP dep,RecordCIF cif,EODBALAV,TCREDIT,FXFLG)	// EOM Financial - Deposit
+
+	new ACRINT,ADRINT,AVGBALN,AVGBALP,AVLSIGN,AVLBAL,HLDAMT,BALCOL
+	new BASERAT,CC,CRCDBAL,CRINT,CRINTCD,CRINTS,DRINT,DRINTS,GLSC
+	new INTAMT,INTLIFE,INTLIFES,INTPAID,INTPAIDS,INTPY,INTPYS,INTRAT
+	new INTRCV,INTRCVS,LSIGN,NEGIPL,NEGIPLS,NEGIPY,NEGIPYS,REC,TAMT
+	new TCRAMT,TDRAMT,X,XADBM2,XBAL,XCID,XCRCD,XGRP,XINDEX,XPHC,XPHC1
+	new XPHC2,XPHC3,XPHC4,XPHC5,XSEQ,XTLD,XTYPE,ZINT,ZTOT,ZTSO
+	// Oct 17, 2005 Modified ZSTATCD - Vorawit -
+	new ZSTATCD	
+	
+	// Oct 10, 2008 - Sarochinee R.: Modified EOM2, Adding Last Salary Paid Date. (JO-0765)
+	new ZSALLPD
+	
+	//Apr 29, 2009 - Sarochinee R.
+	new NINDEX
+	
+	// Oct 24, 2008 - Sarochinee R.
+	//Modified EOM2 for adding Average Monthly Interest and Average Monthly Interest Previous Month(JO-0852)
+	new ZAVINT,ZAVINTP,NZAVINT,NZAVINTP
+	set NZAVINT="AVG-MONTHLY-INTEREST"
+	set NZAVINTP="AVG-MONTHLY-INTEREST-PREV-MONTH"
+	
+	
+	/* Duangporn N. - 05 Oct 2006
+	   Modifile for check field amount */
+	new NBASERAT,NINTRAT,NXBAL,NINTPAID,NINTRCV,NACRINT,NADRINT,NCRINT
+	new NDRINT,NHLDAMT,NTCRAMT,NTDRAMT,NAVGBALN,NAVGBALP,NAVLBAL,NINTPY
+	new NINTLIFE,NNEGIPY,NNEGIPL,CRCDBAL,ZPK2
+	set ZPK2="-"
+	set NBASERAT="BASE-RATE"
+	set NINTRAT="INTEREST RATE"
+	set NXBAL="LEDGER-BALANCE"
+	set NINTPAID="INT-PAID"
+	set NINTRCV="INT-RCV"
+	set NACRINT="ACCRUED-CREDIT-INTEREST"
+	set NADRINT="ACCRUED-DEBIT-INTEREST"
+	set NCRINT="CREDIT-INTEREST"
+	set NDRINT="DEBIT-INTEREST"
+	set NHLDAMT="MANUAL-HOLD"
+	set NTCRAMT="TOTAL-CREDIT-AMT"
+	set NTDRAMT="TOTAL-DEBIT-AMT"
+	set NAVGBALN="AVG-BALANCE-NEGATIVE"
+	set NAVGBALP="AVG-BALANCE-POSITIVE"
+	set NAVLBAL="AVAILABLE-BALANCE"
+	set NINTPY="INT-PRIOR-YEAR"
+	set NINTLIFE="INT-PAID-LIFE"
+	set NNEGIPY="NEG-INT-PRIOR-YEAR"
+	set NNEGIPL="NEG-INT-PRIOR-YEAR"
+	set NCRCDBAL="LEDGER-BALANCE-CURRENCY "
+	
+	
+	type Public IO ioeom2
+	type Public IO iofxeom2
+	//Feb 16, 2007 - Rapeepan Y.,Added for Wash A/C file
+	type Public IO ioeomw2
+	// Jun 22, 2011 - Sarochinee : Added for Foreign Wash A/C File
+	type Public IO iofxeomw2
+
+	// Send only opened account
+	//if dep.zstatcd=4 quit
+	
+	/* 
+	Apr 17, 2006 - Sarochinee R.
+		   Modified condition that confuse between weekly and monthly.
+	Nov 04, 2005 - Kunvadee V.
+	           Modified not sending closed account for weekly or 16th.
+	*/
+	if 'BCHEOM,BCHEOW!BCH16,(dep.zstatcd=4) quit
+		
+	/* 
+	Oct 21,2005
+	Send all account
+	Modified By Vorawit K.
+	*/
+	if BCHEOM,(dep.zstatcd=4),(dep.dtc<ZBDAT) quit
+	
+	/* 
+	 For Product Group DDA and SAV, send the accounts that have 
+	 the Ledger Balance >= 0 and Overdraft Limit = 0
+	
+	 If product group='CD' and ACN.ZMASTER'="" 
+	 send only accounts that have ACN.ZMASFLG='Y'
+	*/
+
+	/* 
+	Jul 29, 2004 - Anchalee
+	Modified criteria for DDA and SAV to balance>=0 and total OD limit=0
+	
+	Feb 16, 2004 - Anchalee
+	Modified getting value from dep.zbal for CD account
+	
+	Dec 2, 2003 - Anchalee
+	Modified getting value from dep.bal to dep.eodbal
+	*/
+
+	set XCID=dep.cid
+	set XGRP=dep.grp
+	set XTYPE=dep.type			// Account product type
+	
+	// Jun 22, 2011 - Sarochinee R.
+	if XTYPE=1104 set FXFLG=3
+	// End Jun 22, 2011 - Sarochinee R.
+	
+	/*
+	Oct 17, 2005 - Vorawit
+	Modified getting value from dep.status for Account Status
+	*/
+	set ZSTATCD=dep.zstatcd			// Account Status
+	
+	// Oct 10, 2008 - Sarochinee R.: Modified EOM2, Adding Last Salary Paid Date. (JO-0765)
+	if dep.zsallpd'="" set ZSALLPD=$ZD(dep.zsallpd,"YEARMMDD")
+	else  set ZSALLPD=FILL.blank(8)
+	
+	// Oct 24, 2008 - Sarochinee R.
+	//Modified EOM2 for adding Average Monthly Interest and Average Monthly Interest Previous Month(JO-0852)
+	set ZAVINT=dep.zavint		// Average Monthly Interest
+	set ZAVINTP=dep.zavintp		// Average Monthly Interest Previous Month
+	
+	/* 
+	Aug 30, 2004 - Anchalee
+	Exclude account that not belong to customer, which is product type
+	-1201 : Money Transfer Account
+	-1205 : KTB Suspense Account
+	*/
+	/*Feb 16, 2007 - Rapeepan Y. Include this account type
+	if (XTYPE=1201) quit
+	if (XTYPE=1205) quit
+	if (XTYPE=1204),($E(XCID.zero(12),6)=7) quit
+	*/
+	/* Nov 04, 2005 - Kunvadee V.
+	           Modified getting balance from dep.bal if account was closed.
+	*/
+		
+	//if BCHEOM set XBAL=$S(XTYPE=1202:dep.eodbal,XTYPE=3301:+dep.eodbalco,XGRP="CD":+dep.zbal,1:+dep.eodbalco)
+	//else  set XBAL=$S(XTYPE=3301:+dep.eodbal,XGRP="CD":+dep.zbal,1:+dep.eodbal)	//Prior Day Ending Ledger Balance
+	
+	/*
+	if dep.zstatcd=4 do {
+		if XTYPE=3301 set XBAL=dep.bal,BALCOL=dep.balcol,AVLBAL=dep.balavl quit
+		if XGRP="CD" set XBAL=dep.zbal,BALCOL=dep.zbalcol,AVLBAL=dep.zbalavl quit
+		set XBAL=dep.bal,BALCOL=dep.balcol,AVLBAL=dep.balavl
+	}
+	else  do {
+		if XTYPE=3301 set XBAL=dep.eodbal,BALCOL=dep.eodbalco,AVLBAL=dep.eodbalav quit
+		if XGRP="CD" set XBAL=dep.zbal,BALCOL=dep.zbalcol,AVLBAL=dep.zbalavl quit
+		set XBAL=dep.eodbal,BALCOL=dep.eodbalco,AVLBAL=dep.eodbalav
+	}
+	*/
+	
+	/* Nov 25, 2005 - Kunvadee V.
+	           Modified getting balance on the end of month from dep.eodbalco if account was not closed.
+	*/
+	
+	if dep.zstatcd=4 do {
+		if XTYPE=3301 set XBAL=dep.bal,BALCOL=dep.balcol,AVLBAL=dep.balavl quit
+		if XGRP="CD" set XBAL=dep.zbal,BALCOL=dep.zbalcol,AVLBAL=dep.zbalavl quit
+		set XBAL=dep.bal,BALCOL=dep.balcol,AVLBAL=dep.balavl
+	}
+	else  do {
+		//Oct 26, 2010 - Sarochinee R.
+		//Modified Code : EOM2 Change Ledger Balance from DEP.EODBALCO to DEP.EODBAL
+		//if BCHEOM set XBAL=$S(XTYPE=1202:dep.eodbal,XTYPE=3301:+dep.eodbalco,XGRP="CD":+dep.zbal,1:+dep.eodbalco)
+		if BCHEOM set XBAL=$S(XTYPE=1202:dep.eodbal,XTYPE=3301:+dep.eodbalco,XGRP="CD":+dep.zbal,1:+dep.eodbal)
+		else  set XBAL=$S(XTYPE=3301:+dep.eodbal,XGRP="CD":+dep.zbal,1:+dep.eodbal)	//Prior Day Ending Ledger Balance
+		set BALCOL=dep.eodbalco						// Prior Day Ending Collected Balance
+		set AVLBAL=$S(XTYPE=3301:EODBALAV,XGRP="CD":dep.zbalavl,1:EODBALAV)		// Prior Day Ending Available Balance
+	}
+	
+	//Sep 18, 2009 - Sarochinee R.	
+	//if ('FXFLG),(XGRP="DDA"!(XGRP="SAV")),((XBAL<0)!(TCREDIT'=0)) quit
+	if ((FXFLG=0)!(FXFLG=2)),(XGRP="DDA"!(XGRP="SAV")),((XBAL<0)!(TCREDIT'=0)) quit
+	
+	if XGRP="CD",dep.zmaster'="",dep.zmasflg'=1 quit
+	
+	/* 
+	 When sending records for the daily file, only include those accounts
+	 that had financial transactions (not include accrued interest) on the
+	 specified date, which affected ledger balance.
+	*/
+	
+	// Calculate total debit/credit amounts for PRIN; interest paid/received
+	
+	/* 
+	Nov 04, 2005 - Kunvadee V.
+	        Modified getting interest received,interest paid,
+	        total debit amount,total credit amount. 
+	        If account was closed,get values from HIST by hist.tjd is date account closed.
+	*/
+	
+	// Feb 09, 2011 - Sarochinee R.
+	//do TOTDRCR(ZTJD,XCID,.TDRAMT,.TCRAMT,.INTPAID,.INTRCV)
+	//do TOTDRCR(ZTJD,XCID,ZSTATCD,dep.dtc,.TDRAMT,.TCRAMT,.INTPAID,.INTRCV)
+	do TOTDRCR2(ZTJD,XCID,ZSTATCD,dep.dtc,.TDRAMT,.TCRAMT)
+	// Feb 09, 2011 - Sarochinee R.
+
+	/*
+	Aug 3, 2004 - Anchalee
+	Send only RFLG.RFLG="01","02","03","04","05","06"
+	
+	 Account Hold Codes
+	 RFLG.RFLG WHERE RFLG.CID = DEP.CID and
+	 BATCH-DATE NOT < STDT and BATCH-DATE NOT > EXDT
+	*/
+
+	set X=1
+	set (XPHC1,XPHC2,XPHC3,XPHC4,XPHC5)=""
+	type ResultSet rs=Db.select("RFLG","RFLG","CID=:XCID AND STDT NOT>:ZTJD AND EXDT NOT<:ZTJD")
+	while rs.next() do {
+		if X=6 quit
+		set XPHC=rs.getCol(1)
+		if (XPHC<"01")!(XPHC>"06") quit
+		if X=1 set XPHC1=XPHC,X=X+1 quit
+		if X=2 set XPHC2=XPHC,X=X+1 quit
+		if X=3 set XPHC3=XPHC,X=X+1 quit
+		if X=4 set XPHC4=XPHC,X=X+1 quit
+		if X=5 set XPHC5=XPHC,X=X+1
+		}
+
+	/*
+	 CR-INT-CODE
+	 CIF.ZKTBCCODE + CIF.ZPOSCD
+	*/
+	//if 'Db.isDefined("CIF","ACN=:dep.acn") set ER=1,RM=$$^MSG(1295) do EXC quit
+	//type RecordCIF cif=Db.getRecord("CIF","ACN=:dep.acn")
+	set CRINTCD=cif.zktbccode_+cif.zposcd
+
+	/*
+	Base Rate
+	The rate to be populated will be the rate either in the index or rate
+	schedule linked to the account as of the batch date (SystemDate -1).
+	
+	Dec 23, 2003 - Anchalee
+	Changed method to calculate base rate
+	- For DDA and SAV, calculate from index and collected balance of batch date
+	- For CD, calculate from Nominal Int/Div Rate - Rate Schedule Int/Div Spread
+	*/
+
+	set XINDEX=dep.index
+
+	// If dep.grp'="CD", dep.index must not null and get base rate from index
+	if XINDEX'="" do {
+		
+		/* Nov 04, 2005 - Kunvadee V.
+	   	           Modified getting balance from dep.bal if account was closed.
+	        */
+	        
+		//set BALCOL=dep.eodbalco		// Prior Day Ending Collected Balance
+		
+		/*
+		Mar 10, 2005 - Anchalee
+		If ledger balance is positive and collected balance is negative,
+		determine interest rate from ledger balance.
+		*/
+		if (XBAL'<0),(BALCOL<0) do {
+			//do CTL^UINDX(XINDEX,ZTJD,XBAL)
+			type String PAR()
+			set PAR("INDEX") = XINDEX
+			
+		    	// Wiphak  07/06/2010
+		    	// exclude SPREAD from rate
+		    	set PAR("SPREAD")=0
+		    	
+			do CTL^UINDX(.dep,ZTJD,XBAL,.PAR)
+			
+			set BASERAT=RATE-dep.intsprp	// Interest Rate
+			set INTRAT=RATE+dep.intspr	// Base Rate
+		}
+		else  do {
+			//do CTL^UINDX(XINDEX,ZTJD,BALCOL)
+			type String PAR()
+			set PAR("INDEX") = XINDEX
+			
+		    	// Wiphak  07/06/2010
+		    	// exclude SPREAD from rate
+		    	set PAR("SPREAD")=0
+		    				
+			do CTL^UINDX(.dep,ZTJD,BALCOL,.PAR)
+			
+			set BASERAT=RATE		// Base Rate
+			set INTRAT=dep.irn		// Interest Rate
+		}
+	}
+	// If dep.grp="CD", get base rate from dep.irn-dep.rsintspr
+	else  set BASERAT=dep.irn-dep.rsintspr,INTRAT=dep.irn
+	
+	if BASERAT<0 set BASERAT=-BASERAT
+	
+	/*
+	 Nov 10, 2005 - Kunvadee V.
+	         Modified sending spaces for interest index if account group is 'DDA'. 
+	         Modified sending zeros for interest rate and base rate if account group is 'DDA'.        
+	*/
+
+	// Jul 20, 2009 - Sarochinee R.
+	// Change Index Value of Current Account from Space to dep.index
+	//if XGRP="DDA" set XINDEX=FILL set (BASERAT,INTRAT)=0
+	if XGRP="DDA" set XINDEX=dep.index set (BASERAT,INTRAT)=0
+
+	// Last Financial Transaction Date
+	if dep.tld'="" set XTLD=$$DAT^%ZM(dep.tld,"YEARMMDD")
+	else  set XTLD=FILL.blank(8)
+	
+	set XCRCD=dep.crcd		// Currency Code
+
+	//set (TCRAMT,TDRAMT)=0
+	
+	set ACRINT=$S(XTYPE=3301:dep.posacr,XGRP="CD":dep.zposacr,1:dep.posacr)	// Accrued Credit Interest
+	set ADRINT=dep.negacr+dep.negacrun	// Accrued Negative Interest
+
+	set CRINT=$S(XTYPE=3301:dep.iytd,XGRP="CD":dep.ziytd,1:dep.iytd)	// Positive paid interest (year-to-date)
+	set DRINT=dep.negiytd		// Interest received year to date
+
+	/*
+	Feb 16,2003 - Anchalee
+	Modified getting permanent hold amount from dep.hldamt for DDA 
+	and SAV. But get from dep.zhldamt for CD
+	   
+	Dec 2,2003 - Anchalee 
+	Modified getting value from dep.hldamt to dep.eodhldam
+	*/
+
+	set HLDAMT=$S(XTYPE=3301:dep.hldamt,XGRP="CD":dep.zhldamt,1:dep.hldamt)	// Manual Hold Amount
+	
+	/*
+	May 16, 2005 - Anchalee
+	Moved original balance to Account Static File.
+	
+	Apr 1, 2004 - Anchalee
+	Modified getting original balance from Original Amount(dep.org) 
+	and Scheduled Deposit Amount (dep.schdepa) to Amount of First 
+	Deposit(dep.afdep).
+	   
+	Feb 20, 2004 - Anchalee
+	Modified getting original balance. If the is SPA account, getting
+	from Scheduled Deposit Amount (dep.schdepa). Otherwise, getting 
+	from Original Amount (dep.org)
+	*/
+
+	//set ORIGAMT=dep.afdep	// Original Balance
+
+	/*
+	Send Average Daily Negative/Positive Balance only end-of-month
+	
+	Mar 10, 2004 - Anchalee
+	Modified Average Daily Negative/Positive Balance.
+	Changed getting value from DEP.ADBM2 to the custom fields
+	which are DEP.ZPABALP for Average Daily Positive Balance
+	and DEP.ZNABALP for Average Daily Negative Balance
+	*/
+	
+	/* Jan 06, 2010 - Sarochinee R.
+	   Modified Code : DLY1 & EOM2
+	   Change Condition that sent Average Balance on Monthly.
+	   
+	if BCHEOM do {
+		set AVGBALP=dep.zpabalp		// Average Positive Balance Prior Month
+		set AVGBALN=dep.znabalp		// Average Negative Balance Prior Month
+		}
+	else  set (AVGBALP,AVGBALN)=0
+	*/
+	set (AVGBALP,AVGBALN)=0
+	
+	if BCHEOM do {
+		if (ZSTATCD=4) do {
+			set ZDAY=$$DAY^SCADAT(ZTJD)
+			set AVGBALN=dep.znbdbal/ZDAY
+			set AVGBALP=dep.zpbdbal/ZDAY
+		} 
+		else  do {
+			set AVGBALN=dep.znabalp	// Average Neg Balance Prior Month
+			set AVGBALP=dep.zpabalp	// Average Pos Balance Prior Month
+		}
+	}
+	else  set (AVGBALP,AVGBALN)=0
+	/* End Jan 06, 2010 */
+	
+	/* 
+	Feb 16, 2003 - Anchalee
+	Modified getting value from dep.zbalavl for CD account
+	
+	Dec 2, 2003 - Anchalee
+	Modified getting value from dep.balavl to dep.eodbalav
+	*/
+
+	/* Nov 04, 2005 - Kunvadee V.
+	           Modified getting balance from dep.bal if account was closed.
+	*/
+	//set AVLBAL=$S(XTYPE=3301:EODBALAV,XGRP="CD":dep.zbalavl,1:EODBALAV)	// Prior Day Ending Available Balance
+	if AVLBAL<0 set AVLSIGN="-",AVLBAL=-AVLBAL
+	else  set AVLSIGN="+"
+	
+	set GLSC=dep.glsc
+	
+	/*
+	Feb 19, 2004 - Anchalee
+	Added a new field Int/Div Paid - Life (dep.ipl) at the end of file
+	*/
+
+	set INTLIFE=$S(XTYPE=3301:dep.ipl,XGRP="CD":dep.zipl,1:dep.ipl)
+	
+	/*
+	Feb 24, 2004 - Anchalee
+	Added 3 fields which are 
+	DEP.IPY - Int/Div Paid Prior Financial Year
+	DEP.NEGIPY - Negative Interest Pr Financial Year
+	DEP.NEGIPL - Negative interest Life
+	*/
+
+	set INTPY=$S(XTYPE=3301:dep.ipy,XGRP="CD":dep.zipy,1:dep.ipy)
+	set NEGIPY=dep.negipy
+	set NEGIPL=dep.negipl
+	
+	//Feb 16, 2007 - Rapeepan Y.
+	//if FXFLG do {
+	
+	set (INTPAID,INTRCV)=0	// Feb 09, 2011 - Sarochinee R.
+	
+	//if FXFLG=1 do {
+	if (FXFLG=1)!(FXFLG=3) do {
+		set CRCDBAL=XBAL
+		//if XCRCD="THB" quit
+		set XBAL=XBAL*MIDRATE(XCRCD)
+		//set INTPAID=INTPAID*MIDRATE(XCRCD) 	// Feb 09, 2011 - Sarochinee R.
+		//set INTRCV=INTRCV*MIDRATE(XCRCD)	// Feb 09, 2011 - Sarochinee R.
+		set ACRINT=ACRINT*MIDRATE(XCRCD)
+		set ADRINT=ADRINT*MIDRATE(XCRCD)
+		set CRINT=CRINT*MIDRATE(XCRCD)
+		set DRINT=DRINT*MIDRATE(XCRCD)
+		set HLDAMT=HLDAMT*MIDRATE(XCRCD)
+		set TCRAMT=TCRAMT*MIDRATE(XCRCD)
+		set TDRAMT=TDRAMT*MIDRATE(XCRCD)
+		set AVGBALN=AVGBALN*MIDRATE(XCRCD)
+		set AVGBALP=AVGBALP*MIDRATE(XCRCD)
+		set AVLBAL=AVLBAL*MIDRATE(XCRCD)
+		set INTPY=INTPY*MIDRATE(XCRCD)
+		set INTLIFE=INTLIFE*MIDRATE(XCRCD)
+		set NEGIPY=NEGIPY*MIDRATE(XCRCD)
+		set NEGIPL=NEGIPL*MIDRATE(XCRCD)
+	}
+	
+	// Control File
+	if BCH16!BCHEOM do {
+		// Feb 09, 2011 - Sarochinee R.
+		do TOTFILE(%ProcessID,"FDEP",FXFLG,XTYPE,dep.zstatcd,XBAL,0,0,0,0,0,CRINT,DRINT,0,0)
+		//do TOTFILE(%ProcessID,"FDEP",FXFLG,XTYPE,dep.zstatcd,XBAL,0,0,0,INTPAID,INTRCV,CRINT,DRINT,0,0)
+		//if FXFLG,XCRCD="THB" do TOTFILE(%ProcessID,"FDEP",0,XTYPE,dep.zstatcd,XBAL,0,0,0,INTPAID,INTRCV,CRINT,DRINT,0,0)
+	}
+	do CNTLCNT(%ProcessID,"FDEP",FXFLG)
+	//if FXFLG,XCRCD="THB" do CNTLCNT(%ProcessID,"FDEP",0)
+	
+	if CRINT<0 set CRINTS="-",CRINT=-CRINT
+	else  set CRINTS="+"
+	if DRINT<0 set DRINTS="-",DRINT=-DRINT
+	else  set DRINTS="+"
+	
+	if INTLIFE<0 set INTLIFES="-",INTLIFE=-INTLIFE
+	else  set INTLIFES="+"
+	if INTPY<0 set INTPYS="-",INTPY=-INTPY
+	else  set INTPYS="+"
+	if NEGIPY<0 set NEGIPYS="-",NEGIPY=-NEGIPY
+	else  set NEGIPYS="+"
+	if NEGIPL<0 set NEGIPLS="-",NEGIPL=-NEGIPL
+	else  set NEGIPLS="+"
+	
+	// Feb 09, 2011 - Sarochinee R.
+	/*
+	if INTPAID<0 set INTPAIDS="-",INTPAID=-INTPAID
+	else  set INTPAIDS="+"
+	
+	if INTRCV<0 set INTRCVS="-",INTRCV=-INTRCV
+	else  set INTRCVS="+"
+	*/
+	set INTPAIDS="+"
+	set INTRCVS="+"
+	//set INTPAIDS=FILL.blank(1)
+	//set INTRCVS=FILL.blank(1)
+	// Feb 09, 2011 - Sarochinee R.
+	
+	/*
+	Jan 19, 2005 - Anchalee
+	Deleted DEP.ICAM
+	
+	Jul 29, 2004 - Anchalee
+	Added more 2 fields at the end of record which are
+	DEP.ICAM - Int/Div Accrual Calc Method
+	DEP.CC - Cost Center
+	*/
+	set CC=dep.cc			// Cost Center
+	
+	if XBAL<0 set LSIGN="-",XBAL=-XBAL
+	else  set LSIGN="+"
+
+	set XTYPE=XTYPE.zero(4)
+	set XPHC1=XPHC1.zero(2)
+	set XPHC2=XPHC2.zero(2)
+	set XPHC3=XPHC3.zero(2)
+	set XPHC4=XPHC4.zero(2)
+	set XPHC5=XPHC5.zero(2)
+	set CRINTCD=CRINTCD.blank(4)
+	
+	//set BASERAT=BASERAT.zero(7,5,1)
+	//set INTRAT=INTRAT.zero(7,5,1)
+	//set XBAL=XBAL.zero(14,2,1)	
+	//set AVLBAL=AVLBAL.zero(14,2,1)
+	set XCRCD=XCRCD.blank(3)
+	//set INTPAID=INTPAID.zero(14,2,1)
+	//set INTRCV=INTRCV.zero(14,2,1)
+	//set ACRINT=ACRINT.zero(14,5,1)
+	//set ADRINT=ADRINT.zero(14,5,1)
+	//set CRINT=CRINT.zero(14,2,1)
+	//set DRINT=DRINT.zero(11,2,1)
+	//set HLDAMT=HLDAMT.zero(14,2,1)
+	//set TCRAMT=TCRAMT.zero(14,2,1)
+	//set TDRAMT=TDRAMT.zero(14,2,1)
+	//set AVGBALN=AVGBALN.zero(14,2,1)
+	//set AVGBALP=AVGBALP.zero(14,2,1)
+	set GLSC=GLSC.blank(4)
+	//set INTLIFE=INTLIFE.zero(14,2,1)
+	//set INTPY=INTPY.zero(14,2,1)
+	//set NEGIPY=NEGIPY.zero(14,2,1)
+	//set NEGIPL=NEGIPL.zero(14,2,1)
+	
+	set BASERAT=$$ZPZERO(BASERAT,7,5,XCID,ZPK2,NBASERAT)
+	set INTRAT=$$ZPZERO(INTRAT,7,5,XCID,ZPK2,NINTRAT)
+	set XBAL=$$ZPZERO(XBAL,14,2,XCID,ZPK2,NXBAL)
+	// Feb 09, 2011 - Sarochinee R.
+	/*
+	set INTPAID=$$ZPZERO(INTPAID,14,2,XCID,ZPK2,NINTPAID)
+	set INTRCV=$$ZPZERO(INTRCV,14,2,XCID,ZPK2,NINTRCV)
+	*/
+	set INTPAID=INTPAID.zero(14)
+	set INTRCV=INTRCV.zero(14)
+	// Feb 09, 2011 - Sarochinee R.
+	set ACRINT=$$ZPZERO(ACRINT,14,5,XCID,ZPK2,NACRINT)
+	set ADRINT=$$ZPZERO(ADRINT,14,5,XCID,ZPK2,NADRINT)
+	set CRINT=$$ZPZERO(CRINT,14,2,XCID,ZPK2,NCRINT)
+	set DRINT=$$ZPZERO(DRINT,11,2,XCID,ZPK2,NDRINT)
+	set HLDAMT=$$ZPZERO(HLDAMT,14,2,XCID,ZPK2,NHLDAMT)
+	set TCRAMT=$$ZPZERO(TCRAMT,14,2,XCID,ZPK2,NTCRAMT)
+	set TDRAMT=$$ZPZERO(TDRAMT,14,2,XCID,ZPK2,NTDRAMT)
+	set AVGBALN=$$ZPZERO(AVGBALN,14,2,XCID,ZPK2,NAVGBALN)
+	set AVGBALP=$$ZPZERO(AVGBALP,14,2,XCID,ZPK2,NAVGBALP)
+	set AVLBAL=$$ZPZERO(AVLBAL,14,2,XCID,ZPK2,NAVLBAL)
+	set INTLIFE=$$ZPZERO(INTLIFE,14,2,XCID,ZPK2,NINTLIFE)
+	set INTPY=$$ZPZERO(INTPY,14,2,XCID,ZPK2,NINTPY)
+	set NEGIPY=$$ZPZERO(NEGIPY,14,2,XCID,ZPK2,NNEGIPY)
+	set NEGIPL=$$ZPZERO(NEGIPL,14,2,XCID,ZPK2,NNEGIPL)
+	
+	// Oct 24, 2008 - Sarochinee R.
+	//Modified EOM2 for adding Average Monthly Interest and Average Monthly Interest Previous Month(JO-0852)
+	set ZAVINT=$$ZPZERO(ZAVINT,14,2,XCID,ZPK2,NZAVINT)
+	set ZAVINTP=$$ZPZERO(ZAVINTP,14,2,XCID,ZPK2,NZAVINTP)
+
+	set CC=CC.zero(6)
+	
+	
+	/*- Modified Vorawit Oct 27, 2005 -
+		ZSTATCD,XINDEX,FILL
+	*/
+	set ZSTATCD=ZSTATCD.zero(2)
+	
+	/*
+	  Nov 04, 2005 - Kunvadee V.
+	          modified getting interest rate from dep.sch if account was fixed deposit.
+ 	*/
+	
+	//set XINDEX=XINDEX.blank(6)	
+	// Apr 29, 2009 - Sarochinee R. : Adde New Index Code
+	// Interest rate
+	if (dep.grp="CD"),(dep.zmaster'=""),(dep.zmasflg) set (ZINDEX,NINDEX)=dep.sch
+	else  set (ZINDEX,NINDEX)=XINDEX
+	set ZINDEX=ZINDEX.blank(6)
+	set NINDEX=NINDEX.blank(8)
+	// End Apr 29, 2009
+	
+	set REC="DF"_XTJD_XTYPE_XCID.zero(12)_XPHC1_XPHC2_XPHC3_XPHC4
+	set REC=REC_XPHC5_CRINTCD_BASERAT_INTRAT_XTLD_LSIGN_XBAL_XCRCD
+	set REC=REC_INTPAIDS_INTPAID_INTRCVS_INTRCV_ACRINT_ADRINT_CRINTS
+	set REC=REC_CRINT_DRINTS_DRINT_HLDAMT_TCRAMT_TDRAMT_AVGBALN_AVGBALP
+	set REC=REC_AVLSIGN_AVLBAL_GLSC_INTPYS_INTPY_INTLIFES_INTLIFE
+	set REC=REC_NEGIPYS_NEGIPY_NEGIPLS_NEGIPL_CC
+	
+	//Feb 16, 2007 - Rapeepan Y.
+	//if FXFLG do {
+	//if FXFLG=1 do {
+	if (FXFLG=1)!(FXFLG=3) do {
+	
+		if CRCDBAL<0 set CRCDBAL=-CRCDBAL
+		//set CRCDBAL=CRCDBAL.zero(14,2,1)
+		set CRCDBAL=$$ZPZERO(CRCDBAL,14,2,XCID,ZPK2,NCRCDBAL)
+		set REC=REC_CRCDBAL
+		// 21-Oct-2005 Modified by Kunvadee V.
+		
+		/*
+	         Nov 04, 2005 - Kunvadee V.
+	                 modified getting interest rate from dep.sch if account was fixed deposit.
+	        */
+	        
+		//set REC=REC_ZSTATCD_XINDEX_FILL.blank(58)
+		//set REC=REC_ZSTATCD_ZINDEX_FILL.blank(58)
+		//set REC=REC_ZSTATCD_ZINDEX_ZSALLPD_FILL.blank(50) //Oct 10, 2008 - Sarochinee R.
+		set REC=REC_ZSTATCD_ZINDEX_ZSALLPD_NINDEX_FILL.blank(42)	// Apr 29, 2009
+		
+		// Jun 22, 2011 : Sarochinee R.
+		//do iofxeom2.write(REC)
+		if FXFLG=1 do iofxeom2.write(REC)
+		else  do iofxeomw2.write(REC)
+		// End Jun 22, 2011 : Sarochinee R.
+		
+	}
+	// 21-Oct-2005 Modified by Kunvadee V.
+	//else  do ioeom2.write(REC)
+	//Feb 16, 2007 - Rapeepan Y.
+	//else  do {
+	if (FXFLG=0)!(FXFLG=2) do {
+	    /*
+	     Nov 04, 2005 - Kunvadee V.
+	             modified getting interest rate from dep.sch if account was fixed deposit.
+	    */
+	    //set REC=REC_ZSTATCD_XINDEX_FILL.blank(72)
+	    //set REC=REC_ZSTATCD_ZINDEX_FILL.blank(72)
+	    //set REC=REC_ZSTATCD_ZINDEX_ZSALLPD_FILL.blank(64)	//Oct 10, 2008 - Sarochinee R.
+	    //set REC=REC_ZSTATCD_ZINDEX_ZSALLPD_ZAVINT_ZAVINTP_FILL.blank(36)   //Oct 24, 2008 - Sarochinee R.
+	    set REC=REC_ZSTATCD_ZINDEX_ZSALLPD_ZAVINT_ZAVINTP_NINDEX_FILL.blank(28) // Apr 29, 2009
+	    
+	    if FXFLG=0 do ioeom2.write(REC)
+	    else  do ioeomw2.write(REC)
+	}
+	
+	quit
+
+
+EOM3(RecordDEP dep,RecordCIF cif,ZCLTOT,FXFLG)	// EOM Account Static
+
+	new ACCBAS,ARECFLG,BUSSCD,CBSTYP,CIFIDNUM,CIFIDTYP,CIFNAM
+	new CNAMCD,CUSTSTAT,CUSTTYP,DFLG,GOVCODE,JACCTFLG,LTYPE
+	new MBNKID,OCCCD,ORGAMT,RACCT,REC,SAMCFLG,SICGCD,SHRTNAM
+	new SMECD,TAMCFLG,TAXID,VIPFLG,XACN,XBAL,XBWF,XCID,XCIZID
+	new XCLS,XDOB,XDTC,XGRP,XMF,XODT,XRECTYP,XSMET,XTYPE,ZIPC
+	new ZRSDT,ZRSTR,ZTITLE,ZOCC,ZSOC,ZTRANCO,CLOSEFLG
+	//Oct 17, 2005  Vorawit Modified ZPERCONS,ZISICKTB,ZSUBT,FWOS,WDATE
+	new ZPERCONS,ZISICKTB,ZSUBT,FWOS,WDATE,TESTLOGIC
+	// Jul 18,2006 Duangporn N. Add ZBOO
+	new ZBOO
+	//Oct 12, 2006 - Sarochinee R.
+	new ZRES
+	
+	//Jan 15, 2007 - Rapeepan Y.
+	//Added ZEDUFLG(DEP.ZEDUFLG) for EDU Loan Flag 
+	new ZEDUFLG
+	
+	//Apr 05, 2007 - Rapeepan Y.
+	/* Owner Unit Code,Review Unit Code ,CRTM ID,Referel unit code,Committed line,
+	AO ID,Specialised lending type,Credit Score,Credit Scoring Date
+	*/
+	new ZOWNUNIT,ZREWUNIT,ZCRTMID,ZORGUNIT,ZCOMLINE,ZACCOID,ZSPLEND,ZCRDSC,ZCRDSCDT
+	
+	//Oct 20, 2009 - Sarochinee R.
+	//Add Restructured Account (dep.zrcid) in DEPACST, FCDACST and WASACST file
+	new ZRCID
+	
+	//Jan 08, 2010 - Sarochinee R.
+	//Add Last Customer Contact Date
+	new ZCCLD
+	
+	//Oct 05, 2006 - Duangporn N.
+	//Modified for check field amount add Variable for field if error
+	new NORGAMT,ZPK2
+	set ZPK2="-"
+	set NORGAMT="Amount of first deposit"
+		
+	type Public IO ioeom3
+	type Public IO iofxeom3
+		
+	//Feb 16, 2007 - Rapeepan Y.,Added for Wash A/C file
+	type Public IO ioeomw3
+	// Jun 22, 2011 - Sarochinee R.
+	type Public IO iofxeomw3
+	
+	/*
+	Include all DDA and SAV accounts
+
+	If group="CD"
+	   Include if DEP.ZMASTER=""
+	   Include if DEP.ZMASTER'="" and DEP.ZMASFLG="Y"
+	*/
+
+	if dep.grp="CD",dep.zmaster'="",dep.zmasflg'=1 quit
+	
+	set XCID=dep.cid
+	set XACN=dep.acn
+	set XTYPE=dep.type		// Account type
+	
+	// Jun 22, 2011 - Sarochinee R.
+	if XTYPE=1104 set FXFLG=3
+
+	if XTYPE=1104 set ^FXT(XCID)=XCID_"|"_XTYPE
+	// End Jun 22, 2011 - Sarochinee R.
+	
+	/*
+	Modified By Vorawit Kitarn 
+	ZPERCONS,ZISICKTB,ZSUBT,FWOS,WDATE
+	*/
+	set ZPERCONS=dep.zpercons	//Personal Consumption
+	/*
+	Dec 13,2005 - Kunvadee V.
+	       Modified sending KTB isic code in account static.
+	*/
+	//set ZISICKTB=dep.zisicktb	//NASIC Code
+	set ZISICSD=dep.zisicsd
+	set ZISICGC=dep.zisicgc
+	set ZISICTS=dep.zisicts
+	
+	if (ZISICSD="") set ZISICKTB=FILL
+	else  do {
+		if (ZISICGC="") set ZISICGC=ZISICGC.zero(1)
+		if (ZISICTS="") set ZISICTS=ZISICTS.zero(3)
+		set ZISICKTB=ZISICSD.blank(3)_ZISICGC.blank(1)_ZISICTS.blank(3)
+	}
+	set ZFWOSTAT=dep.zfwostat
+	set FWOS=dep.zfwos		//Write off Status
+	if ZFWOSTAT do {
+		set WDATE=dep.zfwod	//Write Date
+	}
+	else  do {
+		set WDATE=dep.zdoco
+	}
+	type RecordACN xacn=Db.getRecord("ACN","CID=:XCID")
+	set ZSUBT=xacn.zsubt		//Account Sub Type
+	
+	//Feb 21, 2007 - Rapeepan Y.,Include Account type 1201,1205,1204
+	//if (XTYPE=1201) quit
+	//if (XTYPE=1205) quit
+	//if (XTYPE=1204),($E(XCID.zero(12),6)=7) quit
+	
+	/*
+	May 16, 2005 - Anchalee
+	Excluded type 1102 (FX Demand Draft Account) for Foreign Currency Account.
+	*/
+
+	if BCH16,(dep.zstatcd=4) quit
+	if BCHEOM,(dep.zstatcd=4),(dep.dtc<ZBDAT) quit
+
+	if dep.zstatcd=4 set CLOSEFLG=1
+	else  set CLOSEFLG=0
+
+	/*
+	 If dtjna.oldcrlmt or dtjna.newcrlmt have values, the opening date
+	 will be checked. If the opening date is not within the specified 
+	 date range, quit. Otherwise, proceed to process the record.
+	*/
+
+	set DFLG=0
+	set XODT=dep.odt
+
+	/*
+	 Account Record Flag
+	 A: Added Account (If record is triggered from table DTJNA)
+	 U: Updated Account (If record is triggered from DTJFM)
+	 D: Deleted Account (If record is from DTJFM with a status change to "4")
+	*/
+
+	set ARECFLG="M"
+	set GOVCODE=cif.emplno		// Employer Number & Employer Name
+
+	/*
+	if GOVCODE="" set ER=1,RM="Unable to determine Employer code." do EXC quit
+	if 'Db.isDefined("UTBLEMPLOYER","EMPLNO=:GOVCODE") set ER=1,RM="Employer Code not found in user table." do EXC quit
+	type RecordUTBLEMPLOYER emp=Db.getRecord("UTBLEMPLOYER","EMPLNO=:GOVCODE")
+	set CNAMCD=emp.nam
+	*/
+	
+	/*
+	Anchalee  Nov 1,2003
+	Modified to not log EXC if cif.emplno is null
+	*/
+	/* Vorawit K. 
+	 Modified CNAMCD=""s
+	*/
+	if GOVCODE'="" do {
+		if 'Db.isDefined("UTBLEMPLOYER","EMPLNO=:GOVCODE") set ER=1,RM="Employer Code not found in user table.",CNAMCD="" do EXC quit
+		type RecordUTBLEMPLOYER emp=Db.getRecord("UTBLEMPLOYER","EMPLNO=:GOVCODE")
+		set CNAMCD=emp.nam
+		}
+
+	else  set CNAMCD=""
+	
+	// CIF-ID-TYPE & CIF-ID-NUM
+	do {
+		if cif.zcizid'="" set CIFIDTYP=324001,CIFIDNUM=cif.zcizid quit
+		if cif.pasnum'="" set CIFIDTYP=324002,CIFIDNUM=cif.pasnum quit
+		
+		//Oct 10, 2006 - Sarochinee R.
+		//Modified EOM3, Change sequence of condition for sending CIF-ID-TYPE & CIF-ID-NUM 
+		//By changing from Citizen , Passport , Tax , Juristic  to Citizen, passport , Juristic, tax 
+		if cif.zjin'="" set CIFIDTYP=324004,CIFIDNUM=cif.zjin quit
+		if cif.taxid'="" set CIFIDTYP=324003,CIFIDNUM="" quit
+		
+		if cif.zgovnum'="" set CIFIDTYP=324006,CIFIDNUM=cif.zgovnum quit
+		if cif.zswiftcd'="" set CIFIDTYP=324008,CIFIDNUM=cif.zswiftcd quit
+		if cif.zbotnum'="" set CIFIDTYP=324005,CIFIDNUM=cif.zbotnum quit
+		if cif.zothjid'="" set CIFIDTYP=324013,CIFIDNUM=cif.zothjid quit
+		if cif.zfiasscd'="" set CIFIDTYP=324014,CIFIDNUM=cif.zfiasscd quit
+		if cif.zficd'="" set CIFIDTYP=324007,CIFIDNUM=cif.zficd quit
+		if cif.zovrsea'="" set CIFIDTYP=324009,CIFIDNUM=cif.zovrsea quit
+		if cif.zovrseaj'="" set CIFIDTYP=324010,CIFIDNUM=cif.zovrseaj quit
+		if cif.zintovgov'="" set CIFIDTYP=3240011,CIFIDNUM=cif.zintovgov quit
+		set CIFIDTYP=324012,CIFIDNUM=cif.oin
+		}	
+		
+	// Tax ID
+	set TAXID=cif.taxid
+	if TAXID.length()>10 set TAXID=TAXID.extract(1,10)
+
+	set XGRP=dep.grp // Feb 09, 2011 - Sarochinee R.
+	
+	// Feb 09, 2011 - Sarochinee R.
+	// Set Related Account Field = Blank
+	/*
+	Relate Account
+	If acn.grp="DDA", select depodt.odacn where DEPODP.CID = ACN.CID
+	and DEPODP.PRI = 1 (use 1st Priority of DEPODP.ODACN)
+	
+	If acn.grp="SAV", select depodt.cid = CID where 
+	DEPODP.ODACN = ACN.CID
+
+	If ACN.GRP NOT = DDA and NOT = SAV, send Zero
+	
+
+	set RACCT=0
+	set XGRP=dep.grp
+
+	if XGRP="DDA" do {
+		type ResultSet rs1=Db.select("ODACN","DEPODP","PRI=1 AND CID=:XCID")
+		if rs1.next() set RACCT=rs1.getCol(1)
+		}
+
+	if XGRP="SAV" do {
+		type ResultSet rs2=Db.select("CID","DEPODP","ODACN=:XCID")
+		if rs2.next() set RACCT=rs2.getCol(1)
+		}
+	*/
+	// Feb 09, 2011 - Sarochinee R.
+
+
+	/*
+	Determine Record Type
+	- LA: Loan Account Master Record (Class='D' and Balance < 0)
+	- DA: Saving/Deposit Master Account (Class="D" and Bal >=0)
+	 
+	Apr 2, 2004 - Anchalee
+	Modified getting balance from dep.bal if account was closed
+	 
+	Feb 16, 2003 - Anchalee
+	Modified getting balance from dep.eodbal instead of dep.bal 
+	*/
+
+	
+
+	/* Jun 25, 2004 - Anchalee
+		Added 1 more condition (or dep.odlim>0) to specify Record Type.
+		So the full condition is 
+		- If balance<0 or od limit>0, set record type to 'LA'
+		- Otherwise, set record type to 'DA' */
+	do {
+		if XGRP="CD" set XRECTYP="DA" quit
+		
+		do {
+			if dep.zstatcd=4 set XBAL=dep.bal quit
+			if BCHEOM set XBAL=$S(XTYPE=1202:dep.eodbal,1:dep.eodbalco)
+			else  set XBAL=dep.eodbal
+		}
+		
+		if (XBAL<0)!(ZCLTOT>0) set XRECTYP="LA"
+		else  set XRECTYP="DA"
+	}
+
+	/*
+	Jun 3, 2004 - Anchalee
+		Added product type 1002(Taweepanya) to loan type
+	
+	Determine Loan Type
+	If ACN.CLS="D" and BAL '< 0 leave blank
+
+	If ACN.CLS="L" or (CLS="D" and bal < 0)
+	and TYPE=1001 set to "0010" (O/D)
+	or TYPE=1002 set to "0010" (Taweepanya)
+	or TYPE=2001 set to 7001 (Circle Loan)
+	or TYPE=1301 set to 7002 (Circle Loan Credit Card)
+	*/
+
+	set LTYPE=""
+	
+	/* 
+	Jun 25, 2004 - Anchalee
+		Modified criteria of Loan Type value only consideration from
+		Record Type is 'LA' instead of Balance < 0 */
+	//if XBAL<0 do {
+	if XRECTYP="LA" do {
+		if XTYPE=1301 set LTYPE=7002 quit	// Circle Loan Credit Card
+		if XGRP="DDA" set LTYPE="0010" quit	// O/D & Taweepanya
+		if XGRP="SAV" set LTYPE=7001		// Circle Loan
+		}
+
+	set VIPFLG=$S(cif.zvipflg=1:"Y",1:"N")	// VIP Flag
+	set CUSTSTAT=dep.zstatcd	// Customer Account Status
+	set CUSTTYP=cif.zktbccode	// KTB Customer Code
+	set CBSTYP=cif.type		// Customer (product) type
+	set ZIPC=cif.zipc		// Involved Party Code
+	set ZTITLE=cif.ztitle		// Title name
+	set CIFNAM=cif.nam		// Customer name
+	set SHRTNAM=dep.title1		// Account Name
+
+	// Account Close Date - Use acn.dtc with a status of closed.
+	if dep.stat=4,dep.dtc'="" set XDTC=$$DAT^%ZM(dep.dtc,"YEARMMDD")
+	else  set XDTC=FILL.blank(8)
+
+	set MBNKID=dep.zmrgbkid		// Merge Bank ID
+
+	// Birthdate
+	if cif.dob'="" set XDOB=$$DAT^%ZM(cif.dob,"YEARMMDD")
+	else  set XDOB=FILL.blank(8)
+
+	set XBWF=$S(dep.bwf=1:"Y",1:"N")	// Backup Withholding
+	set JACCTFLG=dep.acnrelc	// Account relationship code
+	/*
+	Jun 16, 2005 - Anchalee
+		Added Write Off flag (W) to TAMC flag if dep.zstatcd=11 or 
+		dep.zfwostat=1.
+	*/
+	if (dep.zstatcd=11)!(dep.zfwostat) set TAMCFLG="W"
+	else  set TAMCFLG=dep.ztamcd	// TAMC Flag
+	set SAMCFLG=dep.zsamcd		// SAM Flag
+	set SMECD=dep.zsmecd		// SME Code
+	set SICGCD=dep.zisic		// SICG-Code
+	set XMF=dep.mf			// Send Mail Option
+	set XSMET=$S(dep.smet=1:"Y",1:"N")	// Statement Flag
+	set ZOCC=cif.zocc		// Occupation Code
+	set ZSOCC=cif.zsocc		// Sub occupation Code
+	//set OCCCD=ZOCC.zero(4)_ZSOCC.zero(2)	// Occupation Code
+
+	/* Teeranuch W. 28-09-2005
+	// Map ISCI Code to Business Type
+	// set BUSSCD=dep.zbustype		// Business Type
+	*/
+	/*
+	/* Teeranuch L. 28-03-2006 */
+	/*
+	if dep.zisic'="" do {
+		type RecordZUTBLISICMAP zisicmap=Db.getRecord("ZUTBLISICMAP","ZISIC=:dep.zisic",1)
+		set BUSSCD=zisicmap.zbustype	
+	}
+	else  set BUSSCD=dep.zbustype	
+	// End 28-09-2005
+	*/
+	new ZPERCONS,ZARRPUS
+	set BUSSCD=dep.zbustype
+	set ZPERCONS=dep.zpercons
+	set ZARRPUS=dep.zarrpur
+	if BUSSCD="" do {
+		if (dep.grp="SAV") do {
+	 		if (ZPERCONS'=""),(ZARRPUS'="") do {
+	 			type RecordZUTBLPCONSMAP zpconsmp=Db.getRecord("ZUTBLPCONSMAP","ZPERCONS=:ZPERCONS,ZARRPUS=:ZARRPUS",1)
+				set BUSSCD=zpconsmp.zbustype
+	 		}
+	 		else  if dep.zisic'="" do { 
+				type RecordZUTBLISICMAP zisicmap=Db.getRecord("ZUTBLISICMAP","ZISIC=:dep.zisic",1)
+				set BUSSCD=zisicmap.zbustype		
+			} // End zisic
+		} // End Group Saving
+		if (dep.grp="DDA") do {
+			if dep.zisic'="" do {
+				type RecordZUTBLISICMAP zisicmap=Db.getRecord("ZUTBLISICMAP","ZISIC=:dep.zisic",1)
+				set BUSSCD=zisicmap.zbustype
+			}
+			else  if (ZPERCONS'=""),(ZARRPUS'="") do {
+				type RecordZUTBLPCONSMAP zpconsmp=Db.getRecord("ZUTBLPCONSMAP","ZPERCONS=:ZPERCONS,ZARRPUS=:ZARRPUS",1)
+				set BUSSCD=zpconsmp.zbustype
+	 		}
+		} // End Group Current Account
+	}
+	// End 28-03-2006
+	
+	set ZRSTR=$S(dep.zrstr=1:"Y",1:"N")	// Restructure Flag
+	set COMMCD=dep.zcommntycd		// Community Code
+
+	// Restructure Date
+	if dep.zrsdt'="" set ZRSDT=$$DAT^%ZM(dep.zrsdt,"YEARMMDD")
+	else  set ZRSDT=FILL.blank(8)
+	
+	set ORGAMT=dep.afdep	// Amount of first deposit
+	set ACCBAS=dep.iacm	// Accrual Calc Method
+	
+	// Duangporn N. - 18 July 2005
+	set ZBOO=dep.boo  // Branch of Ownership
+	//Oct 12, 2006 - Sarochinee R. : Added Response Unit at the end of File 
+	set ZRES=dep.zresunit		//Response Unit
+	
+	//Jan 15, 2007 - Rapeepan Y.
+	//Added ZEDUFLG(DEP.ZEDUFLG) for EDU Loan Flag 
+	set ZEDUFLG=dep.zeduflg
+	if ZEDUFLG set ZEDUFLG="Y"
+	else  set ZEDUFLG="N"
+	
+	//Apr 05, 2007 - Rapeepan Y.
+	set ZOWNUNIT=dep.zownunit		//Owner Unit Code
+	set ZREWUNIT=dep.zrewunit		//Review Unit Code
+	set ZCRTMID=dep.zcrtmid			//CRTM ID
+	set ZORGUNIT=dep.zorgunit		//Referel unit code
+	set ZCOMLINE=dep.zcomline		//Committed line
+	/*------------- 18/07/2008 - Rapeepan Y. --------------------------
+	Change sending Committed Line from Logic(Y/N) to Text(0-Uncommitted,1-Committed,2-Other)
+	if ZCOMLINE set ZCOMLINE="Y"
+	else  set ZCOMLINE="N"
+	--------------- End 18/07/2008 -----------------------------------*/
+	set ZACCOID=dep.zaccoid			//AO ID
+	set ZSPLEND=dep.zsplend			//Specialised lending type
+	
+	set ZCRDSC=dep.zcrdsc			//Credit Score	
+	if '(ZCRDSC=+ZCRDSC) set ZCRDSC=FILL.zero(5,2,1)	//Check Credit Score is Numeric 
+ 	if (ZCRDSC>100)!(ZCRDSC<0) set ZCRDSC=FILL.zero(5,2,1) 	//Credit Score is Max 100
+	
+	if dep.zcrdscdt'="" set ZCRDSCDT=$$DAT^%ZM(dep.zcrdscdt,"YEARMMDD")  //Credit Scoring Date
+	else  set ZCRDSCDT=FILL.blank(8)
+	
+	if dep.crcd'="THB" set ORGAMT=ORGAMT*MIDRATE(dep.crcd)
+	
+	//Oct 20, 2009 - Sarochinee R.
+	set ZRCID=dep.zrcid		// Restructured Account
+	
+	//Jan 08, 2010 - Sarochinee R.
+	set ZCCLD=dep.ccld		// Last Customer Contact Date
+	if ZCCLD set ZCCLD=$$DAT^%ZM(ZCCLD,"YEARMMDD")
+	else  set ZCCLD=ZCCLD.blank(8)
+	
+	// Control File
+	if BCH16!BCHEOM do {
+		do TOTFILE(%ProcessID,"ACST",FXFLG,XTYPE,CUSTSTAT,0,0,0,0,0,0,0,0,0,ORGAMT)
+		//if FXFLG,(dep.crcd="THB") do TOTFILE(%ProcessID,"ACST",0,XTYPE,CUSTSTAT,0,0,0,0,0,0,0,0,0,ORGAMT)
+	}
+	do CNTLCNT(%ProcessID,"ACST",FXFLG)
+	//if FXFLG,(dep.crcd="THB") do CNTLCNT(%ProcessID,"ACST",0)
+
+	set XTYPE=XTYPE.zero(4)
+	set LTYPE=LTYPE.blank(4)
+	set CUSTSTAT=CUSTSTAT.zero(2)
+	set CUSTTYP=CUSTTYP.blank(3)
+	set CBSTYP=CBSTYP.zero(4)
+	set XACN=XACN.zero(12)
+	set ZIPC=ZIPC.blank(6)
+	set ZTITLE=ZTITLE.blank(20)
+	set CIFNAM=CIFNAM.blank(40)
+	set SHRTNAM=SHRTNAM.blank(40)
+	set GOVCODE=GOVCODE.blank(12)
+	set CNAMCD=CNAMCD.blank(40)
+	set CIFIDTYP=CIFIDTYP.blank(6)
+	set CIFIDNUM=CIFIDNUM.blank(20)
+	set TAXID=TAXID.blank(10)
+	
+	if dep.odt'="" set XODT=$$DAT^%ZM(dep.odt,"YEARMMDD")
+	else  set XODT=FILL.blank(8)
+
+	set MBNKID=MBNKID.blank(1)
+	
+	//Feb 09, 2011 - Sarochinee R.
+	//set RACCT=RACCT.zero(12)
+	set RACCT=FILL.blank(12)
+	//Feb 09, 2011 - Sarochinee R.
+	
+	set JACCTFLG=JACCTFLG.blank(2)
+	set TAMCFLG=TAMCFLG.blank(1)
+	set SAMCFLG=SAMCFLG.blank(1)
+	set SMECD=SMECD.zero(2)
+	set SICGCD=SICGCD.blank(7)
+	set XMF=XMF.zero(1)
+
+	/*
+	For occupation code, the value is follow
+	   - If ZOCC is null, set OCCCD to blank(6)
+	   - If ZOCC has value but ZSOCC is null, set OCCCD to ZOCC_"00"
+	   - If ZOCC and ZSOCC have value, set OCCCD to ZOCC_ZSOCC
+	*/
+	
+	set OCCCD=$S(ZOCC="":ZOCC.blank(6),ZSOCC="":ZOCC.zero(4)_ZSOCC.zero(2),1:ZOCC.zero(4)_ZSOCC.zero(2))
+	set BUSSCD=BUSSCD.blank(5)
+	set COMMCD=COMMCD.blank(5)
+	
+	// Sep 18, 2006 - Duangporn 
+	//Modified for check field amount add Variable for field if error
+	set XCID=XCID.zero(12)
+	//set ORGAMT=ORGAMT.zero(14,2,1)
+	set ORGAMT=$$ZPZERO(ORGAMT,14,2,XCID,ZPK2,NORGAMT)
+	
+	set ACCBAS=ACCBAS.blank(2)
+	/*
+	Oct 17, 2005 Modified By Vorawit 
+	ZPERCONS,ZISICKTB
+	*/
+	set ZPERCONS=ZPERCONS.blank(6)
+	set ZISICKTB=ZISICKTB.blank(7)
+	set ZSUBT=ZSUBT.blank(5)
+	if WDATE'="" set WDATE=$$DAT^%ZM(WDATE,"YEARMMDD")
+	else  set WDATE=FILL.blank(8)
+	set FWOS=FWOS.blank(2)
+	
+	//Duangporn N. - 18 July 2005
+	 set ZBOO=ZBOO.zero(6)        // Branch of Ownership
+	//Oct 12, 2006 - Sarochinee R. : Added Response Unit at the end of File 
+	set ZRES=ZRES.zero(6)		//Response Unit
+	
+	//Jan 15, 2007 - Rapeepan Y.
+	//Added ZEDUFLG(DEP.ZEDUFLG) for EDU Loan Flag 
+	set ZEDUFLG=ZEDUFLG.blank(1)
+	
+	//Apr 05, 2007 - Rapeepan Y.
+	set ZOWNUNIT=ZOWNUNIT.blank(6)		
+	set ZREWUNIT=ZREWUNIT.blank(6)		
+	set ZCRTMID=ZCRTMID.blank(8)		
+	set ZORGUNIT=ZORGUNIT.blank(6)	
+	set ZCOMLINE=ZCOMLINE.blank(1)
+	set ZACCOID=ZACCOID.blank(8)	
+	set ZSPLEND=ZSPLEND.blank(2)	
+	set ZCRDSC=ZCRDSC.zero(5,2,1)
+	//Oct 20, 2009 - Sarochinee R.
+	set ZRCID=ZRCID.zero(12)	
+	
+	set REC=XRECTYP_XTJD_XTYPE_XCID_LTYPE_VIPFLG_CUSTSTAT
+	set REC=REC_CUSTTYP_CBSTYP_XACN_ZIPC_ZTITLE_CIFNAM_SHRTNAM
+	set REC=REC_GOVCODE_CNAMCD_CIFIDTYP_CIFIDNUM_TAXID_XODT_XDTC
+	set REC=REC_MBNKID_XDOB_XBWF_RACCT_JACCTFLG_TAMCFLG_SAMCFLG
+	set REC=REC_SMECD_SICGCD_XMF_XSMET_OCCCD_BUSSCD_ZRSTR_ZRSDT
+	set REC=REC_COMMCD_ORGAMT_ACCBAS_ARECFLG
+	//Oct 21,2005 Modified By Vorawit
+	/*
+	 Dec 21,2005 - Kunvadee V.
+	 	Changed the order for sending write off status and write off date.,
+	*/
+	//set REC=REC_ZPERCONS_ZISICKTB_ZSUBT_WDATE_FWOS_FILL.blank(41)
+	// Jul 18,2006 Duangporn N. Modified set REC=REC_ZPERCONS_ZISICKTB_ZSUBT_FWOS_WDATE_FILL.blank(41)
+	
+	//Oct 12, 2006 - Sarochinee R. : Added Response Unit at the end of File
+	//set REC=REC_ZPERCONS_ZISICKTB_ZSUBT_FWOS_WDATE_ZBOO_ZRES_FILL.blank(29)
+	
+	//Jan 15, 2007 - Rapeepan Y.
+	//Added ZEDUFLG(DEP.ZEDUFLG) for EDU Loan Flag 
+	
+	//Apr 05, 2007 - Rapeepan Y.
+	//set REC=REC_ZPERCONS_ZISICKTB_ZSUBT_FWOS_WDATE_ZBOO_ZRES_ZEDUFLG_FILL.blank(28)
+	set REC=REC_ZPERCONS_ZISICKTB_ZSUBT_FWOS_WDATE_ZBOO_ZRES_ZEDUFLG
+	set REC=REC_ZOWNUNIT_ZREWUNIT_ZCRTMID_ZORGUNIT_ZCOMLINE
+	//Oct 20, 2009 - Sarochinee R.
+	//set REC=REC_ZACCOID_ZSPLEND_ZCRDSC_ZCRDSCDT_FILL.blank(68)
+	//Jan 08, 2010 - Sarochinee R.
+	//set REC=REC_ZACCOID_ZSPLEND_ZCRDSC_ZCRDSCDT_ZRCID_FILL.blank(56)
+	set REC=REC_ZACCOID_ZSPLEND_ZCRDSC_ZCRDSCDT_ZRCID_ZCCLD_FILL.blank(48)
+	
+	//Feb 16, 2007 - Rapeepan Y.
+	//if FXFLG do {
+	/*
+	if FXFLG=1 do {
+		
+		// Jun 22, 2011 - Sarochinee R.
+		//do iofxeom3.write(REC)
+		if XTYPE=1104 do iofxeomw3.write(REC)
+		else  do iofxeom3.write(REC)
+		
+	}
+	*/
+	if FXFLG=3 set ^FXT2(XCID)=XCID_"|"_XTYPE_"|"_FXFLG
+	
+	// Jun 22, 2011 - Sarochinee R.
+	if FXFLG=1 do iofxeom3.write(REC)
+	if FXFLG=3 do iofxeomw3.write(REC)
+	// Jun 22, 2011 - Sarochinee R.
+	
+	//else  do ioeom3.write(REC)
+	if FXFLG=0 do ioeom3.write(REC)
+	//Feb 16, 2007 - Rapeepan Y. ,Added for Wash A/C file
+	if FXFLG=2 do ioeomw3.write(REC)	
+		
+	quit
+
+
+EOM4(RecordDEP dep,FXFLG)	// EOM Deposit Items
+
+	new ACCTNUM,BALCOL,CRCDBAL,IBONRATE,IBONRSIG,IBRATE,ICRINT,IEFFDT
+	new IHLDCD1,IHLDCD2,IHLDCD3,IHLDCD4,IHLDCD5,IMDT,INORATE,INORSIGN
+	new INTPAIDS,INTPAID,INTRCV,IORATE,IORIGBAL,IORIGDT,IORSIGN,IPERIOD
+	new IPRIN,ISTAT,ITEMNO,ITRATE,ITRSIGN,MANHOLD,REC,TAXPAID,TCRAMT
+	new TDRAMT,XCID,XCRCD,XINDEX,XMLD,XPHC,XSEQ,XTYPE,ZINT,ZSEQ,ZTOT
+	
+	//OCT 17, 2005 ,Modified ZPABALP By Vorawit 
+	new ZPABALP
+	/*
+	Jun 05, 2006 - Sarochinee R.
+		Added a new field Int/Div Paid - Life (dep.ipl) at the end of file
+	*/
+	new INTLIFE,INTLIFES,XGRP
+	set XGRP=dep.grp
+	
+	//Apr 29, 2009 - Sarochinee R.
+	new NINDEX
+	
+	//May 19, 2011 - Sarochinee R.
+	new ZPRSCD
+	
+	// Sep 19, 2006 - Duangporn N.
+	//Modified for check field amount add Variable for field if error
+	new ZPK2	
+	set ZPK2="-"
+	new NIPRIN,NIBRATE,NINORATE,NIORATE,NIBONRATE,NITRATE,NICRINT
+	new NIORIGBAL,NINTPAID,NTAXPAID,NMANHOLD,NZPABALP,NINTLIFE,NCRCDBAL
+	set NIPRIN="ITEM PRINCIPLE"
+	set NIBRATE="ITEM BASE RATE"
+	set NINORATE="ITEM NEG OFF RATE"
+	set NIORATE="ITEM OFFSET RATE"
+	set NIBONRATE="ITEM BONUS RATE"
+	set NITRATE="ITEM TOTAL RATE"
+	set NICRINT="ITEM CREDIT INTEREST"
+	set NIORIGBAL="ITEM-ORIG-AMT"
+	set NINTPAID="ITEM-INT-PAID"
+	set NTAXPAID="ITEM-TAX-PAID"
+	set NMANHOLD="MANUAL HOLD"
+	set NZPABALP="Positive average balance"
+	set NINTLIFE="INT-PAID-LIFE"	
+	set NCRCDBAL="ITEM PRINCIPLE_CURRENCY"
+	
+	type Public IO ioeom4
+	type Public IO iofxeom4
+
+	/*
+	 Include only accounts where product group = "CD" and 
+	 dep.zmaster not equal null and dep.zmasflg="N"
+	*/
+
+	if dep.zmaster="" quit
+	if dep.zmasflg=1 quit
+	
+	//if (dep.zstatcd=4) quit
+	
+	/* 
+	Apr 17, 2006 - Sarochinee R.
+		   Modified condition that confuse between weekly and monthly.
+	Nov 04, 2005 - Kunvadee V.
+	           Modified not sending closed account for weekly or 16th.
+	*/
+	if 'BCHEOM,BCHEOW!BCH16,(dep.zstatcd=4) quit
+	
+	/* 
+	Oct 21,2005
+	Send all account
+	Modified By Vorawit K. 
+	*/
+	if BCHEOM,(dep.zstatcd=4),(dep.dtc<ZBDAT) quit
+	set XCID=dep.cid
+	/*
+	Oct 17, 2005 Modified By Vorawit 
+	set value ZPABALP 
+	*/
+	//set ZPABALP=dep.zpabalp
+	
+	/*
+	 Nov 04, 2005 - Kunvadee V.
+	         modified to move zeros for positive average balance if account is sub account (item).
+	*/
+	set ZPABALP=0
+	
+	/* 
+	 When sending records for the daily file, only include those accounts
+	 that had financial transactions on the specified date, which affected
+	 ledger balance.
+	*/
+	
+	// Calculate total debit/credit amounts for PRIN; interest paid/received
+
+	/* 
+	Nov 04, 2005 - Kunvadee V.
+	        Modified getting interest received,interest paid,
+	        total debit amount,total credit amount. 
+	        If account was closed,get values from HIST by hist.tjd is date account closed.
+	*/
+	
+	
+	//do TOTDRCR(ZTJD,XCID,.TDRAMT,.TCRAMT,.INTPAID,.INTRCV)
+	//do TOTDRCR(ZTJD,XCID,dep.zstatcd,dep.dtc,.TDRAMT,.TCRAMT,.INTPAID,.INTRCV) // Feb 09, 2011 - Sarochinee R.
+	
+	/* 
+	Nov 16, 2005 - Kunvadee V.
+	        Modified getting interest paid if sub account was closed.  
+	        If date account closed is not null and not less than maturity date and interest paid is zeros,
+	        getting interest paid with previous date of date account closed.   
+	*/
+	
+	// Feb 09, 2011 - Sarochinee R.
+	/*
+	if (INTPAID=0),(dep.dtc'=""),(dep.dtc'<dep.mdt) do {
+	    new OTDRAMT,OTCRAMT,OINTRCV
+	    set OTDRAMT=TDRAMT
+	    set OTCRAMT=TCRAMT
+	    set OINTRCV=INTRCV
+	    do TOTDRCR(ZTJD,XCID,dep.zstatcd,dep.dtc-1,.TDRAMT,.TCRAMT,.INTPAID,.INTRCV)
+	    set TDRAMT=OTDRAMT
+	    set TCRAMT=OTCRAMT
+	    set INTRCV=OINTRCV
+	}
+	*/
+	// Feb 09, 2011 - Sarochinee R.
+	
+	set ACCTNUM=dep.zmaster		// Master Account Number
+	set XTYPE=dep.type		// Product Type
+	set ITEMNO=XCID			// Item Number
+	set ISTAT=dep.zstatcd		// Item Status
+
+	set X=1
+	set (IHLDCD1,IHLDCD2,IHLDCD3,IHLDCD4,IHLDCD5)=""
+
+        type ResultSet rs=Db.select("RFLG","RFLG","CID=:XCID AND STDT NOT>:ZTJD AND EXDT NOT<:ZTJD")
+	while rs.next() do {
+		if X=6 quit
+		set XPHC=rs.getCol(1)
+		if (XPHC<"01")!(XPHC>"06") quit
+		if X=1 set IHLDCD1=XPHC,X=X+1 quit
+		if X=2 set IHLDCD2=XPHC,X=X+1 quit
+		if X=3 set IHLDCD3=XPHC,X=X+1 quit
+		if X=4 set IHLDCD4=XPHC,X=X+1 quit
+		if X=5 set IHLDCD5=XPHC,X=X+1
+		}
+	
+	/* Item Period
+	Nov 24, 2004 - Anchalee
+		Added term conversion from year to month.
+	*/
+	/*
+	May 08, 2008 - Rapeepan Y. , Modified Item Period
+		- Cancel term conv. from year to month
+		- Send Profile value
+		  Ex.	3M send 03M
+			6M send 06M
+			7D send 07D 
+	*/
+	set IPERIOD=$$TRIM^%ZS(dep.trm)
+	set TERMTYP=$E(IPERIOD,$L(IPERIOD))
+	
+	//if TERMTYP="Y" set IPERIOD=IPERIOD*12
+	if +IPERIOD>99 set IPERIOD=99
+	//if IPERIOD'="" set IPERIOD=IPERIOD.zero(2)_"M"
+	if IPERIOD'="" set IPERIOD=IPERIOD.zero(2)_TERMTYP.blank(1)
+	else  set IPERIOD=IPERIOD.blank(3)
+	
+	/*
+	Dec 2, 2003 - Anchalee
+	Modified getting value from dep.bal to dep.eodbal
+	*/
+
+	/* 
+	Nov 04, 2005 - Kunvadee V.
+	        modified getting balance from dep.bal if account was closed.  
+	*/        
+	 	
+	//set IPRIN=dep.eodbal		// Prior Day Ending Item Priciple Amount
+	if dep.zstatcd=4 set IPRIN=dep.bal
+	else  set IPRIN=dep.eodbal
+	
+	set XCRCD=dep.crcd		// Currency Code
+
+	/*
+	Base Rate
+	The rate to be populated will be the rate either in the index or rate
+	schedule linked to the account as of the batch date (SystemDate -1).
+	Compute the rate for the index without any spread using dep.ichld for
+	the effective date.  Round to 5 decimal places using rounding option 0
+	*/
+
+	set XINDEX=dep.index
+	set IBRATE=""
+	/*if XINDEX'="" do {
+		type ResultSet rs5=Db.select("RATE","INDEX1","INDEX=:XINDEX AND EFD=:ZTJD")
+		if rs5.next() set IBRATE=$$^SCARND(rs5.getCol(1),,,,5)
+		}
+	*/
+	if XINDEX'="" do {
+		set BALCOL=dep.eodbalco		// Prior Day Ending Collected Balance
+		//do CTL^UINDX(XINDEX,ZTJD,BALCOL)
+		type String PAR()
+		set PAR("INDEX") = XINDEX
+		
+		// Wiphak  07/06/2010
+		// exclude SPREAD from rate
+		set PAR("SPREAD")=0
+		
+		do CTL^UINDX(.dep,ZTJD,BALCOL,.PAR)
+		
+		set IBRATE=RATE
+		}
+	else  set IBRATE=dep.irn-dep.rsintspr
+	
+	/*
+	Sep 16, 2004 - Anchalee
+	Modified Item Neg Off Rate by change to numeric instead of string 
+	and reduce the size from 9 to 7, then add 2 bytes of blank after 
+	this field.
+	*/
+	set INORATE=+dep.intspr		// Item Neg Offset Rate
+	if INORATE<0 set INORSIGN="-",INORATE=-INORATE
+	else  set INORSIGN="+"
+	
+	// Item Maturity Date
+	if dep.mdt'="" set IMDT=$$DAT^%ZM(dep.mdt,"YEARMMDD")
+	else  set IMDT=FILL.blank(8)
+
+	set IORATE=dep.rsintspr		// Item Offset Rate
+	if IORATE<0 set IORSIGN="-",IORATE=-IORATE
+	else  set IORSIGN="+"
+
+	set IBONRATE=dep.trate		// Item Bonus Rate
+	if IBONRATE<0 set IBONRSIG="-",IBONRATE=-IBONRATE
+	else  set IBONRSIG="+"
+
+	set ITRATE=dep.irn		// Item Total Rate
+	if ITRATE<0 set ITRSIGN="-",ITRATE=-ITRATE
+	else  set ITRSIGN="+"
+
+	// Item Origination Date
+	if dep.odt'="" set IORIGDT=$$DAT^%ZM(dep.odt,"YEARMMDD")
+	else  set IORIGDT=FILL.blank(8)
+	
+	// Date aacount last renewed
+	if dep.dlr'="" set IEFFDT=$$DAT^%ZM(dep.dlr,"YEARMMDD")
+	else  set IEFFDT=FILL.blank(8)
+
+	// Last Maturity Date
+	if dep.mld'="" set XMLD=$$DAT^%ZM(dep.mld,"YEARMMDD")
+	else  set XMLD=FILL.blank(8)
+
+	/*
+	Apr 1, 2004 - Anchalee
+	Modified getting original balance from Original Amount(dep.org) 
+	to Amount of First Deposit(dep.afdep).
+	*/
+	set IORIGBAL=dep.afdep		// Item Origination Balance
+	set TAXPAID=dep.bwtytd		// Amt withheld during current tax yr
+	set ICRINT=dep.posacr		// Item Credit Interest
+	
+	/*
+	Aug 3, 2004 - Anchalee
+	Added 2 more fields at the end of record which are
+	- Accrued Credit Interest (dep.acr)
+	- Hold Amount (dep.hldamt)
+	Made record length up to 235.
+	*/
+	set MANHOLD=dep.hldamt		// Hold Amount
+	
+	/*
+	Jun 05, 2006 - Sarochinee R.
+		Added a new field Int/Div Paid - Life (dep.ipl) at the end of file
+	*/
+	set INTLIFE=$S(XTYPE=3301:dep.ipl,XGRP="CD":dep.zipl,1:dep.ipl)
+	if INTLIFE<0 set INTLIFES="-",INTLIFE=-INTLIFE
+	else  set INTLIFES="+"
+	
+	if FXFLG do {
+		set CRCDBAL=IPRIN
+		if XCRCD="THB" quit
+		set IPRIN=IPRIN*MIDRATE(XCRCD)
+		set ICRINT=ICRINT*MIDRATE(XCRCD)
+		set IORIGBAL=IORIGBAL*MIDRATE(XCRCD)
+		//set INTPAID=INTPAID*MIDRATE(XCRCD)	// Feb 09, 2011 - Sarochinee R.
+		set TAXPAID=TAXPAID*MIDRATE(XCRCD)
+		set MANHOLD=MANHOLD*MIDRATE(XCRCD)
+		/*
+		  Jun 05, 2006 - Sarochinee R.
+			Added a new field Int/Div Paid - Life (dep.ipl) at the end of file
+		*/
+		set INTLIFE=INTLIFE*MIDRATE(XCRCD)
+	}
+	
+	// Control File
+	//if BCH16!BCHEOM do TOTFILE(%ProcessID,"ITEM",FXFLG,XTYPE,ISTAT,IPRIN,0,0,0,INTPAID,0,0,0,0,0) Feb 09, 2011 - Sarochinee R.
+	if BCH16!BCHEOM do TOTFILE(%ProcessID,"ITEM",FXFLG,XTYPE,ISTAT,IPRIN,0,0,0,0,0,0,0,0,0)
+	do CNTLCNT(%ProcessID,"ITEM",FXFLG)
+	
+	if ICRINT<0 set ICRINTS="-",ICRINT=-ICRINT
+	else  set ICRINTS="+"
+	
+	// Feb 09, 2011 - Sarochinee R.
+	//if INTPAID<0 set INTPAIDS="-",INTPAID=-INTPAID
+	//else  set INTPAIDS="+"
+	set INTPAIDS=FILL.blank(1)
+	// Feb 09, 2011 - Sarochinee R.
+	
+	/*
+	Aug 16, 2004 - Anchalee
+	Added Item Sequence Number (dep.zseq) at the end of record.
+	Made record length up to 240.
+	*/
+	set ZSEQ=+dep.zseq		// Sub-account Sequence Number
+	
+	
+	/* 
+	Nov 21, 2005 - Kunvadee V.
+	        Added account close date for item deposit file.
+	*/
+	if (dep.zstatcd=4),(dep.dtc'="") set XDTC=$$DAT^%ZM(dep.dtc,"YEARMMDD")
+	else  set XDTC=FILL.blank(8)
+	
+	//May 19, 2011 - Sarochinee R.
+	set ZPRSCD=dep.zprscode
+	set ZPRSCD=ZPRSCD.blank(6)
+	//End May 19, 2011
+		
+		
+	set XTYPE=XTYPE.zero(4)
+	set ACCTNUM=ACCTNUM.zero(12)
+	set ITEMNO=ITEMNO.zero(12)
+	set ISTAT=ISTAT.zero(2)
+	set IHLDCD1=IHLDCD1.zero(2)
+	set IHLDCD2=IHLDCD2.zero(2)
+	set IHLDCD3=IHLDCD3.zero(2)
+	set IHLDCD4=IHLDCD4.zero(2)
+	set IHLDCD5=IHLDCD5.zero(2)
+	set XCRCD=XCRCD.blank(3)
+	//set IPRIN=IPRIN.zero(14,2,1)	
+	//set IBRATE=IBRATE.zero(7,5,1)
+	//set INORATE=INORATE.zero(7,5,1)
+	//set IORATE=IORATE.zero(7,5,1)
+	//set IBONRATE=IBONRATE.zero(7,5,1)
+	//set ITRATE=ITRATE.zero(7,5,1)
+	//set ICRINT=ICRINT.zero(14,5,1)
+	//set IORIGBAL=IORIGBAL.zero(14,2,1)
+	//set INTPAID=INTPAID.zero(14,2,1)
+	//set TAXPAID=TAXPAID.zero(17,2,1)
+	//set MANHOLD=MANHOLD.zero(14,2,1)
+	set IPRIN=$$ZPZERO(IPRIN,14,2,ACCTNUM,ITEMNO,NIPRIN)
+	set IBRATE=$$ZPZERO(IBRATE,7,5,ACCTNUM,ITEMNO,NIBRATE)
+	set INORATE=$$ZPZERO(INORATE,7,5,ACCTNUM,ITEMNO,NINORATE)
+	set IORATE=$$ZPZERO(IORATE,7,5,ACCTNUM,ITEMNO,NIORATE)
+	set IBONRATE=$$ZPZERO(IBONRATE,7,5,ACCTNUM,ITEMNO,NIBONRATE)
+	set ITRATE=$$ZPZERO(ITRATE,7,5,ACCTNUM,ITEMNO,NITRATE)
+	//Jan 10, 2007 : Sarochinee R.
+	//set ICRINT=$$ZPZERO(ICRINT,14,2,ACCTNUM,ITEMNO,NICRINT)
+	set ICRINT=$$ZPZERO(ICRINT,14,5,ACCTNUM,ITEMNO,NICRINT)
+	set IORIGBAL=$$ZPZERO(IORIGBAL,14,2,ACCTNUM,ITEMNO,NIORIGBAL)
+	// Feb 09, 2011 - Sarochinee R.
+	//set INTPAID=$$ZPZERO(INTPAID,14,2,ACCTNUM,ITEMNO,NINTPAID)
+	set INTPAID=FILL.blank(14)
+	// Feb 09, 2011 - Sarochinee R.
+	set TAXPAID=$$ZPZERO(TAXPAID,17,2,ACCTNUM,ITEMNO,NTAXPAID)
+	set MANHOLD=$$ZPZERO(MANHOLD,14,2,ACCTNUM,ITEMNO,NMANHOLD)
+	
+	set ZSEQ=ZSEQ.zero(5)
+	//Oct 21,2005 Modified By Vorawit
+	//set ZPABALP=ZPABALP.zero(14,2,1)
+	//Sep 19,2006 Modified By Duangporn N.
+	 set ZPABALP=$$ZPZERO(ZPABALP,14,2,ACCTNUM,ITEMNO,NZPABALP)
+	
+	/*
+	 Nov 04, 2005 - Kunvadee V.
+	         modified getting interest rate from dep.sch if account was fixed deposit.
+	*/
+	//set XINDEX=XINDEX.blank(6)
+	// Interest rate
+	//set ZINDEX=dep.sch
+	set (ZINDEX,NINDEX)=dep.sch	// Apr 29, 2009
+	set ZINDEX=ZINDEX.blank(6)
+	set NINDEX=NINDEX.blank(8)	// Apr 29, 2009
+	/*
+	  Jun 05, 2006 - Sarochinee R.
+	  	Added a new field Int/Div Paid - Life (dep.ipl) at the end of file
+	*/
+	//set INTLIFE=INTLIFE.zero(14,2,1) 
+	set INTLIFE=$$ZPZERO(INTLIFE,14,2,ACCTNUM,ITEMNO,NINTLIFE)
+	
+	set REC="DI"_XTJD_XTYPE_ACCTNUM_ITEMNO_ISTAT_IHLDCD1_IHLDCD2
+	set REC=REC_IHLDCD3_IHLDCD4_IHLDCD5_IPERIOD_IPRIN_XCRCD_IBRATE
+	set REC=REC_INORSIGN_INORATE_IMDT_IORSIGN_IORATE_IBONRSIG_IBONRATE
+	set REC=REC_ITRSIGN_ITRATE_ICRINTS_ICRINT_IORIGDT_IORIGBAL_IEFFDT
+	set REC=REC_XMLD_INTPAIDS_INTPAID_TAXPAID_MANHOLD_ZSEQ
+	
+	// 31-Oct-2005 by Kunvadee V. : Removed incorrect statement.
+	//set REC=REC_ZPABALP_XINDEX_FILL.blank(45)
+	
+	//Oct 21,2005 Modified By Vorawit K.
+	//if 'FXFLG do ioeom4.write(REC)
+	if 'FXFLG do {
+		/*
+	 	 Nov 04, 2005 - Kunvadee V.
+	                 modified getting interest rate from dep.sch if account was fixed deposit.
+ 		*/
+		//set REC=REC_ZPABALP_XINDEX_FILL.blank(59)
+	
+		/* 
+		Nov 21, 2005 - Kunvadee V.
+	                Added account close date for item deposit file.
+		*/
+		//set REC=REC_ZPABALP_ZINDEX_FILL.blank(59)
+		/*
+	  	Jun 05, 2006 - Sarochinee R.
+	  		Added a new field Int/Div Paid - Life (dep.ipl) at the end of file
+		*/
+		//set REC=REC_ZPABALP_ZINDEX_XDTC_FILL.blank(51)
+		//set REC=REC_ZPABALP_ZINDEX_XDTC_INTLIFES_INTLIFE_FILL.blank(36)
+		//set REC=REC_ZPABALP_ZINDEX_XDTC_INTLIFES_INTLIFE_NINDEX_FILL.blank(28) // Apr 29, 2009
+		set REC=REC_ZPABALP_ZINDEX_XDTC_INTLIFES_INTLIFE_NINDEX_ZPRSCD_FILL.blank(22) //May 19, 2011
+		
+		do ioeom4.write(REC)
+	}
+	else  do {
+		//set REC=REC_CRCDBAL.zero(14,2,1)
+		  set REC=REC_$$ZPZERO(CRCDBAL,14,2,ACCTNUM,ITEMNO,NCRCDBAL)
+		//Oct 21,2005 Modified By Vorawit K.
+		/*
+	 	 Nov 04, 2005 - Kunvadee V.
+	                 modified getting interest rate from dep.sch if account was fixed deposit.
+ 		*/
+		//set REC=REC_ZPABALP_XINDEX_FILL.blank(45)
+		
+		/* 
+		Nov 21, 2005 - Kunvadee V.
+	                Added account close date for item deposit file.
+		*/
+		//set REC=REC_ZPABALP_ZINDEX_FILL.blank(45)
+		/*
+		Jun 05, 2006 - Sarochinee R.
+	  		Added a new field Int/Div Paid - Life (dep.ipl) at the end of file
+		*/
+		//set REC=REC_ZPABALP_ZINDEX_XDTC_FILL.blank(37)
+		//set REC=REC_ZPABALP_ZINDEX_XDTC_INTLIFES_INTLIFE_FILL.blank(22)
+		//set REC=REC_ZPABALP_ZINDEX_XDTC_INTLIFES_INTLIFE_NINDEX_FILL.blank(14) // Apr 29, 2009
+		set REC=REC_ZPABALP_ZINDEX_XDTC_INTLIFES_INTLIFE_NINDEX_ZPRSCD_FILL.blank(8) //May 19, 2011
+		
+		do iofxeom4.write(REC)
+	}
+	
+	quit
+
+
+EOM5(RecordDEP dep,ZCLTOT)	// EOM Loan Classification
+
+	new BOTCLASS,DAYS,INTACRDY,INTACRMT,LTYPE,MONS,PACCRDAY
+	new PACCRDT,PACCRMTH,PACCRTDY,REC,XBAL,XCID,XDD,XGRP,XTYPE
+	new YEAR,ZINTDEL
+
+	type Public IO ioeom5
+
+	// Include only opened accounts
+	if (dep.zstatcd=4),(dep.dtc'>ZTJD) quit
+
+	/*
+	  Include only accounts in Product Group DDA and SAV
+	  and (Ledger Balance < 0 or Total OD Limit > 0).
+	*/
+
+	set XCID=dep.cid
+	set XGRP=dep.grp
+	set XTYPE=dep.type
+	
+	if XGRP'="DDA",XGRP'="SAV" quit
+	
+	//Jan 26, 2009 - Sarochinee R.
+	//Modified EOM5, Exclude Product Type 1206
+	// Exclude account owned by KTB
+	if (XTYPE=1201) quit
+	if (XTYPE=1205) quit
+	//Apr 10, 2009 - Sarochinee R.
+	//Fixed Wash Account [1220,1221,1222]
+	//if dep.zgrp1206="Y" quit
+	if (dep.zgrp1206) quit
+	
+	set XBAL=dep.eodbal 
+	if (XBAL'<0),(ZCLTOT'>0) quit
+
+	set LTYPE=""
+
+	/* 
+	Sep 17, 2004 - Anchalee
+		Modified loan type mapping to consider from account group by
+		-Product group "DDA" except product type 1301, set to 0010
+		-Product type 1301, set to 7002
+		-Product group "SAV", set to 7001
+	Jun 3, 2004 - Anchalee
+		Added product type 1002(Taweepanya) to loan type */
+	do {
+		/*if XTYPE=1001 set LTYPE="0010" quit	// O/D
+		if XTYPE=1002 set LTYPE="0010" quit	// Taweepanya
+		if XTYPE=2001 set LTYPE=7001 quit	// Circle Loan */
+		if XTYPE=1301 set LTYPE=7002 quit	// Circle Loan Credit Card
+		if XGRP="DDA" set LTYPE="0010" quit	// O/D and Taweepanya
+		if XGRP="SAV" set LTYPE=7001		// Circle Loan
+		}
+	// BOT Class
+	set BOTCLASS=dep.darcls
+	if BOTCLASS="" set BOTCLASS=1
+	set BOTCLASS=BOTCLASS.zero(2)
+
+	/*
+	Due Date of Principal
+	If DEP.DELDT = Null, send zero
+	Else, send DEP.ZEXPDT	
+	*/
+
+	if dep.deldt'="" set PACCRDT=dep.zexpdt
+	else  set PACCRDT=""
+	
+	/*
+	Calculate number of months and days from 
+	PRIN-ACCRUED-DATE to (System Date-1) such
+	as 2M17D - send 2 in PRIN-ACCRUED-MTH 
+	and send 17 in PRIN-ACCRUED-DAY
+
+	Calculate total number of days from 
+	PRIN-ACCRUED-DATE to (System Date-1)
+	*/
+
+	set (PACCRMTH,PACCRDAY,PACCRTDY)=""
+
+	if PACCRDT'="" do {
+		set XDD=$$DD^SCADAT(PACCRDT,ZTJD,1)
+		if XDD.extract()="-" S XDD=XDD.extract(2,XDD.length()) // Remove negative
+		set MONS=XDD.piece("/",1)
+		set DAYS=XDD.piece("/",2)
+		set YEAR=XDD.piece("/",3)
+		set MONS=MONS+(YEAR*12)
+
+		set PACCRMTH=MONS  // Number of months from principal due date
+		set PACCRDAY=DAYS  // Number of days from principal due date
+
+		set PACCRTDY=$$NOD^SCADAT(PACCRDT,ZTJD,1) // Total number of days
+		set PACCRDT=$$DAT^%ZM(PACCRDT,"YEARMMDD")
+		}
+
+	/*
+	INT-ACCRUED-MTH & INT-ACCRUED-DAY
+	Calculate number of months and days from DEP.ZINTDEL
+	*/
+
+	set ZINTDEL=dep.zintdel
+	set INTACRMT=ZINTDEL.piece(".",1)		// Number of months
+	set INTACRDY=(ZINTDEL-INTACRMT)*30		// Number of days
+	set INTACRDY=$$^SCARND(INTACRDY,,,,0,"")
+
+	/*
+	INT-ACCRUED-DATE (Due date of interest)
+	Count back from (System Date - 1) for number of months
+	and days in INT-ACCRUED-MTH and INT-ACCRUED-DAY
+
+	Calculate total number of days from INT-ACCRUED-DATE
+	to (SystemDate-1)
+	*/
+
+	set (INTACRDT,INTACRTD)=""
+
+	if +ZINTDEL'=0 do {
+		set INTACRDT=$$ADDMJD^SCADAT(ZTJD,-INTACRMT)-INTACRDY
+		set INTACRTD=$$NOD^SCADAT(INTACRDT,ZTJD,1)
+		set INTACRDT=$$DAT^%ZM(INTACRDT,"YEARMMDD")
+		}
+
+	set XTYPE=XTYPE.zero(4)
+	set LTYPE=LTYPE.blank(4)
+	set PACCRDT=PACCRDT.blank(8)
+	set PACCRMTH=$S(PACCRMTH>9999:9999,1:PACCRMTH.zero(4))
+	set PACCRDAY=PACCRDAY.zero(2)
+	set PACCRTDY=$S(PACCRTDY>999999:999999,1:PACCRTDY.zero(6))
+	set INTACRDT=INTACRDT.blank(8)
+	set INTACRMT=$S(INTACRMT>9999:9999,1:INTACRMT.zero(4))
+	set INTACRDY=INTACRDY.zero(2)
+	set INTACRTD=$S(INTACRTD>999999:999999,1:INTACRTD.zero(6))
+	
+	set REC="LC"_XTJD_XTYPE_XCID.zero(12)_FILL.zero(12)_LTYPE_FILL.blank(48)
+	set REC=REC_BOTCLASS_DARCLPDT_PACCRDT_PACCRMTH_PACCRDAY_PACCRTDY
+	set REC=REC_INTACRDT_INTACRMT_INTACRDY_INTACRTD	
+	
+	do ioeom5.write(REC)
+	quit
+
+	/* 
+	Nov 04, 2005 - Kunvadee V.
+	        Modified getting interest received,interest paid,
+	        total debit amount,total credit amount. 
+	        If account was closed,get values from HIST by hist.tjd is date account closed.
+	*/
+	//TOTDRCR(ZTJD,XCID,TPRINDR,TPRINCR,INTPAID,INTRCV)
+TOTDRCR(ZTJD,XCID,ZSTATCD,ZDTC,TPRINDR,TPRINCR,INTPAID,INTRCV)
+
+	/*
+	Calculate total debit and credit transaction amounts, total
+	debit and credit principal amounts, interest paid, and
+	interest received of the account.
+	
+	Total debit and credit calculated from HIST which the transaction has
+	principal amount>0 and transaction amount>0 and Reversed/Error 
+	Corrected Indicator is null.
+	
+	Interest paid calculated from HIST which 
+	- HIST.ITC1=1 and HIST.ITC4=1 and "INT#" in HIST.TSO, Interest Paid=HIST.PRIN+DTJ.WHLD
+	- HIST.ITC1=0 and HIST.PRIN'=0 and HIST.INT'=0, Interest Paid=HIST.INT-HIST.PENALTY
+	
+	Interest received calulated from HIST which
+	- HIST.ITC1=0 and HIST.ITC4=1 and "NEGINT#" in HIST.TSO
+	or
+	- HIST.ITC1=0 and "INTADJ#" in HIST.TSO
+	set Interest Received = HIST.PRIN
+	
+	Jan 20, 2005 - Anchalee
+		- Deleted Total Debit/Credit Amount calculation.
+	Mar 18, 2004 - Anchalee
+		- Modified interest paid calculation by not minus tax withholding
+	Mar 30, 2004 - Anchalee
+		- Modified interest paid calculation by adding tax witholding
+		  for credit transaction.
+	*/
+
+	new EXIT,ITC1,PRIN,TAMT,TSEQ
+	
+	set (EXIT,INTPAID,INTRCV,TPRINCR,TPRINDR)=0
+	
+	type ResultSet rs=Db.select("TSEQ","HIST","CID=:XCID","TSEQ DESC")
+	while rs.next() do { quit:EXIT
+		set TSEQ=rs.getCol(1)
+
+		type RecordHIST hist=Db.getRecord("HIST","CID=:XCID,TSEQ=:TSEQ")
+
+		if hist.tjd="" quit
+		
+		/* 
+		 Nov 04, 2005 - Kunvadee V.
+		         Modified getting interest received,interest paid,
+		         total debit amount,total credit amount. 
+		         If account was closed,get values from HIST by hist.tjd is date account closed.
+		*/
+		
+				
+		//if hist.tjd>ZTJD quit
+		//if hist.tjd<ZTJD set EXIT=1 quit
+		
+		if (ZSTATCD=4),(hist.tjd'=ZDTC) quit
+		if (ZSTATCD'=4),(hist.tjd>ZTJD) quit
+		if (ZSTATCD'=4),(hist.tjd<ZTJD) set EXIT=1 quit
+		
+
+		if hist.itc="" quit
+
+		// Ignore error-corrects/reversals
+		if $$HISTRVAL^DTJCDI(XCID,TSEQ)'="" quit		
+
+		set ITC1=hist.itc1
+		set PRIN=hist.prin
+		set TAMT=hist.tamt
+		/*
+		if TAMT>0 do {
+			if ITC1=0 set TTAMTDR=TTAMTDR+TAMT
+			else  set TTAMTCR=TTAMTCR+TAMT
+			}
+		*/
+		if PRIN>0 do {
+			if ITC1=0 set TPRINDR=TPRINDR+PRIN
+			else  set TPRINCR=TPRINCR+PRIN
+			}
+		
+		if ITC1=1 do { quit
+			if hist.itc4,hist.tso["INT#" set INTPAID=INTPAID+PRIN+hist.whld
+			}
+			
+		if +PRIN'=0,+hist.int'=0 do { quit
+			set INTPAID=INTPAID+(hist.int-hist.penalty)
+			}
+			
+		if hist.itc4,hist.tso["NEGINT#" set INTRCV=INTRCV+PRIN quit
+		if hist.tso["INTADJ#" set INTRCV=INTRCV+PRIN
+		}
+	
+	quit 
+	
+TOTDRCR2(ZTJD,XCID,ZSTATCD,ZDTC,TPRINDR,TPRINCR)
+
+	new EXIT,ITC1,PRIN,TAMT,TSEQ
+	
+	set (EXIT,TPRINCR,TPRINDR)=0
+	
+	type ResultSet rs=Db.select("TSEQ","HIST","CID=:XCID","TSEQ DESC")
+	while rs.next() do { quit:EXIT
+		set TSEQ=rs.getCol(1)
+
+		type RecordHIST hist=Db.getRecord("HIST","CID=:XCID,TSEQ=:TSEQ")
+
+		if hist.tjd="" quit
+		
+		if (ZSTATCD=4),(hist.tjd'=ZDTC) quit
+		if (ZSTATCD'=4),(hist.tjd>ZTJD) quit
+		if (ZSTATCD'=4),(hist.tjd<ZTJD) set EXIT=1 quit
+		
+
+		if hist.itc="" quit
+
+		// Ignore error-corrects/reversals
+		if $$HISTRVAL^DTJCDI(XCID,TSEQ)'="" quit		
+
+		set ITC1=hist.itc1
+		set PRIN=hist.prin
+		set TAMT=hist.tamt
+		
+		if PRIN>0 do {
+			if ITC1=0 set TPRINDR=TPRINDR+PRIN
+			else  set TPRINCR=TPRINCR+PRIN
+			}
+		}
+	
+	quit 
+
+TOTDRCR3(ZTJD,XCID,ZSTATCD,ZDTC,TPRINDR,TPRINCR,INTPAID,INTRCV)
+
+	/*
+	Calculate total debit and credit transaction amounts, total
+	debit and credit principal amounts, interest paid, and
+	interest received of the account.
+	
+	Total debit and credit calculated from HIST which the transaction has
+	principal amount>0 and transaction amount>0 and Reversed/Error 
+	Corrected Indicator is null.
+	
+	Interest paid calculated from HIST which 
+	- HIST.ITC1=1 and HIST.ITC4=1 and "INT#" in HIST.TSO, Interest Paid=HIST.PRIN+DTJ.WHLD
+	- HIST.ITC1=0 and HIST.PRIN'=0 and HIST.INT'=0, Interest Paid=HIST.INT-HIST.PENALTY
+	
+	Interest received calulated from HIST which
+	- HIST.ITC1=0 and HIST.ITC4=1 and "NEGINT#" in HIST.TSO
+	or
+	- HIST.ITC1=0 and "INTADJ#" in HIST.TSO
+	set Interest Received = HIST.PRIN
+	
+	Jan 20, 2005 - Anchalee
+		- Deleted Total Debit/Credit Amount calculation.
+	Mar 18, 2004 - Anchalee
+		- Modified interest paid calculation by not minus tax withholding
+	Mar 30, 2004 - Anchalee
+		- Modified interest paid calculation by adding tax witholding
+		  for credit transaction.
+	*/
+
+	new EXIT,ITC1,PRIN,TAMT,TSEQ
+	
+	set (EXIT,INTPAID,INTRCV,TPRINCR,TPRINDR)=0
+	
+	type ResultSet rs=Db.select("TSEQ","HIST","CID=:XCID","TSEQ DESC")
+	while rs.next() do { quit:EXIT
+		set TSEQ=rs.getCol(1)
+
+		type RecordHIST hist=Db.getRecord("HIST","CID=:XCID,TSEQ=:TSEQ")
+
+		if hist.tjd="" quit
+		
+		/* 
+		 Nov 04, 2005 - Kunvadee V.
+		         Modified getting interest received,interest paid,
+		         total debit amount,total credit amount. 
+		         If account was closed,get values from HIST by hist.tjd is date account closed.
+		*/
+		
+				
+		//if hist.tjd>ZTJD quit
+		//if hist.tjd<ZTJD set EXIT=1 quit
+		
+		if (ZSTATCD=4),(hist.tjd'=ZDTC) quit
+		if (ZSTATCD'=4),(hist.tjd>ZTJD) quit
+		if (ZSTATCD'=4),(hist.tjd<ZTJD) set EXIT=1 quit
+		
+
+		if hist.itc="" quit
+
+		// Ignore error-corrects/reversals
+		if $$HISTRVAL^DTJCDI(XCID,TSEQ)'="" quit		
+
+		set ITC1=hist.itc1
+		set PRIN=hist.prin
+		set TAMT=hist.tamt
+		/*
+		if TAMT>0 do {
+			if ITC1=0 set TTAMTDR=TTAMTDR+TAMT
+			else  set TTAMTCR=TTAMTCR+TAMT
+			}
+		*/
+		if PRIN>0 do {
+			if ITC1=0 set TPRINDR=TPRINDR+PRIN
+			else  set TPRINCR=TPRINCR+PRIN
+			}
+		
+		if ITC1=1 do { quit
+			if hist.itc4,hist.tso["INT#" set INTPAID=INTPAID+PRIN+hist.whld
+			}
+			
+		if +PRIN'=0,+hist.int'=0 do { quit
+			set INTPAID=INTPAID+(hist.int-hist.penalty)
+			}
+			
+		if hist.itc4,hist.tso["NEGINT#" set INTRCV=INTRCV+PRIN quit
+		if hist.tso["INTADJ#" set INTRCV=INTRCV+PRIN
+		}
+	
+	quit 
+	
+EXC	//	LOG ERROR TO DAYEND
+
+	if DESC.get()="" set DESC="DEP Batch"
+	if RM.get()="" set RM=ET.get()
+
+	do LOG^UTLEXC($T(+0),"*",DESC,CID.get(),TSEQ.get(),RM.get()) 
+	kill ET,TSEQ,CID,RM
+	quit  	
+
+
+PZKOTYMAP(X)
+	//S ER=$$PZKOTYMAP^ZBCHDEP(X),RM=$S(ER=0:"",1:$$^MSG(1503))
+	//S ER=$$BANKFUNC^ZMEDFUNC(X),RM=$S(ER=0:"",1:$$^MSG(65812))
+	
+	// This line tag is tied to [ZUTBLKOTYPE]PRACTYPE in data entry post processor
+	// to check that only valid value for product type in profile is allowed to insert
+	// X is product type
+
+	if $$TRIM^%ZS(X)="" quit 1
+	if 'Db.isDefined("PRODCTL","TYPE=:X")  quit 1
+	quit 0
+
+
+ZBRCDCHECK(X)
+	// line tag to check for a valid branch code
+
+	new ZBRCD
+
+	if $$TRIM^%ZS(X)="" quit 1
+	set ZBRCD=+X
+
+	if 'Db.isDefined("ZUTBLBRCD","BRCD=:ZBRCD") quit 1
+	quit 0
+	
+
+MIS(ZTJD)
+
+	// **********************************************************
+	// MIS
+	// **********************************************************
+
+	if BCHEOM do {
+		new IOTYP
+		
+		type IO ioeod3=Class.new("IO")
+		
+		set ioeod3.directory=$$TRNLNM^%ZFUNC("SCAU_SPOOL_MIS")
+		set ioeod3.fileName="ACBAL"
+		set ioeod3.openParams="NEWV/WRITE"
+		do ioeod3.open()
+	
+		do Schema.createTable("ZEXTMIS","TJD,EXT,JOB,BRCD,KEY","DRCNT,DRAMT,CRCNT,CRAMT","TMPEXTF")
+		type ResultSet rs=Db.select("DISTINCT BRCD","ZEXTMIS","TJD=:ZTJD AND EXT='MIS'")
+	
+		while rs.next() set REC=$$MISTOT(ZTJD,rs.getCol(1)) do ioeod3.write(REC)
+		set IOTYP="RMS"
+		do ioeod3.close()
+		}
+
+	// **********************************************************
+	// Summarize ZMIS022* and ZMIS023* report data
+	// **********************************************************
+
+	/*
+	Initialize ZMIS022R and ZMIS023R records
+	1 GOVERMENT
+	2 STATE ENTERPRISE
+	3 OVERSEA DEPOSITORS
+	4 OTHER
+	5 TOTAL
+
+	Each BRANCH must have all groups (1-5)
+	type "CD" must have all terms (3M,6M,12M,24M,36M)
+	*/
+
+	type ResultSet rs=Db.select("DISTINCT BOO","ZMIS022B")
+	
+	for GROUP=1:1:5 do {
+		set GRP023=GROUP
+		if GRP023=5 set GRP023=6
+		
+		for TYPE=3005,3006,"SPA","SAV","DDA","FIX","OTHR" do {
+			if TYPE="FIX" for TRM="3M","6M","12M","24M","36M" do {
+				type RecordZMIS023R zmis3=Class.new("RecordZMIS023R")
+				set zmis3.type=TYPE
+				set zmis3.group=GRP023	      	        
+				set zmis3.trm=TRM
+				set zmis3.credita=0
+				set zmis3.creditc=0
+				set zmis3.debita=0
+				set zmis3.debitc=0
+				do zmis3.bypassSave()
+				}
+
+			else  do {
+				type RecordZMIS023R zmis3=Class.new("RecordZMIS023R")
+				set zmis3.type=TYPE
+				set zmis3.group=GRP023      	        
+				set zmis3.trm=0
+				set zmis3.credita=0
+				set zmis3.creditc=0
+				set zmis3.debita=0
+				set zmis3.debitc=0
+				do zmis3.bypassSave()
+				}
+
+			while rs.next() do {
+				set BOO=rs.getCol(1)
+				if TYPE="FIX" for TRM="3M","6M","12M","24M","36M" do {
+					type RecordZMIS022R zmis2=Class.new("RecordZMIS022R")
+					set zmis2.boo=BOO
+					set zmis2.type=TYPE
+	      	        		set zmis2.group=GROUP
+					set zmis2.trm=TRM
+					set zmis2.credita=0
+					set zmis2.creditc=0
+	      	        		set zmis2.debita=0
+	      	        		set zmis2.debitc=0
+	      	        		do zmis2.bypassSave()
+					}
+
+				else  do {
+					type RecordZMIS022R zmis2=Class.new("RecordZMIS022R")
+					set zmis2.boo=BOO
+					set zmis2.type=TYPE
+	      	        		set zmis2.group=GROUP
+					set zmis2.trm=0
+					set zmis2.credita=0
+					set zmis2.creditc=0
+	      	        		set zmis2.debita=0
+	      	        		set zmis2.debitc=0
+	      	        		do zmis2.bypassSave()
+					}
+				}
+			}
+		}
+
+	type ResultSet rs=Db.select("BOO,TYPE,GROUP,TRM,CREDITA,CREDITC,DEBITA,DEBITC","ZMIS022B")
+	while rs.next() do {
+		set BOO=rs.getCol(1)
+		set TYPE=rs.getCol(2)
+		set LGROUP=rs.getCol(3)
+		set LTERM=rs.getCol(4)
+		set CREDITA=rs.getCol(5)
+		set CREDITC=rs.getCol(6)
+		set DEBITA=rs.getCol(7)
+		set DEBITC=rs.getCol(8)
+		
+		// #K002 - Start
+		// #K001 - Start
+		//if TYPE=3010 quit
+		// #K001 - End
+		if (TYPE=3010)!(TYPE=3011)!(TYPE=3012) quit
+		// #K002 - End
+		
+		type RecordZMIS022R zmisr=Db.getRecord("ZMIS022R","BOO=:BOO,TYPE=:TYPE,GROUP=:LGROUP,TRM=:LTERM",1)	
+		set zmisr.credita=zmisr.credita+CREDITA
+		set zmisr.creditc=zmisr.creditc+CREDITC
+		set zmisr.debita=zmisr.debita+DEBITA
+		set zmisr.debitc=zmisr.debitc+DEBITC
+		do zmisr.bypassSave()
+
+		type RecordZMIS022R zmist=Db.getRecord("ZMIS022R","BOO=:BOO,TYPE=:TYPE,GROUP=5,TRM=:LTERM",1)	
+		set zmist.credita=zmist.credita+CREDITA
+		set zmist.creditc=zmist.creditc+CREDITC
+		set zmist.debita=zmist.debita+DEBITA
+		set zmist.debitc=zmist.debitc+DEBITC
+		do zmist.bypassSave()	
+
+		type RecordZMIS023R zmisr3=Db.getRecord("ZMIS023R","TYPE=:TYPE,GROUP=:LGROUP,TRM=:LTERM",1)	
+		set zmisr3.credita=zmisr3.credita+CREDITA
+		set zmisr3.creditc=zmisr3.creditc+CREDITC
+		set zmisr3.debita=zmisr3.debita+DEBITA
+		set zmisr3.debitc=zmisr3.debitc+DEBITC
+		do zmisr3.bypassSave()
+
+		// Total all branches into group 6
+		type RecordZMIS023R zmist3=Db.getRecord("ZMIS023R","TYPE=:TYPE,GROUP=6,TRM=:LTERM",1)	
+		set zmist3.credita=zmist3.credita+CREDITA
+		set zmist3.creditc=zmist3.creditc+CREDITC
+		set zmist3.debita=zmist3.debita+DEBITA
+		set zmist3.debitc=zmist3.debitc+DEBITC
+		do zmist3.bypassSave()		     
+		}
+	quit
+
+
+MISTOT(TJD,BRCD)
+
+	new ACTYP,DRCNT,DRAMT,CRCNT,CRAMT,JOB,KEY,REC,TOT,ZRECTMP
+
+	do Schema.createTable("ZEXTMIS","TJD,EXT,JOB,BRCD,KEY","DRCNT,DRAMT,CRCNT,CRAMT","TMPEXTF")
+
+	type ResultSet rs=Db.select("JOB,KEY","ZEXTMIS","TJD=:TJD AND EXT='MIS' AND BRCD=:BRCD")
+	while rs.next() do {
+
+		set JOB=rs.getCol(1)
+		set KEY=rs.getCol(2)
+
+		type RecordZEXTMIS zextmis=Db.getRecord("ZEXTMIS","TJD=:TJD,EXT='MIS',JOB=:JOB,BRCD=:BRCD,KEY=:KEY")
+
+		set TOT(KEY)=TOT(KEY).get()
+		set TOT(KEY).piece("|",1)=TOT(KEY).piece("|",1)+zextmis.drcnt
+		set TOT(KEY).piece("|",2)=TOT(KEY).piece("|",2)+zextmis.dramt
+		set TOT(KEY).piece("|",3)=TOT(KEY).piece("|",3)+zextmis.crcnt
+		set TOT(KEY).piece("|",4)=TOT(KEY).piece("|",4)+zextmis.cramt
+		}
+
+	set REC=""
+	set KEY=""
+	for  set KEY=TOT(KEY).order() quit:KEY=""  do {
+		set DRCNT=TOT(KEY).piece("|",1)
+		set DRAMT=TOT(KEY).piece("|",2)
+		set CRCNT=TOT(KEY).piece("|",3)
+		set CRAMT=TOT(KEY).piece("|",4)
+		set DRAMT=$TR(DRAMT,"-")
+		set ACTYP=ZMISKEY(KEY)
+		
+		if ACTYP.length()>4 set RM=$$^MSG(3037,"Branch: "_BRCD_", A/C Type:"_ACTYP,4) set ACTYP="".blank(4) do EXC
+		else  set ACTYP=ACTYP.zero(4)
+		
+		if DRCNT.length()>10 set RM=$$^MSG(3037,"Branch: "_BRCD_", Debit Count:"_DRCNT,10) set DRCNT="".blank(10) do EXC
+		else  set DRCNT=DRCNT.zero(10)
+		
+		if DRAMT.length()>18 set RM=$$^MSG(3037,"Branch: "_BRCD_", Debit Amt:"_DRAMT,18) set DRAMT="".blank(18) do EXC
+		else  set DRAMT=DRAMT.zero(18,2,1)
+		
+		if CRCNT.length()>10 set RM=$$^MSG(3037,"Branch: "_BRCD_", Credit Count:"_CRCNT,10) set CRCNT="".blank(10) do EXC
+		else  set CRCNT=CRCNT.zero(10)
+		
+		if CRAMT.length()>18 set RM=$$^MSG(3037,"Branch: "_BRCD_", Credit Amt:"_CRAMT,18) set CRAMT="".blank(18) do EXC
+		else  set CRAMT=CRAMT.zero(18,2,1)
+			
+		set ZRECTMP=ACTYP_DRCNT_DRAMT_CRCNT_CRAMT
+		if ZRECTMP.length()'=60 set ZRECTMP="0".zero(60)
+		set REC=REC_ZRECTMP
+		}
+		
+	if BRCD.length()>6 set RM=$$^MSG(3037,BRCD,6) set BRCD=BRCD.blank(6) do EXC
+	set BRCD=BRCD.zero(6)
+
+	set REC=BRCD_REC
+
+	//do Schema.deleteTable("ZEXTMIS")
+	quit REC
+
+
+DELTMP(ZTJD)	// Delete temporary table
+
+	do Schema.createTable("ZEXTRACT","TJD,EXT","","TMPEXTF")
+	do Db.fastDelete("ZEXTRACT","TJD=:ZTJD,EXT='MIS'")
+	//do Schema.deleteTable("ZEXTRACT")
+	
+	do Schema.createTable("ZCRPCNTFILE","JOB,FILETYP,FXFLG","","TMPACCNT")
+	do Schema.createTable("ZACNEXTCNTRL","JOB,FILETYP,FXFLG,TYPE,STAT","","TMPACCTL")
+	do Schema.createTable("ZACNEXTSUM","FILETYP,TYPE,STAT","","TMPACSUM")
+
+	do Db.fastDelete("ZCRPCNTFILE")
+	do Db.fastDelete("ZACNEXTCNTRL")
+	do Db.fastDelete("ZACNEXTSUM")
+
+	//do Schema.deleteTable("ZCRPCNTFILE")
+	//do Schema.deleteTable("ZACNEXTCNTRL")
+	//do Schema.deleteTable("ZACNEXTSUM")
+	
+	quit
+
+BOT(RecordDEP dep, RecordCIF cif)
+
+	new ACCTTYPE,ATMLINK,FDFLAG,FILL,PERIOD,XTRM
+	
+	// Temporary subtotal tables
+	do Schema.createTable("ZTMPBOT080","FDFLAG,BOO,CRCD,ACCTTYPE,PERIOD,RANGENUM,PROCID","LINKCNT,LINKSUM,NOLNKCNT,NOLNKSUM","TMP080B")
+	do Schema.createTable("ZTMPBOT310","FDFLAG,BOO,CRCD,ACCTTYPE,PERIOD,CUSTCODE,PROCID","CRAMT,ACCRUECR","TMP310B")
+	do Schema.createTable("ZTMPBOT311","FDFLAG,BOO,CRCD,ACCTTYPE,PERIOD,CID,PROCID","CUSTCODE,TITLE,POSAMT,NEGAMT","TMP311B")
+	do Schema.createTable("ZTMPBOT312","FDFLAG,BOO,CRCD,ACCTTYPE,PERIOD,CUSTCODE,PROCID","CRAMT","TMP312B")
+	do Schema.createTable("ZTMPBOT320","BOO,CRCD,ACCTTYPE,CUSTCODE,PROCID","CRAMT","TMP320B")
+	do Schema.createTable("ZTMPBOT330","PROCID,BOO,CRCD,ACCTTYPE,GRP1,GRP2,GRP3","CRAMT","TMP330B")
+	do Schema.createTable("ZTMPBOT612","PROCID,BOO,CRCD,ACCTTYPE,PERIOD,IRN","CRAMT,PERIOD1,COUNT","TMP612B")
+			
+	set FILL=""
+
+	// Calculate Account Type
+	set ACCTTYPE=$$ACCTTYPE(.dep) quit:ER
+	if ACCTTYPE="" quit
+	
+	// FD (Fixed Deposit) accounts are kept separate.  Calculate FDFLAG.
+	set FDFLAG=$S(ACCTTYPE="FD":1,1:0)
+	
+	// Multiple subroutines will use the period in months.  Calculate here.
+	if FDFLAG=1 do {
+		set XTRM=dep.trm
+		if +XTRM=0 set PERIOD=0 quit
+		// Term in Months
+		if $P(XTRM,+XTRM,2)="M" set PERIOD=+XTRM quit
+		// Term in Years
+		if $P(XTRM,+XTRM,2)="Y" set PERIOD=(12*XTRM) quit
+		set PERIOD=0
+		}
+	else  set PERIOD=0
+
+	//658094 - Invalid term ~p1, please check account number ~p2 
+	if +PERIOD>99 set RM=$$^MSG(658094,dep.trm,dep.cid) do EXC quit
+	
+	// Determine if account is linked to ATM card.	
+	set ATMLINK=$$ATMLINK(dep.cid) quit:ER
+	
+	// The following are all subtotal records to be later combined.	
+	do TAB080(.dep,ATMLINK,ACCTTYPE,FDFLAG,PERIOD) quit:ER
+	do TAB310(.dep,.cif,ACCTTYPE,FDFLAG,PERIOD) quit:ER
+	do TAB311(.dep,.cif,ACCTTYPE,FDFLAG,PERIOD) quit:ER	
+	do TAB312(.dep,.cif,ACCTTYPE,FDFLAG,PERIOD) quit:ER
+	if ACCTTYPE="SA"!(ACCTTYPE="CA") do TAB320(.dep,.cif,ACCTTYPE) quit:ER
+	if ACCTTYPE="SA"!(ACCTTYPE="CA") do TAB330(.dep,.cif,ACCTTYPE) quit:ER
+	if ACCTTYPE="FD" do TAB612(.dep,.cif,ACCTTYPE,FDFLAG,PERIOD) quit:ER
+			
+	quit
+
+
+ACCTTYPE(RecordDEP dep) // Compute Account Type
+
+	new XTYPE
+	set XTYPE=dep.type
+	
+	//Jan 26, 2009 - Sarochinee R.: Exclude Product Type 1206 
+	//Exclude these DDA product type
+	//if XTYPE=1201!(XTYPE=1205) quit ""
+	//Apr 10, 2009 - Sarochinee R.
+	//Fixed Wash Account [1220,1221,1222]
+	//if XTYPE=1201!(XTYPE=1205)!(dep.zgrp1206="Y") quit ""
+	if XTYPE=1201!(XTYPE=1205)!(dep.zgrp1206) quit ""
+	//if XTYPE=1204,($E(XTYPE.zero(12),6)=7) quit ""
+	if (XTYPE=1204),(dep.zwashpf7=1) quit ""
+
+	// Don't report Master account
+	if dep.cid=dep.zmaster quit ""
+	
+	if dep.grp="SAV" quit "SA"	// Savings
+	if dep.grp="DDA" quit "CA"	// Checking (Current)
+	
+	if dep.grp'="CD" quit ""
+
+	if dep.schproc quit "SP"	// Savings Promotion
+
+	// SP account that missed 3 times deposit	
+	// Per P'Ta's new requirement, comment the following line
+	//if 'dep.schproc,dep.zstatcd=9 quit ""	
+	
+	quit "FD"			// Fixed Deposit
+
+
+ATMLINK(XCID) // Determine if ATM card linkage exists
+
+	new ATMLINK
+
+	type ResultSet rscrd=Db.select("CARDTYPE","ACNCRD","CID=:XCID")
+	if rscrd.isEmpty() quit 0
+	
+	set ATMLINK=0
+	while rscrd.next() set ATMLINK=$G(ATMCARD(rscrd.getCol(1)),0) quit:ATMLINK
+
+	quit ATMLINK
+
+	
+TAB080(RecordDEP dep,ATMLINK,ACCTTYPE,FDFLAG,PERIOD) // TAB080 subtotals
+
+	new BOO,CRCD,RANGENUM
+	
+	type RecordZTMPBOT080 zbot080
+	
+	if dep.zstatcd=2 quit
+	if dep.zstatcd=4 quit
+	
+	if +dep.eodbal<0 quit
+	
+	if dep.eodbal'>100000 set RANGENUM=1
+	else  if dep.eodbal'>200000 set RANGENUM=2
+	else  if dep.eodbal'>500000 set RANGENUM=3
+	else  if dep.eodbal'>1000000 set RANGENUM=4
+	else  if dep.eodbal'>10000000 set RANGENUM=5
+	else  set RANGENUM=6
+
+	set BOO=dep.boo
+	set CRCD=dep.crcd
+
+	if Db.isDefined("ZTMPBOT080","FDFLAG,BOO,CRCD,ACCTTYPE,PERIOD,RANGENUM,%ProcessID") set zbot080=Db.getRecord("ZTMPBOT080","FDFLAG,BOO,CRCD,ACCTTYPE,PERIOD,RANGENUM,%ProcessID")
+	else  set zbot080=Class.new("RecordZTMPBOT080")
+
+	set zbot080.procid=%ProcessID
+	set zbot080.fdflag=FDFLAG	
+	set zbot080.boo=BOO
+	set zbot080.crcd=CRCD
+	set zbot080.accttype=ACCTTYPE
+	set zbot080.period=PERIOD
+	set zbot080.rangenum=RANGENUM
+	
+	// Depending on linkage, increase counter and add to subtotal
+	if ATMLINK do {
+		set zbot080.linkcnt=zbot080.linkcnt+1
+		set zbot080.linksum=zbot080.linksum+dep.eodbal
+		}
+	else  do {
+		set zbot080.nolnkcnt=zbot080.nolnkcnt+1
+		set zbot080.nolnksum=zbot080.nolnksum+dep.eodbal
+		}
+		
+	do zbot080.bypassSave() 
+		
+	quit
+	
+TAB310(RecordDEP dep,RecordCIF cif,ACCTTYPE,FDFLAG,PERIOD) // TAB310 subtotals
+
+	new BOO,CRCD,ZKTBCCOD,ZCUSTGRP
+
+	type RecordZTMPBOT310 zbot310
+
+	if dep.eodbal'>0 quit
+	if dep.zstatcd=2 quit		// No misc. income
+	if dep.zstatcd=4 quit		// No closed account
+
+	set BOO=dep.boo
+	set CRCD=dep.crcd
+	
+	set ZKTBCCOD=cif.zktbccode
+	if ZKTBCCOD="" quit
+	set ZCUSTGRP=$G(CUSTGRP(+ZKTBCCOD),23)
+		
+	if Db.isDefined("ZTMPBOT310","FDFLAG,BOO,CRCD,ACCTTYPE,PERIOD,ZCUSTGRP,%ProcessID") set zbot310=Db.getRecord("ZTMPBOT310","FDFLAG,BOO,CRCD,ACCTTYPE,PERIOD,ZCUSTGRP,%ProcessID")
+	else  set zbot310=Class.new("RecordZTMPBOT310")
+	
+	set zbot310.procid=%ProcessID
+	set zbot310.fdflag=FDFLAG
+	set zbot310.boo=BOO
+	set zbot310.crcd=CRCD
+	set zbot310.accttype=ACCTTYPE
+	set zbot310.period=PERIOD
+	set zbot310.custcode=ZCUSTGRP
+	
+	set zbot310.cramt=zbot310.cramt+dep.eodbal		   // Running subtotal
+	set zbot310.accruecr=zbot310.accruecr+dep.posacr   // Running subtotal
+	
+	do zbot310.bypassSave()
+
+	quit
+        
+TAB311(RecordDEP dep,RecordCIF cif,ACCTTYPE,FDFLAG,PERIOD) // BOT-TAB311 Record
+
+	new ZKTBCCOD
+	
+	type RecordZTMPBOT311 zbot311	
+
+	if dep.zstatcd=2 quit		// No misc. income
+	if dep.zstatcd=4 quit		// No closed account
+
+	set ZKTBCCOD=+cif.zktbccode
+	if ZKTBCCOD="" quit
+
+	set BOO=dep.boo
+	set CRCD=dep.crcd
+	
+	if dep.zmaster'="",dep.cid'=dep.zmaster set ZCID=dep.zmaster
+	else  set ZCID=dep.cid
+
+	if (ZKTBCCOD<11) quit	
+	if (ZKTBCCOD>19)&(ZKTBCCOD<21) quit
+	if (ZKTBCCOD>29)&(ZKTBCCOD<31) quit		
+	if (ZKTBCCOD>36)&(ZKTBCCOD<352) quit
+	if (ZKTBCCOD>352)&(ZKTBCCOD<501) quit		
+	if (ZKTBCCOD>501) quit	
+
+	if Db.isDefined("ZTMPBOT311","FDFLAG,BOO,CRCD,ACCTTYPE,PERIOD,ZCID,%ProcessID") set zbot311=Db.getRecord("ZTMPBOT311","FDFLAG,BOO,CRCD,ACCTTYPE,PERIOD,ZCID,%ProcessID")
+	else  set zbot311=Class.new("RecordZTMPBOT311")
+
+	set zbot311.procid=%ProcessID
+	set zbot311.fdflag=FDFLAG
+	set zbot311.boo=dep.boo
+	set zbot311.crcd=dep.crcd
+	set zbot311.accttype=ACCTTYPE
+	set zbot311.period=PERIOD
+	set zbot311.cid=ZCID
+	set zbot311.custcode=ZKTBCCOD
+	set zbot311.title=dep.title1
+	if dep.eodbal<0 set zbot311.negamt=zbot311.negamt+((dep.eodbal)*(-1))
+	else  set zbot311.posamt=zbot311.posamt+dep.eodbal
+	
+	do zbot311.bypassSave()
+
+        quit
+      
+        	
+TAB312(RecordDEP dep,RecordCIF cif,ACCTTYPE,FDFLAG,PERIOD) // TAB312 subtotals
+
+	new BOO,CRCD,ZKTBCCOD,ZCUSTGRP
+	
+	type RecordZTMPBOT312 zbot312	
+	
+	if dep.eodbal'>0 quit
+	if dep.zstatcd=2 quit		// No misc. income	
+	if dep.zstatcd=4 quit		// No closed account
+	
+	set BOO=dep.boo
+	set CRCD=dep.crcd
+
+	set ZKTBCCOD=cif.zktbccode
+	if ZKTBCCOD="" quit
+	if (+ZKTBCCOD<362)!(+ZKTBCCOD>365) quit
+
+	set ZCUSTGRP=$G(CUSTGRP2(+ZKTBCCOD),"")
+	if Db.isDefined("ZTMPBOT312","FDFLAG,BOO,CRCD,ACCTTYPE,PERIOD,ZCUSTGRP,%ProcessID") set zbot312=Db.getRecord("ZTMPBOT312","FDFLAG,BOO,CRCD,ACCTTYPE,PERIOD,ZCUSTGRP,%ProcessID")
+	else  set zbot312=Class.new("RecordZTMPBOT312")
+
+	set zbot312.procid=%ProcessID
+	set zbot312.fdflag=FDFLAG
+	set zbot312.boo=BOO
+	set zbot312.crcd=CRCD
+	set zbot312.accttype=ACCTTYPE
+	set zbot312.period=PERIOD
+	set zbot312.custcode=ZCUSTGRP
+	set zbot312.cramt=zbot312.cramt+dep.eodbal		// Running subtotal
+
+	do zbot312.bypassSave()
+
+	quit
+	
+	
+TAB320(RecordDEP dep,RecordCIF cif,ACCTTYPE) // TAB320 subtotals
+
+	new BOO,CRCD,ZKTBCCOD,ZCUSTGRP
+
+	type RecordZTMPBOT320 zbot320
+
+	if dep.eodbal'<0&(dep.zasint'>0) quit
+	if dep.zstatcd=2 quit		// No misc. income
+	if dep.zstatcd=4 quit		// No closed account
+
+	set BOO=dep.boo
+	set CRCD=dep.crcd
+	set ZKTBCCOD=cif.zktbccode
+	if ZKTBCCOD="" quit
+
+	set ZCUSTGRP=$G(CUSTGRP(+ZKTBCCOD),23)
+	
+	if Db.isDefined("ZTMPBOT320","BOO,CRCD,ACCTTYPE,ZCUSTGRP,%ProcessID") set zbot320=Db.getRecord("ZTMPBOT320","BOO,CRCD,ACCTTYPE,ZCUSTGRP,%ProcessID")
+	else  set zbot320=Class.new("RecordZTMPBOT320")
+	
+	set zbot320.procid=%ProcessID
+	set zbot320.boo=BOO
+	set zbot320.crcd=CRCD
+	set zbot320.accttype=ACCTTYPE
+	set zbot320.custcode=ZCUSTGRP
+
+	// Running subtotal
+	if dep.eodbal<0!(dep.zasint>0) do {
+		if dep.zstatcd=5!(dep.zstatcd=6) do {
+			if dep.eodbal<0 set zbot320.cramt=zbot320.cramt+dep.eodbal+dep.zasint
+			else  set zbot320.cramt=zbot320.cramt+dep.zasint
+			}
+		else  set zbot320.cramt=zbot320.cramt+dep.eodbal
+		}
+	
+	do zbot320.bypassSave()
+
+	quit	
+
+TAB330(RecordDEP dep,RecordCIF cif,ACCTTYPE) // TAB320 subtotals
+
+	new BOO,CRCD,GRP,ZKTBCCOD
+
+	type RecordZTMPBOT330 zbot330
+
+	if dep.eodbal'<0&(dep.zasint'>0) quit
+	
+	if dep.zstatcd=2 quit		// No misc. income
+	if dep.zstatcd=4 quit		// No closed account
+		
+	set BOO=dep.boo
+	set CRCD=dep.crcd
+	set ZKTBCCOD=cif.zktbccode
+	if ZKTBCCOD="" quit
+	
+	set GRP=$$ZBUSTYPE(dep.zbustype)
+	if GRP="" set GRP="110000"	
+	set GRP1=+$E(GRP,1,2)
+	set GRP2=+$E(GRP,3,4)
+	set GRP3=+$E(GRP,5,6)
+	
+	if Db.isDefined("ZTMPBOT330","%ProcessID,BOO,CRCD,ACCTTYPE,GRP1,GRP2,GRP3") set zbot330=Db.getRecord("ZTMPBOT330","%ProcessID,BOO,CRCD,ACCTTYPE,GRP1,GRP2,GRP3")
+	else  set zbot330=Class.new("RecordZTMPBOT330")
+	
+	set zbot330.procid=%ProcessID
+	set zbot330.boo=BOO
+	set zbot330.crcd=CRCD
+	set zbot330.accttype=ACCTTYPE
+	set zbot330.grp1=GRP1
+	set zbot330.grp2=GRP2	
+	set zbot330.grp3=GRP3
+
+	if dep.zstatcd=5!(dep.zstatcd=6) do {
+		if dep.eodbal<0 set zbot330.cramt=zbot330.cramt+dep.eodbal+dep.zasint
+		else  set zbot330.cramt=zbot330.cramt+dep.zasint
+		}
+	else  set zbot330.cramt=zbot330.cramt+dep.eodbal
+
+	do zbot330.bypassSave()
+	
+	quit
+	
+TAB612(RecordDEP dep,RecordCIF cif,ACCTTYPE,FDFLAG,PERIOD) // TAB612 subtotals
+
+	new BOO,CRCD,IRN,ZKTBCCOD
+
+	type RecordZTMPBOT612 zbot612
+	
+	set BOO=dep.boo
+	set CRCD=dep.crcd
+	set ZKTBCCOD=cif.zktbccode
+	if ZKTBCCOD="" quit
+	
+	//1515 - Invalid ~p1 ~p2
+	if PERIOD>99 set RM=$$^MSG(1515,"TERM",PERIOD) do EXC quit
+
+	set IRN=+dep.irn
+				
+	if Db.isDefined("ZTMPBOT612","%ProcessID,BOO,CRCD,ACCTTYPE,PERIOD,IRN") set zbot612=Db.getRecord("ZTMPBOT612","%ProcessID,BOO,CRCD,ACCTTYPE,PERIOD,IRN")
+	else  set zbot612=Class.new("RecordZTMPBOT612")
+	
+	set zbot612.procid=%ProcessID
+	set zbot612.boo=BOO
+	set zbot612.crcd=CRCD
+	set zbot612.accttype=ACCTTYPE
+	set zbot612.period=PERIOD
+	set zbot612.period1=PERIOD
+	set zbot612.irn=IRN
+	set zbot612.cramt=zbot612.cramt+dep.eodbal	// Running subtotal
+	set zbot612.count=zbot612.count+1
+	do zbot612.bypassSave()
+
+	quit
+
+ZBUSTYPE(TYPE)	// Find Grp 1, 2 and 3 based on Business type
+
+	if TYPE="" quit ""
+	new GRP1,GRP2,GRP3
+	if $D(%CACHE("ZUTBLBUSTYPE",TYPE)) do {  quit GRP1.zero(2)_GRP2.zero(2)_GRP3.zero(2)
+		type String x
+		set x=%CACHE("ZUTBLBUSTYPE",TYPE)
+		set GRP1=$P(x,"|",1)
+	        set GRP2=$P(x,"|",2)
+	        set GRP3=$P(x,"|",3)
+		}
+	type Number cnt
+	set cnt=$G(%CACHE("ZUTBLBUSTYPE"))
+        if cnt>500 kill %CACHE("ZUTBLBUSTYPE") set cnt=0
+        
+	if 'Db.isDefined("ZUTBLBUSTYPE","CODE=:TYPE") quit ""
+	type RecordZUTBLBUSTYPE zbustype=Db.getRecord("ZUTBLBUSTYPE","CODE=:TYPE")
+        
+        set GRP1=zbustype.grp1
+        set GRP2=zbustype.grp2
+        set GRP3=zbustype.grp3
+
+       	set %CACHE("ZUTBLBUSTYPE")=cnt+1
+        set %CACHE("ZUTBLBUSTYPE",TYPE)=GRP1_"|"_GRP2_"|"_GRP3
+
+        quit GRP1.zero(2)_GRP2.zero(2)_GRP3.zero(2)
+	
+CNTLCNT(THRDID,FILETYP,FXFLG)
+
+	do Schema.createTable("ZCRPCNTFILE","JOB,FILETYP,FXFLG","CNT","TMPACCNT")
+	
+	if 'Db.isDefined("ZCRPCNTFILE","JOB=:THRDID,FILETYP=:FILETYP,FXFLG=:FXFLG") do {
+		type RecordZCRPCNTFILE zcnt=Class.new("RecordZCRPCNTFILE")
+		set zcnt.job=THRDID
+		set zcnt.filetyp=FILETYP
+		set zcnt.fxflg=FXFLG
+		set zcnt.cnt=1
+		
+		do zcnt.bypassSave()
+	}
+	else  do {
+		type RecordZCRPCNTFILE zcnt=Db.getRecord("ZCRPCNTFILE","JOB=:THRDID,FILETYP=:FILETYP,FXFLG=:FXFLG")
+		set zcnt.cnt=zcnt.cnt+1
+		
+		do zcnt.bypassSave()
+	}
+	
+	//do Schema.deleteTable("ZCRPCNTFILE")
+	
+	quit
+	
+TOTFILE(THRDID,FILETYP,FXFLG,TYPE,STAT,BAL,TOTODLIM,ODLIM,AVLLMT,INTPAID,INTRCV,CREINT,DEBINT,INTACSUS,ORGAMT)
+
+	set STAT=+STAT
+	set INTPAID=+$G(INTPAID)
+	set INTRCV=+$G(INTRCV)
+	set CREINT=+$G(CREINT)
+	set DEBINT=+$G(DEBINT)
+
+	do Schema.createTable("ZACNEXTCNTRL","JOB,FILETYP,FXFLG,TYPE,STAT","CNT,POSBAL,NEGBAL,TOTODLIM,ODLIM,AVLLMT,PINTPAID,NINTPAID,PINTRCV,NINTRCV,PCREINT,NCREINT,PDEBINT,NDEBINT,INTACSUS,ORGAMT","TMPACCTL")
+	
+	if 'Db.isDefined("ZACNEXTCNTRL","JOB=:THRDID,FILETYP=:FILETYP,FXFLG=:FXFLG,TYPE=:TYPE,STAT=:STAT") do {
+		type RecordZACNEXTCNTRL zcntrl=Class.new("RecordZACNEXTCNTRL")
+		set zcntrl.job=THRDID
+		set zcntrl.filetyp=FILETYP
+		set zcntrl.fxflg=FXFLG
+		set zcntrl.type=TYPE
+		set zcntrl.stat=STAT
+		set zcntrl.cnt=1
+		if BAL<0 set zcntrl.negbal=-BAL
+		else  set zcntrl.posbal=BAL
+		set zcntrl.totodlim=TOTODLIM
+		set zcntrl.odlim=ODLIM
+		set zcntrl.avllmt=AVLLMT
+		if INTPAID<0 set zcntrl.nintpaid=-INTPAID
+		else  set zcntrl.pintpaid=INTPAID
+		if INTRCV<0 set zcntrl.nintrcv=-INTRCV
+		else  set zcntrl.pintrcv=INTRCV
+		if CREINT<0 set zcntrl.ncreint=-CREINT
+		else  set zcntrl.pcreint=CREINT
+		if DEBINT<0 set zcntrl.ndebint=-DEBINT
+		else  set zcntrl.pdebint=DEBINT
+		set zcntrl.intacsus=+$G(INTACSUS)
+		set zcntrl.orgamt=ORGAMT
+		do zcntrl.bypassSave()
+		
+		//do Schema.deleteTable("ZACNEXTCNTRL")
+	}
+	else  do {
+		type RecordZACNEXTCNTRL zcntrl=Db.getRecord("ZACNEXTCNTRL","JOB=:THRDID,FILETYP=:FILETYP,FXFLG=:FXFLG,TYPE=:TYPE,STAT=:STAT")
+		set zcntrl.cnt=zcntrl.cnt+1
+		if BAL<0 set zcntrl.negbal=zcntrl.negbal-BAL
+		else  set zcntrl.posbal=zcntrl.posbal+BAL
+		set zcntrl.totodlim=zcntrl.totodlim+TOTODLIM
+		set zcntrl.odlim=zcntrl.odlim+ODLIM
+		set zcntrl.avllmt=zcntrl.avllmt+AVLLMT
+		if INTPAID<0 set zcntrl.nintpaid=zcntrl.nintpaid-INTPAID
+		else  set zcntrl.pintpaid=zcntrl.pintpaid+INTPAID
+		if INTRCV<0 set zcntrl.nintrcv=zcntrl.nintrcv-INTRCV
+		else  set zcntrl.pintrcv=zcntrl.pintrcv+INTRCV
+		if CREINT<0 set zcntrl.ncreint=zcntrl.ncreint-CREINT
+		else  set zcntrl.pcreint=zcntrl.pcreint+CREINT
+		if DEBINT<0 set zcntrl.ndebint=zcntrl.ndebint-DEBINT
+		else  set zcntrl.pdebint=zcntrl.pdebint+DEBINT
+		set zcntrl.intacsus=zcntrl.intacsus+$G(INTACSUS)
+		set zcntrl.orgamt=zcntrl.orgamt+ORGAMT
+		do zcntrl.bypassSave()
+	}
+	
+	//do Schema.deleteTable("ZACNEXTCNTRL")
+ 
+	quit
+
+ZPZERO(ZNUMX,ZLEN,ZDEC,KEY1,KEY2,NFIELD)
+	new VAL1
+	set VAL1=ZNUMX
+	if ZNUMX<0 set ZNUMX=-ZNUMX
+	set ZDEC=+$G(ZDEC)
+	set ZNUMX=+ZNUMX                 
+	set ZNUMX=ZNUMX.zero(ZLEN,ZDEC,1)
+	//if $L(ZNUMX)>ZLEN quit "0".zero(ZLEN)
+	if $L(ZNUMX)>ZLEN do { quit ZNUMX.blank(ZLEN)
+		do ADDERR(KEY1,KEY2,NFIELD,VAL1)	
+	}
+	
+	quit ZNUMX
+
+
+ADDERR(KEY1,KEY2,NAMFIELD,VALFIELD)	
+	
+	//Add new Record in ZERRNUM
+	new zerrnum
+	type RecordZERRNUM zerrnum=Class.new("RecordZERRNUM")
+	
+	do zerrnum.setAuditFlag(1)
+					
+	set zerrnum.tjd=XBDATE
+	set zerrnum.pk1=KEY1          //A/C No.
+	set zerrnum.pk2=KEY2	       	
+	set zerrnum.pk3="-"		//set for no value key 
+	set zerrnum.fname="Deposit Extract"
+	set zerrnum.errnam=NAMFIELD
+	set zerrnum.errval=VALFIELD
+	
+	do zerrnum.save()
+
+	quit	
+	
+---------- THREXIT ------ Section marker

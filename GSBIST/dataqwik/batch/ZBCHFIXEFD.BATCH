@@ -1,0 +1,49 @@
+//DO NOT MODIFY  Batch For Fix EFD issue(LOR)|ZBCHFIXE||||||EFD|||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+	
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	//if PID="CID" do PROC(SEQ)
+	do Runtime.rollback()
+	//type Date ZEFD,ZTJD,ZBUFF
+	//type Number seq,akey
+	//set 
+	do PROC(EFDATE.get(),BUFF.get(),SEQ.get(),SQL.get())
+	quit
+	
+PROC(EFDATE,BUFF,SEQ,SQL)
+
+	type String ZSQL,zpref,zsuff,zcorrected
+	
+	set ZSQL=SQL.get()
+	set zpref=$P(ZSQL,"'INDEX='",1)
+	set zsuff=$P(ZSQL,"'INDEX='",2)
+	
+	//quit if sql statement doesn't match incident pattern 
+	if $L(zsuff)<1 quit
+	
+	set zcorrected=zpref_",'INDEX='"_zsuff
+	
+	
+	type RecordEFD efd = Db.getRecord("EFD","EFDATE=:EFDATE,BUFF=:BUFF,SEQ=:SEQ")
+	set efd.sql=zcorrected
+	do efd.save()
+	
+
+	quit
+
+---------- THREXIT ------ Section marker

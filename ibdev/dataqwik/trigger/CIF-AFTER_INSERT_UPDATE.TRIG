@@ -1,0 +1,129 @@
+//DO NOT MODIFY  After Insert Trigger|0|0|0|1|0|0||||
+	/*
+	--Revision History-----------------------------------------------------------
+
+	03/14/07 - KumarSS - CR 25177
+		   Removed Invalid Unicode Characters.
+
+	06/02/06 - GIRIDHAL - 21207
+	 	   Trigger has been modified to validate the ZIP code, state, and
+	 	   country fields associated with a customer's employer
+	 	    
+	01/17/05 - HILLANBRAND - 13686
+		   Changed call for TAXID verfication to call directly into EXT^VERTIN.
+
+	06/14/04 - SCHWARTZC - CR10219
+		   Removed code to default the relationship matrix (CIF.RELMAT)
+		   from the product type.  The code has been moved to the
+		   BEFORE_INSERT trigger to prevent calling the CIF filer
+		   from the triggers, which was causing a "Record already
+		   exists" error when creating customers.
+
+	11/12/02 - CARROLLJ - 43583
+		   PSL conversion cleanup.	
+
+	08/23/01 - VETSENM - 46279:18
+		   Trigger modified to default Relationship Matrix value from
+		   from product type to customer record.            
+
+ 	11/2/00 - Spier - 42606
+		   Added call to CHKSTATE^ADDRUTL to validate states against the
+		   STBLCNTRY1 table. This check can not be done by DQ table validate.
+
+        03/29/00 - SIVCHUKA - 37734
+                   Add new check to prevent account creation prior to
+                   PRODCTL.DTBEG
+		   Optimized performance by passing a parameter to SCADAT
+                   calls, reference LRQ 58163-03
+
+	01/17/00 - KELLYP - 36682
+		   Added checks on MT900THR and MT910THR (RF of these triggers
+		   from 6.2). 
+
+	12/08/99 - Chiang - 33890
+                   Modified to convert triggers into PSL format.
+
+	04/16/99 - CARROLLJ - 31428
+	           Added integrity check to check if plan owner's date of death for
+		   records with dates with the year prior to the current year.
+	*/
+
+	// ----- Validate Postal/zip code
+	
+	do ZIP^PROCZIP(cif.pcntry,cif.pstate,cif.pzip) if $G(ER) do Runtime.setErrMSG("CIF",3333,RM) quit:ER 
+	do ZIP^PROCZIP(cif.mcntry,cif.mstate,cif.mzip) if $G(ER) do Runtime.setErrMSG("CIF",3333,RM) quit:ER 
+	do ZIP^PROCZIP(cif.empcntry,cif.empstate,cif.empzip) if $G(ER) do Runtime.setErrMSG("CIF",3333,RM) quit:ER
+	
+ 	//Validate State
+
+	if cif.mstate'="",$$CHKSTATE^ADDRUTL("CIF",cif.mcntry,cif.mstate) quit:ER
+	if cif.pstate'="",$$CHKSTATE^ADDRUTL("CIF",cif.pcntry,cif.pstate) quit:ER
+	if cif.empstate'="",$$CHKSTATE^ADDRUTL("CIF",cif.empcntry,cif.empstate) quit:ER
+
+
+	// ----- Validate Tax Id	
+	do EXT^VERTIN(.cif)
+	if ER do Runtime.setErrSTBLER("CIF","INVLDTX") quit:ER         // Log fatal error
+	
+        // ----- New check to prevent account creation prior to PRODCTL.DTBEG
+               new ddate,diff,TYPE
+	       set TYPE=cif.type
+	       set dtbeg=Db.getOneRow("DTBEG","PRODCTL","TYPE")
+	       set dao=cif.dao
+               if dao<dtbeg set ER=1
+	       if ER set ddate=$$DAT^%ZM(dtbeg) do Runtime.setErrMSG("CIF",2036,"TYPE~ddate") quit:ER
+              
+	// ----- Validate audit information
+	do { quit:ER 
+		if cif.aud1="",cif.aud1cf="",cif.aud1nd="",cif.aud1ld="" quit 
+		if cif.aud1'="",cif.aud1cf'="",cif.aud1nd'="",cif.aud1ld'="" quit 
+		do Runtime.setErrMSG("CIF",1767,"AUD1 AUD1CF AUD1ND AUD1LD") quit:ER 
+
+		}
+	do { quit:ER 
+		if cif.aud2="",cif.aud2cf="",cif.aud2nd="",cif.aud2ld="" quit 
+		if cif.aud2'="",cif.aud2cf'="",cif.aud2nd'="",cif.aud2ld'="" quit 
+		do Runtime.setErrMSG("CIF",1767,"AUD2 AUD2CF AUD2ND AUD2LD") quit:ER 
+		}
+	
+	// Verify the value exist in [UTBLACC]
+	if cif.darcovr,'Db.isDefined("UTBLACC","'L',cif.darcovr") do Runtime.setErrMSG("CIF",1485,"UTBLACC.AC") quit:ER 
+
+
+	// Verify the date entered if it is end of the month
+	if cif.semfin'="",cif.semfin'=$$EOMJD^SCADAT(cif.semfin,1) do Runtime.setErrMSG("CIF",2848) quit:ER 
+	
+
+	// Only execute following code during account creation
+	if %ProcessMode=0 do { quit:ER 
+		// Duplicate Customer Search
+		if 'Db.isDefined("UTBLDUPCIF","1") quit 
+		new xacn,XACN,CIFDATA
+		set CIFDATA=""
+		do SEARCH^DUPLCIF(CIFDATA,.XACN) quit:ER 
+		set xacn=$P($O(XACN("")),$C(9),1) if xacn'="" do Runtime.setErrXBAD("CIF","DUPCIF",xacn) quit:ER 
+		}
+
+
+	// Check Plan Owner's Date of Death
+	if %ProcessMode=2 do { quit:ER 
+		if 'cif.dod quit 
+		set TYR=$$YEAR^SCADAT(%SystemDate,1)
+		set DYR=$$YEAR^SCADAT(cif.dod,1)
+		if (TYR-1)'>DYR quit 
+	
+		new rs 
+		type ResultSet rs=Db.select("PLNFMV,PVMAD","IRA","ACN=:ACN AND TAXYR=:TYR") 
+		if rs.isEmpty() quit
+		set INFO=rs.next()
+	
+		if (rs.getCol(1))!(rs.getCol(2)) do Runtime.setErrXBAD("CIF","CIFPLN",) quit:ER 
+		}
+
+	// MT900THR - MT900 Debit Threshold
+	if (cif.mt900=1)&(cif.mt900thr="") do Runtime.setErrMSG("CIF",4077) quit:ER
+
+	// MT910THR - MT910 Credit Threshold
+	if (cif.mt910=1)&(cif.mt910thr="") do Runtime.setErrMSG("CIF",4078) quit:ER
+
+	quit

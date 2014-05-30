@@ -1,0 +1,212 @@
+//DO NOT MODIFY  Data Extract Utilities|ZEXTUTL|||||||1
+	/*
+	ORIG: Allan Mattson - 12 July 2012
+	DESC: Data Extract Utilities
+	
+	---- Comments --------------------------------------------------------
+
+	$$ENDBAL	Return ending balance as of date
+	$$FMTAMT	Return amount in fixed length format
+	PHLD		Return permanent hold info (PHC, THLDAMT)
+	$$TERM		Return number of months for specified term
+
+	---- Revision History ------------------------------------------------
+	
+	08/02/2012 - Zwitkowits
+		Added yearly terms to TERM section.
+		Added ENDBAL2 section to use EOD balances.
+	
+	07/26/2012 - Zwitkowits
+		Modified .zero methods in section FMTAMT to pass decimal length.
+		Corrects rounding issues.
+	
+	07/20/2012 - Zwitkowits
+		Added section AMTRANGE to return Amount Range Code.
+		
+	----------------------------------------------------------------------
+	*/
+
+	quit
+
+
+public ENDBAL(RecordDEP dep, Date DATE)
+	/*
+	Return ending balance as of the date specified by 'DATE'
+	*/
+
+	type Number ENDBAL
+
+	set ENDBAL = dep.bal
+
+	type DbSet ds = Db.selectDbSet("HIST", "CID = :dep.cid and TJD > :DATE", "TSEQ DESC")
+
+	while ds.next() do {
+
+		type RecordHIST hist = ds.getRecord("HIST")
+		if hist.etc.isNull() quit
+
+		if hist.itc1 set ENDBAL = (hist.endbal - hist.prin)
+		else  set ENDBAL = (hist.endbal + hist.prin)
+	}
+
+	quit ENDBAL
+
+
+public ENDBAL2(RecordDEP dep, Number DAYS)
+	/*
+	Return ending balance for number of DAYS in the past.
+	*/
+	
+	type Number ENDBAL = ""
+	
+	if DAYS = 1 do {
+		set ENDBAL = $S(dep.grp = "CD":dep.zeodbal, 1:dep.eodbal)
+		if dep.grp '= "CD", 'dep.dtc.isNull(), dep.dtc < %SystemDate set ENDBAL = dep.bal
+	}
+	else  if DAYS = 2 set ENDBAL = $S(dep.grp = "CD":dep.zeodbal2, 1:dep.eodbal2)
+	
+	quit ENDBAL
+
+
+public FMTAMT(Number AMT, Number LEN, Number DEC, Number OPT)
+	/*
+	Format amount to Cobol fixed length field (decimal implied).
+	Note that the sign is dropped for negative amounts.
+
+	ARGUMENTS:
+	     . AMT	Amount			/REQ/MECH=VAL
+	     . LEN	Field length		/REQ/MECH=VAL
+	     . DEC	Decimal precision	/NOREQ/MECH=VAL/DFT=2
+	     . OPT	Format option		/NOREQ/MECH=VAL/DFT=0
+
+	     		0 = Signed, decimal point
+	     		1 = Unsigned, decimal point
+	     		2 = Unsigned, decimal point implied
+
+	RETURNS:
+	     . $$	Formatted amount
+
+	EXAMPLE:
+			write $$FMTAMT^ZEXTUTL(1234.56,15,2,0)
+			+00000001234.56
+
+			write $$FMTAMT^ZEXTUTL(1234.56,15,2,1)
+			000000001234.56
+
+			write $$FMTAMT^ZEXTUTL(1234.56,15,2,2)
+			000000000123456
+	*/
+
+	type String FMTAMT
+
+	if DEC.get().isNull() set DEC = 2
+	if OPT.get().isNull() set OPT = 0
+
+	set FMTAMT = AMT.roundDec(DEC)
+	if FMTAMT < 0 set FMTAMT = -FMTAMT
+
+	if OPT = 0 do {
+		set FMTAMT = FMTAMT.zero(LEN-1, DEC)
+		set FMTAMT = $S(AMT < 0:"-", 1:"+")_FMTAMT
+	}
+
+	if OPT = 1 set FMTAMT = FMTAMT.zero(LEN, DEC)
+
+	if OPT = 2 do {
+		set FMTAMT = FMTAMT * (10**DEC)
+		set FMTAMT = FMTAMT.zero(LEN)
+	}
+
+	quit FMTAMT
+
+
+public PHLD(Number CID, String PHC, Number THLDAMT, Number ZHLDACT, Number ZHLDTYP)
+
+	set PHC = ""
+	set THLDAMT = 0
+	set ZHLDACT = ""
+	set ZHLDTYP = ""
+
+	type ResultSet rs = Db.select("PHC,THLDAMT,ZHLDACT,ZHLDTYP", "PHLD", "CID = :CID AND STDT <= :%SystemDate AND (EXPDT IS NULL OR EXPDT > :%SystemDate)")
+
+	while rs.next() do {
+		set THLDAMT = (THLDAMT + rs.getCol("THLDAMT"))
+		set PHC = $S(PHC.isNull():rs.getCol("PHC"), 1:99)
+		if ZHLDACT.isNull() set ZHLDACT = rs.getCol("ZHLDACT")
+		if ZHLDTYP.isNull() set ZHLDTYP = rs.getCol("ZHLDTYP")
+	}
+	
+	quit
+
+
+public TERM(Date BEG, Date END, Number CODE)
+	/*
+	Return term (in months) and term code.
+
+	ARGUMENTS:
+	     . BEG	Start (opening) date	/REQ/MECH=VAL
+	     . END	End (maturity) date	/REQ/MECH=VAL
+	     . CODE	Term code		/NOREQ/MECH=REF:W
+
+	RETURNS:
+	     . $$	Term (in months)
+	*/
+
+	type Number TERM
+
+	if BEG.isNull() set CODE = 310029 quit 0
+	if END.isNull() set CODE = 310029 quit 0
+
+	set TERM = ((END.year() - BEG.year()) * 12)
+	set TERM = (TERM + (END.month() - BEG.month()))
+	set TERM = (TERM + (END.day() - BEG.day() / 100))
+
+	if TERM <= 1 set CODE = 310006
+	else  if TERM <= 2 set CODE = 310007
+	else  if TERM <= 3 set CODE = 310008
+	else  if TERM <= 4 set CODE = 310009
+	else  if TERM <= 5 set CODE = 310010
+	else  if TERM <= 6 set CODE = 310011
+	else  if TERM <= 7 set CODE = 310012
+	else  if TERM <= 8 set CODE = 310013
+	else  if TERM <= 9 set CODE = 310014
+	else  if TERM <= 10 set CODE = 310015
+	else  if TERM <= 11 set CODE = 310016
+	else  if TERM <= 12 set CODE = 310017
+	else  if TERM <= 24 set CODE = 310019
+	else  if TERM <= 36 set CODE = 310020
+	else  if TERM <= 48 set CODE = 310021
+	else  if TERM <= 60 set CODE = 310022
+	else  if TERM <= 72 set CODE = 310023
+	else  if TERM <= 84 set CODE = 310024
+	else  if TERM <= 96 set CODE = 310025
+	else  if TERM <= 108 set CODE = 310026
+	else  if TERM <= 120 set CODE = 310027
+	else  set CODE = 310028
+
+	quit (TERM \ 1)
+	
+public AMTRANGE(Number AMT)
+	/*
+	Return amount range code for input amount in Baht.
+
+	ARGUMENTS:
+	     . AMT	Amount (in Baht)	/REQ/MECH=VAL
+
+	RETURNS:
+	     . $$	Amount Range Code
+	*/
+	
+	if AMT <= 50000 quit "004001"
+	if AMT <= 100000 quit "004002"
+	if AMT <= 200000 quit "004003"
+	if AMT <= 500000 quit "004004"
+	if AMT <= 1000000 quit "004005"
+	if AMT <= 10000000 quit "004006"
+	if AMT <= 25000000 quit "004007"
+	if AMT <= 50000000 quit "004008"
+	if AMT <= 100000000 quit "004009"
+	if AMT <= 200000000 quit "004010"
+	if AMT <= 500000000 quit "004011"
+
+	quit "004012"

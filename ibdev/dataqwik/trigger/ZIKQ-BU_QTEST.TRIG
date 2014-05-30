@@ -1,0 +1,13 @@
+//DO NOT MODIFY  Before Update Test|0|1|0|0|0|0|SAL|||
+	if zikq.dep="" quit
+	set DEP=zikq.dep
+	
+	if 'Db.isDefined("ZIKQ","DEP=:DEP") quit
+	type RecordZUTBLQII sala=Db.getRecord("ZUTBLQII","DEP=:DEP")
+	if zikq.sal<sala.min do {
+		set ER=1,RM="Salary lower limit" quit
+	}
+	if zikq.sal>sala.max do {
+		set ER=1,RM="Salary over limit" quit
+	}
+	quit

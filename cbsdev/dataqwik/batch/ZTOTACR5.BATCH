@@ -1,0 +1,55 @@
+//DO NOT MODIFY  TEST5|ZTOTACR5||||||DEP|DEP.GRP='SAV'|9|100|10000||0|10000|10000|10|10|||0||1
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+---------- SCHINIT ------ Section marker
+
+	do SYSVAR^SCADRV0()
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	new ACN
+
+	type RecordDEP dep=Db.getRecord("DEP","CID=:CID")
+
+	if dep.zstatcd'=0 quit
+	/*
+	if dep.zostatcd=0 quit
+	if +dep.zostatcd>2 quit
+	*/
+	if dep.ipf'="75YAE" quit
+
+	/*
+	set ACN=dep.acn
+        type RecordCIF cif=Db.getRecord("CIF","ACN=:ACN")
+	*/
+
+	/*type RecordDEP dep=Db.getRecord("DEP","CID=:CID")*/
+
+        new INP,IPLD,ODT,CCLD
+        set ODT=$$DAT^%ZM(dep.odt)
+        set IPLD=$$DAT^%ZM(dep.ipld)
+        set INP=$$DAT^%ZM(dep.inp)
+	set CCLD=$$DAT^%ZM(dep.ccld)
+
+	set ^ZTOTACR5(CID)=dep.grp_"|"_dep.acctname_"|"_dep.lnm_"|"_dep.zstatcd_"|"_dep.zostatcd_"|"_dep.bal_"|"_dep.acr_"|"_dep.ipf_"|"_INP_"|"_IPLD_"|"_dep.intwcalc_"|"_dep.awtr_"|"_dep.boo_"|"_dep.cc
+	/*
+	set ^ZTOTACR5(CID)=dep.grp_"|"_dep.type_"|"_dep.zstatcd_"|"_dep.zostatcd_"|"_dep.stat_"|"_dep.bal_"|"_CCLD_"|"_cif.zktbccode_"|"_dep.boo_"|"_dep.cc
+	*/
+	/*if dmj.itc1 set ^TMPKTC("DMJ",1)=$G(^TMPKTC("DMJ",1))+dmj.tamt quit
+	set ^TMPKTC("DMJ",0)=$G(^TMPKTC("DMJ",0))+dmj.tamt */
+
+	quit
+
+---------- THREXIT ------ Section marker

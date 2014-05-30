@@ -1,0 +1,501 @@
+//DO NOT MODIFY  Custom ACN Computed Columns|ZACNCDI||||||ACN|1
+  /*
+ORIG: srisane - 04/16/2003
+DESC: Custom ACN Computed Columns
+
+ ****** Consider using setAuditFlag for all objects in this procedure
+   example :do dep.setAuditFlag(1)
+
+ */
+
+	/* This procedure definition replaces [.TANGOOLW]ZACNCDI.M
+	
+	ORIG: TNIS - 04/17/03
+	DESC: Account Computed Data Item library
+
+
+	LIBRARY:
+	. $$ZISIC    - International Standard Industrial Classification
+	. $$ZISICD   - International Standard Industrial Classification Description
+	. $$ZSTAT    - Custom Account Status
+	. $$ZACRLN   - Accrued Interest for Loan
+
+	Revision History
+
+	04/14/10 - Rachod Intraha (Profile Upgrade)
+		   Modified ZGETCRLMT to prevent the growing too large
+		   of vobj array which affecting system performance.
+
+	09/07/09 - Siripong Prayoonhong (07Sep09) - Profile Upgrade
+		   Created ZACRLN section to return Accrued Interest for 
+		   loan account or O/D account.
+
+	08/03/09 - MATTSONA 
+		   Retrofit the following:
+		   	01/19/09 - Tawiton Chingchit
+	   	        Create LineTag ZCRLMTA (for Computed field 
+	   	        Get Active Total Credit Limit)
+
+	04/07/09 - Siripong Prayoonhong (07Apr09) - Profile Upgrade
+		   Changed the ZSTAT section to also return description of 
+		   account status of loan account.
+
+	02/06/08 - Sedtha Jittiarunchai
+		   Create Linetag ZCRD 
+		   to check a Card No and Card Type that Link to this account.
+
+	11/17/05 - Sedtha Jittiarunchai
+		   Create Linetag ZSUBAFLG and ZPRIMAFLG 
+		   to check a condition for ACN.ZSUBFLG and ACN.ZPRIMFLG
+
+	06/21/05 - Kittipong -
+		   Create linetag ZCHECKOD for check if that CID exist 
+		   in table ZODTIER or not
+
+	06/15/05 - Oracha P
+		   Modified section ZGETCRLMT to set credit limit value for 
+		   deposit account. 	
+
+	02/22/05 - JSK
+		   Modified section ZISIC, ZISICD to reflect the correct ISIC code
+		   & description.
+
+	01/13/05 - Krit
+		   Change method in ZISICD section to get definition from table
+		   ZUTBLISICKTB
+
+	09/13/04 - Tanatkit -
+		   Create ZGETSUBT,ZGETMKTCD,ZGETCRLMT,ZGETODLIM,ZGETBAL
+		   for Related Accounts Report
+
+	06/11/03 - Rachod -
+		   Create linetag ZSTAT for return account status description
+
+	04/25/03 - Wasin -
+		   Modify ZISIC,ZISICD codes that may cause errors when it run
+
+	04/17/03 - Ekrat - 
+		   Create File and have 2 Function ZISIC and ZISICD
+	*/
+
+	/*
+	This procedure will be add computed data item for columns on table
+	ACN. this proedure compute ACN.ZISIC(ISIC Code) and ACN.ZISICD
+	(ISIC Description)
+	*/
+
+	quit
+
+ZMASFLG(CID,ZMASTER)	// Compare CID with ZMASTER
+	/*
+	   The function is used to compute [ACN]ZISIC field
+	
+	   ARGUMENTS:
+	   . CID                   Account Number /TYP=N/REQ/MECH=VAL	   
+	   . ZMASTER               Master Account Number /TYP=N/REQ/MECH=VAL		   
+	
+	   RETURNS:
+	   . $$ 1 If this account is a Master Account /TYP=T
+	   . $$ 0 If this account is not a Master Account /TYP=T	   
+	
+	   EXAMPLE:
+	   W $$ZMASFLG^ZACNCDI(XXXX,XXXX)
+	*/
+	new result
+	if (CID=ZMASTER) set result=1
+	else  set result=0
+
+	quit result	
+	
+ZISIC(CID)	// Computed ISIC Code field in ACN 
+	/*
+	   The function is used to compute [ACN]ZISIC field
+	
+	   ARGUMENTS:
+	   . CID                   Account Number /TYP=N/REQ/MECH=VAL	   
+	
+	   RETURNS:
+	   . $$ ISIC Code /TYP=T
+	
+	   EXAMPLE:
+	   W $$ZISIC^ZACNCDI(100)
+	*/
+	
+	new ISICSD,ISICGC,ISICTS
+	
+	set (ISICSD,ISICGC,ISICTS)=""
+	if 'Db.isDefined("ACN","CID=:CID") quit ""
+	else  do {
+        	type RecordACN acn=Db.getRecord("ACN","CID=:CID")
+        	set ISICSD=acn.zisicsd
+        	set ISICGC=acn.zisicgc
+        	set ISICTS=acn.zisicts
+	}
+	if ISICSD=""&(ISICGC="")&(ISICTS="") quit ""
+
+	if ISICSD="" set ISICSD="000"
+	if ISICGC="" set ISICGC=0
+	if ISICTS="" set ISICTS="000"
+
+
+	if 'Db.isDefined("ZUTBLISICGC","ISICSD=:ISICSD,ISICGC=:ISICGC") quit ISICSD_ISICGC_ISICTS
+	if 'Db.isDefined("ZUTBLISICTS","ISICSD=:ISICSD,ISICGC=:ISICGC,ISICTS=:ISICTS") quit ISICSD_ISICGC_ISICTS
+	type RecordZUTBLISICTS zisicts=Db.getRecord("ZUTBLISICTS","ISICSD=:ISICSD,ISICGC=:ISICGC,ISICTS=:ISICTS")
+
+	if zisicts.isicbot="" set ISICBOT="000"
+	else  set ISICBOT=zisicts.isicbot
+	
+	quit ISICSD_ISICGC_ISICBOT
+
+
+ZISICD(CID)	// Gather ISIC Description field from ACN 
+	/*
+	   The function is used to compute [ACN]ZISICD field
+	
+	   ARGUMENTS:
+	   . CID                   Account Number /TYP=N/REQ/MECH=VAL	   
+	
+	   RETURNS:
+	   . $$ ISIC Description /TYP=T
+	
+	   EXAMPLE:
+	   W $$ZISICD^ZACNCDI(100)
+	*/
+	
+	new ISICSD,ISICGC,ISICTS,ISICD,ISIC,ISICKTB
+	
+	set (ISICSD,ISICGC,ISICTS,ISIC)=""
+	if 'Db.isDefined("ACN","CID=:CID") quit ""
+	else  do {
+        	type RecordACN acn=Db.getRecord("ACN","CID=:CID")
+        	set ISICSD=acn.zisicsd
+        	set ISICGC=acn.zisicgc
+        	set ISICTS=acn.zisicts
+	}
+	if ISICSD="" set ISICSD="000"
+	if ISICGC="" set ISICGC=0
+	if ISICTS="" set ISICTS="000"
+	
+	if 'Db.isDefined("ZUTBLISICSD","ISICSD=:ISICSD") quit ""
+	type RecordZUTBLISICSD zisicsd=Db.getRecord("ZUTBLISICSD","ISICSD=:ISICSD")
+	set ISICD=zisicsd.tdes
+
+	if 'Db.isDefined("ZUTBLISICGC","ISICSD=:ISICSD,ISICGC=:ISICGC") quit ISICD
+	type RecordZUTBLISICGC zisicgc=Db.getRecord("ZUTBLISICGC","ISICSD=:ISICSD,ISICGC=:ISICGC")
+	set ISICD=zisicgc.tdes	
+	
+	if 'Db.isDefined("ZUTBLISICTS","ISICSD=:ISICSD,ISICGC=:ISICGC,ISICTS=:ISICTS") quit ISICD
+	type RecordZUTBLISICTS zisicts=Db.getRecord("ZUTBLISICTS","ISICSD=:ISICSD,ISICGC=:ISICGC,ISICTS=:ISICTS")
+	set ISICD=zisicts.tdes
+
+	if ISICD=zisicts.isicbot quit ISICD
+
+	set ISICBOT=zisicts.isicbot
+	if ISICBOT="" set ISICBOT="000"
+	
+	if 'Db.isDefined("ZUTBLISICTS","ISICSD=:ISICSD,ISICGC=:ISICGC,ISICTS=:ISICBOT") quit ISICD
+	type RecordZUTBLISICTS zisicts2=Db.getRecord("ZUTBLISICTS","ISICSD=:ISICSD,ISICGC=:ISICGC,ISICTS=:ISICBOT")
+	set ISICD=zisicts2.tdes
+
+	quit ISICD
+		
+	/*
+	set (ISICSD,ISICGC,ISICTS,ISICD,ISIC,ISICKTB)=""
+        if 'Db.isDefined("ACN","CID=:CID") quit ISIC
+        else  do {     
+        	type RecordACN acn=Db.getRecord("ACN","CID=:CID")
+        	set ISICSD=acn.zisicsd
+        	set ISICGC=acn.zisicgc
+        	set ISICTS=acn.zisicts
+        	set ISICKTB=Db.getOneRow("ZISICKTB","LN","CID")
+        }
+
+	if ((ISICSD="")&(ISICGC="")&(ISICTS="")&(ISICKTB="")) quit ISICD	
+	else  do {
+		if ISICSD="" set ISICSD="000"
+		if ISICGC="" set ISICGC="0"
+		if ISICTS="" set ISICTS="000"
+		if ISICKTB="" set ISICKTB="000"
+	}	
+	
+	if Db.isDefined("ZUTBLISICKTB","ISICSD=:ISICSD,ISICGC=:ISICGC,ISICTS=:ISICTS,ISICKTB=:ISICKTB") do {
+		type RecordZUTBLISICKTB rec1=Db.getRecord("ZUTBLISICKTB","ISICSD=:ISICSD,ISICGC=:ISICGC,ISICTS=:ISICTS,ISICKTB=:ISICKTB")
+		set ISICD=rec1.des
+	}
+	*/
+	/*
+	if ((ISICSD'="000")&(ISICGC'="00")&(ISICTS'="000")) do { 
+		if 'Db.isDefined("ZUTBLISICTS","ISICSD=:ISICSD,ISICGC=:ISICGC,ISICTS=:ISICTS") quit 
+		else  do {
+			type RecordZUTBLISICTS rec1=Db.getRecord("ZUTBLISICTS","ISICSD=:ISICSD,ISICGC=:ISICGC,ISICTS=:ISICTS")
+        		set ISICD=rec1.des
+        	}
+	}
+	if ((ISICSD'="000")&(ISICGC'="00")&(ISICTS="000")) do {
+		if 'Db.isDefined("ZUTBLISICGC","ISICSD=:ISICSD,ISICGC=:ISICGC") quit 
+		else  do {
+			type RecordZUTBLISICGC rec2=Db.getRecord("ZUTBLISICGC","ISICSD=:ISICSD,ISICGC=:ISICGC")
+        		set ISICD=rec2.des
+        	}	
+	}
+	if ((ISICSD'="000")&(ISICGC="00")&(ISICTS="000")) do {
+		if 'Db.isDefined("ZUTBLISICSD","ISICSD=:ISICSD") quit 
+		else  do {
+			type RecordZUTBLISICSD rec3=Db.getRecord("ZUTBLISICSD","ISICSD=:ISICSD")
+        		set ISICD=rec3.des
+        	}			
+	}
+	*/
+
+	// ZSTAT(ZSTATCD,CLS) - Siripong - 07Apr09 - Added new argument
+ZSTAT(Number ZSTATCD, String CLS, Number STAT)
+	/*
+	   This function use for retrieve Account Status description
+
+	   ARGUMENTS:
+	   . ZSTATCD                   Deposit Account Status Code /TYP=N/REQ/MECH=VAL
+	   . CLS		       Account Class
+	   . STAT		       Loan Account Status Code
+
+	   RETURNS:
+	   . $$ Account Status Description /TYP=T
+
+	   EXAMPLE:
+	   W $$ZSTAT^ZACNCDI(1,"D")
+	*/
+
+	// Siripong - 07Apr09 - Begin
+	/*
+	new DES
+
+	if CLS'="D" quit ""
+	if ZSTATCD="" quit ""
+
+	if 'Db.isDefined("ZUTBLSTATD","ZSTATCD=:ZSTATCD") quit ""
+
+	type RecordZUTBLSTATD zstatcd=Db.getRecord("ZUTBLSTATD","ZSTATCD=:ZSTATCD")
+    	set DES=zstatcd.des
+	quit DES
+	*/
+	type String DES
+
+	if CLS = "D" do { quit DES
+
+		set ZSTATCD = ZSTATCD.get()
+		if ZSTATCD.isNull() set DES = "" quit
+
+		type RecordZUTBLSTATD zstatcd = Db.getRecord("ZUTBLSTATD", "ZSTATCD=:ZSTATCD", 1)
+		if 'zstatcd.getMode() set DES = "" quit
+		set DES = zstatcd.des
+	}
+	else  if CLS = "L" do { quit DES
+
+		set STAT = STAT.get()
+		if STAT.isNull() set DES = "" quit
+
+		type RecordSTBLSTATL statl = Db.getRecord("STBLSTATL", "STAT=:STAT", 1)
+		if 'statl.getMode() set DES = "" quit
+		set DES = statl.desc
+	}
+	else  quit ""
+	// Siripong - 07Apr09 - End
+
+
+ZGETSUBT(ZCID)
+	/* This function use for get Subtype from LN Table */
+
+	type RecordACN acn=Db.getRecord("ACN","CID=:ZCID")
+	set ZCLS=acn.cls
+
+	if ZCLS="D" quit ""
+
+	set ZSUBT=""
+
+	type RecordLN ln={RecordLN}acn
+	set ZSUBT=ln.subt
+
+	quit ZSUBT
+
+
+ZGETMKTCD(ZCID)
+	/* This function use for get Market Code from LN Table */
+	
+	type RecordACN acn=Db.getRecord("ACN","CID=:ZCID")
+	set ZCLS=acn.cls
+	
+	if ZCLS="D" quit ""
+	
+	set ZMKTCD=""
+	
+	type RecordLN ln=Db.getRecord("LN","CID=:ZCID")
+	set ZMKTCD=ln.zmktcd
+	
+	quit ZMKTCD
+		
+
+ZGETCRLMT(ZCID)
+	/* This function use for get Credit Limit from LN Table */
+	
+	new ZCLS,ZCRLMT
+
+	type RecordACN acn=Db.getRecord("ACN","CID=:ZCID",1)
+	set ZCLS=acn.cls
+	
+	// Oracha P - 15June05 - begin
+	set ZCRLMT=""
+
+	// if ZCLS="D" quit ""
+	if ZCLS="D" do { quit ZCRLMT
+		if Db.currVal("ZODTIER","CID=:ZCID").isNull() quit
+		set acn={RecordDEP}acn
+		set ZCRLMT=acn.zcltot
+	}
+	// Oracha P - 15June05 - end 
+	set acn={RecordLN}acn
+	set ZCRLMT=acn.crlmt
+	
+	quit ZCRLMT
+	
+	
+ZGETODLIM(ZCID)
+	/* This function use for get OD Limit from DEP Table */
+	
+	type RecordACN acn=Db.getRecord("ACN","CID=:ZCID")
+	set ZCLS=acn.cls
+	
+	if ZCLS="L" quit ""
+	
+	set ZODLIM=""
+	
+	type RecordDEP dep={RecordDEP}acn
+	set ZODLIM=dep.odlim
+	
+	quit ZODLIM
+
+ZGETBAL(ZCID)
+	/* This function use for get 
+	      - Account Balance from ACN Table for deposit accounts
+	      - Ledget Balance from LN Table for loan accounts */
+	
+	type RecordACN acn=Db.getRecord("ACN","CID=:ZCID")
+	set ZCLS=acn.cls
+	
+	if ZCLS="D" quit acn.ballegr
+	
+	set ZBAL=""
+	
+	type RecordLN ln={RecordLN}acn
+	set ZBAL=ln.bal
+	
+	quit ZBAL
+			
+ZCHECKOD(CID)
+	/* This Function use for check if that CID exist
+           in table ZODTIER or not */
+
+        //quit $E($D(^ZODTIER(CID)),1,1))	
+        type ResultSet rs = Db.select("SEQ","ZODTIER","CID=:CID")
+        if 'rs.next() quit 0
+        else  quit 1
+        
+ZSUBAFLG(CID,CLS,TYPE,STAT)
+	new RET,ZSUBAC,ZODTFLG
+	set RET=0
+	if STAT=4 quit RET
+	if CLS="D" do {
+		if TYPE'=1001,TYPE'=2001 quit
+		type RecordDEP dep=Db.getRecord("DEP","CID=:CID")
+		set ZODTFLG=dep.zodtflg
+		if ZODTFLG=1 set RET=1
+	}
+	if CLS="L" do {
+		type RecordLN ln=Db.getRecord("LN","CID=:CID")
+		set ZSUBAC=ln.zsubac
+		if ZSUBAC=1 set RET=1
+	}
+	quit RET
+	
+ZPRIMFLG(CID,CLS,TYPE,STAT)
+	new RET,ZSUBAC,ZODTFLG
+	set RET=0
+	if STAT=4 quit RET
+	if CLS="D" do {
+		if TYPE'=1001,TYPE'=2001 quit
+		type RecordDEP dep=Db.getRecord("DEP","CID=:CID")
+		set ZODTFLG=dep.zodtflg
+		if ZODTFLG=1 set RET=1
+	}
+	if CLS="L" do {
+		type RecordLN ln=Db.getRecord("LN","CID=:CID")
+		set ZSUBAC=ln.zsubac
+		if ZSUBAC'=1 set RET=1
+	}
+	quit RET
+	
+ZCRD(CID)
+	new RET,ACN,CRDTYP,CRDNUM
+	set RET=""
+	
+	type ResultSet rs=Db.select("CRDTYP,CRDNUM","CRDGRP","CID=:CID AND PRIMCRD=1")
+	if 'rs.isEmpty() while rs.next() do {
+		set CRDTYP=rs.getCol(1)
+		set CRDNUM=rs.getCol(2)
+		set RET=CRDTYP_"#"_CRDNUM
+	}
+	
+	quit RET
+	
+ZCRLMTA(ZCID)  // Get Active Total Credit Limit
+	
+	/* This function use for get Active Total Credit Limit from LN Table */
+	
+	new ZCLS,ZCRLMT
+
+	type RecordACN acn=Db.getRecord("ACN","CID=:ZCID")
+	set ZCLS=acn.cls
+	
+	// Oracha P - 15June05 - begin
+	set ZCRLMT=""
+
+	// if ZCLS="D" quit ""
+	if ZCLS="D" do { quit ZCRLMT
+		if Db.currVal("ZODTIER","CID=:ZCID").isNull() quit
+		type RecordDEP dep={RecordDEP}acn
+		set ZCRLMT=dep.odlim   // Tawiton  Add 19/01/2009
+	}
+	// Oracha P - 15June05 - end 
+	type RecordLN ln={RecordLN}acn
+	set ZCRLMT=ln.crlmt
+	
+	quit ZCRLMT
+
+ZACRLN(Number CID)
+	/*
+	   This function is used to compute [ACN]ZACRLN field
+
+	   ARGUMENTS:
+	   . CID                       Account Number /TYP=N/REQ/MECH=VAL
+
+	   RETURNS:
+	   . $$ Accrued Interest for Loan		/TYP=N
+
+	   EXAMPLE:
+	   W $$ZACRLN^ZACNCDI(123)
+	*/
+
+	type Number ZACRLN = 0
+	if CID.isNull() quit 0
+
+	type RecordACN acn = Db.getRecord("ACN", "CID=:CID", 1)
+	if 'acn.getMode() quit 0
+
+	if acn.cls = "L" do {
+		type RecordLN ln = {RecordLN}acn
+		set ZACRLN = ln.acr
+	}
+	else  if acn.cls = "D" do {
+		type RecordDEP dep = {RecordDEP}acn
+		set ZACRLN = dep.negacr + dep.negacrun
+	}
+
+	quit ZACRLN

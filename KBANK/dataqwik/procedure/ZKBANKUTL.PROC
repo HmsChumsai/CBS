@@ -1,0 +1,176 @@
+//DO NOT MODIFY  KBANK Utilities|ZKBNKUTL|||||||1
+	/*
+	 ORIG: Anchalee Ch. - 5 July 2012
+	 DESC: KBANK Utilities
+	
+	 ---- Comments --------------------------------------------------------
+	
+	 ---- Revision History ------------------------------------------------
+	
+	 ****** Consider using setAuditFlag for all objects in this procedure
+	   example :do dep.setAuditFlag(1)
+	
+	*/
+	
+	quit
+	
+NTREF(Date XTJD, Number XBRCD)
+
+	type Number XSEQ
+	
+	type RecordZUTBLNSEQTRF zntref=Db.getRecord("ZUTBLNSEQTRF","TJD=:XTJD,BRCD=:XBRCD",1)
+	set XSEQ=+zntref.nseq
+	
+	if XSEQ=0 set XSEQ=1
+	set zntref.nseq=XSEQ+1
+	do zntref.save()
+	
+	quit XSEQ
+	
+GETTREF(Date XTJD, Number XBRCD)
+	
+	type String XTREF
+	type Number SEQ
+	
+	set XTREF=""
+	set SEQ=$$NTREF(XTJD,XBRCD)
+	set XTREF=XTJD_XBRCD.zero(4)_SEQ.zero(7)
+	
+	quit XTREF
+	
+ONLERR(String XERR)
+
+	type String ZERRMSG = "TFCD90001"
+	
+	set XERR=XERR.get().extract(1,50)
+	set XERR=XERR.blank(50)
+	set ZERRMSG=ZERRMSG_XERR_$$^MSG(662003)
+
+	quit ZERRMSG
+	
+NUMETC(String ZETC, Number ZLEN, Boolean ZEC, Boolean ZTF)
+	/*
+	Returns KBANK transaction code in number
+	
+	ARGUMENTS:
+		ZETC	Profile Transaction Code		/REQ
+		ZLEN	Length of KBANK transaction code	/NOREQ
+		ZEC	EC Flag (ITC6 or ITC12)			/NOREQ
+		ZTF	Trade Finance Flag			/NOREQ
+			(Transaction from trade finance determine from ZTF TSO
+				ZTF TSO=1 -> Trade Finance Transaction
+				ZTF TSO=0 -> Other channel)
+	
+	RETURNS:
+		KBANK Transaction Code
+		
+	EXAMPLE:
+		set ZNUMETC=$$NUMETC^ZKBNKUTL(TTX.ETC,4,0,0)
+	*/
+
+	type Number TMPETC
+	type String NUMETC
+	
+	if ZLEN.isNull() set ZLEN=4
+	set ZTF=ZTF.get()
+	
+	type RecordZUTBLTRCD ztrcd=Db.getRecord("ZUTBLTRCD","ETC=:ZETC",1)
+	if ZEC.get() set TMPETC=ztrcd.ecetcnum.extract(1,4)
+	else  set TMPETC=ztrcd.etcnum.extract(1,4)
+	set NUMETC=TMPETC.zero(ZLEN)
+	
+	if ZTF set NUMETC=NUMETC.extract(1,NUMETC.length()-1)_"2"
+
+	quit NUMETC
+	
+USERID(String ZUID, Number ZLEN)
+	/*
+	Returns KBANK User ID for extraction
+	
+	ARGUMENTS:
+		ZUID	Profile User ID				/REQ
+		ZLEN	Length of output User ID		/NOREQ
+
+	RETURNS:
+		User ID with length as input
+	
+	EXAMPLE:
+		set ZUID=$$USERID^ZKBNKUTL(TTX.UID,5)
+	*/
+
+	type String USERID
+	
+	set USERID=ZUID
+	if ZLEN.isNull() set ZLEN=ZUID.length()
+	
+	do {
+		if ZUID.extract(1,2)="K0" do { quit
+			if ZLEN=4 set USERID=ZUID.extract(4,7) quit
+			if ZLEN=5 set USERID=ZUID.extract(3,7) quit
+			if ZLEN=6 set USERID=ZUID.extract(3,8) quit
+			if ZLEN=7 set USERID=ZUID.extract(2,8)
+		}
+		if ZUID.length()'>ZLEN set USERID=ZUID.zero(ZLEN) quit
+		set USERID=ZUID.extract(1,ZLEN)
+	}
+
+	quit USERID
+	
+HLDTYP(Number CID, Date ZTJD)
+
+	type Number HLDTYP,ZCNT
+	
+	set ZCNT=0
+	set HLDTYP=0
+	type ResultSet rs=Db.select("PHC,STDT,EXPDT,ZHLDTYP","PHLD","CID=:CID")
+	while rs.next() do { quit:ZCNT>1
+		if rs.getCol("STDT")>ZTJD quit
+		if (rs.getCol("EXPDT")'=""),(rs.getCol("EXPDT")'>ZTJD) quit
+		
+		set HLDTYP=+rs.getCol("ZHLDTYP")
+		set ZCNT=ZCNT+1
+	}
+	
+	if ZCNT>1 set HLDTYP=99
+	if HLDTYP=0 set HLDTYP=99
+
+	quit HLDTYP
+	
+MISCCD(Number CID, Date ZTJD)
+
+	type String MISCCD
+	
+	set MISCCD=""
+	
+	type DbSet ds=Db.selectDbSet("RFLG","CID=:CID")
+	while ds.next() do {
+		type RecordRFLG rflg=ds.getRecord("RFLG")
+		if rflg.stdt>ZTJD quit
+		if ('rflg.exdt.isNull()),(rflg.exdt<ZTJD) quit
+		
+		if rflg.rflg.extract(1,2)'="MC" quit
+		
+		set MISCCD=MISCCD_rflg.rflg.extract(3,4)
+	}
+
+	quit MISCCD
+	
+AUTHINFO(Date ZTJD, Number ZBRCD, String ZUID, Number ZTSEQ)
+
+	type String ZAUTH
+	type Number ZLEVEL
+	
+	
+	set ZLEVEL=0
+	set ZAUTH=ZUID
+	
+	type DbSet ds=Db.selectDbSet("SPV","TJD=:ZTJD AND BRCD=:ZBRCD AND UID=:ZUID AND TSEQ=:ZTSEQ")
+	while ds.next() do { quit:ZLEVEL'=0
+		type RecordSPV spv=ds.getRecord("SPV")
+		if spv.ovrid=ZUID quit
+		if spv.ovrid="*" quit
+		set ZLEVEL=3
+		set ZAUTH=spv.ovrid
+	}
+
+	quit ZAUTH_"|"_ZLEVEL

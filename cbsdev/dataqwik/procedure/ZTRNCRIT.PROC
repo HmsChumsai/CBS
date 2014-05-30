@@ -1,0 +1,2952 @@
+//DO NOT MODIFY  Transaction Monitor (Critical)|ZTRNCRIT|||||||1
+  /*
+	ORIG: Rapeepan Y. - 08/08/2008
+	DESC: Transaction Monitor (Critical)
+
+---- Comments --------------------------------------------------------
+
+---- Revision History ------------------------------------------------
+
+	July 22, 2011	Srisuda A.		
+			- Set ZSUSDLOG.DATE=$P($H,",",1)
+			
+	July 20, 2011	Srisuda A.		
+			- Set ZSUSDLOG.DATE=%CurrentDate
+				
+	July 19, 2011	Srisuda Assawadeekul
+			Modify R044 : If Fee Transaction then quit
+			
+	Mar 28, 2011	Srisuda Assawadeekul
+			Modify R005 : Detect both two Debit Transaction(itc1=0) and Credit Transaction(itc1=1)
+				      			
+	Feb 5, 2011	Srisuda Assawadeekul
+			Modify R005 : Change Field to compare from itc to itc1
+				      Detect only Debit Transaction(itc1=0)
+			
+	Jun 5, 2010	Rachod Intraha
+		        - Modified code to use HIST.ZITC6, HIST.ZITC12
+		   	instead of HIST.ITC6, HIST.ITC12 to remain same
+		   	return value as V64.	
+		   	
+	Oct 08, 2008	Rapeepan Y. 
+			1. Modified Linetag : INIT and DETRULE , by adding check Min Tx Amount for R033
+			2. Modified Linetag : HISTTIME 
+				- Change get SystemDate from TJD to ^CUVAR(2)
+				
+	Oct 29, 2008	Rapeepan Y.
+			- Add Rule Detection R016 and R017
+
+	Oct 31, 2008	Srisuda A.
+			- Add Rule Detection R005
+
+	Sep 03, 2008	Srisuda A.
+			- Add Rule Detection R032
+
+	Dec 02, 2008	Srisuda A.
+			- Change Global log status monitor from ZSVRMCTR to ZMONCTRL
+			
+	Dec 25, 2008	Srisuda A.
+			- R032: Check ETC is SSB transaction by ZUTBLTRCD.PRODFLG="PB"
+
+	Jan 16, 2009	Srisuda A.
+			- Added to get value for field zsusdlog.ovrname
+
+	Mar 16, 2009	Srisuda A.
+			- R032 : Added Threshold Parameter
+			1. Limit Amount (ZUTBLSURLAMT)
+
+	Aug 24, 2009 	Srisuda A.
+			- Modify how to set/get override user id from SPV(Supervisory Override) - LineTag:GOVRID^ZSURUTL
+			
+	Sep 04, 2009 	Srisuda A.
+			- Add Rule Detection R034(C,D,F), R035(C), R038(D,E,F)
+
+	Nov 06,2009	Srisuda A.
+			- Add Channel(ZSUSDLOG.CHNL) for Rule R032, R033
+
+	Nov 13, 2009	Srisuda A.
+			- Check transaction is needed to Analyze in Surveillance $$CANLYZTR^ZSURUTL			
+												
+	Dec 03, 2009	Srisuda A.
+			- Check Surveillance Product Flag Excluded $$CHKPRDF^ZSURUTL for R044B	
+	
+	Dec 29, 2009	Srisuda A.
+			- R035 not need to check Credit of Debit Transaction by Transaction Amount for in case not waive fee	
+
+	Jan 18, 2010	Srisuda A.		
+			- Add Field Flag of KTB User and Channel Reference
+
+	Feb 08, 2010	Srisuda A.
+			- Not Initiate Channel for R031, R032
+
+	Feb 19, 2010	Srisuda A.
+			- Initiate Channel for R032 but not define channel.	
+
+	Mar 22, 2010	Srisuda A.		
+			- KTB Update to Profile 7.2
+
+	June 02, 2011	Srisuda A.			
+			- If credit transaction is not inclued for R044						
+ ****** Consider using setAuditFlag for all objects in this procedure
+   example :do dep.setAuditFlag(1)
+
+ */
+
+	
+MAIN(Number ZREDAYS)
+	//D MAIN^ZTRNCRIT(0)
+	catch error {          
+		type String ET
+
+		set ET=error.type
+		if ET["%GTM-" do ZE^UTLERR
+		set ET=ET_"-"_error.thrownAt
+		set ET=ET_","_error.description
+
+		do LOG^ZSUREXC($T(+0),"*",%FN.get(),"",%ZTSEQ.get(),ET)
+		}
+
+	type Date DATE
+	type Number EXIT,SEQ,MONTIME
+	type String THRSHAMT
+	
+	
+	// cache rule switch
+	type String ZRULESW()
+	
+	// cache common condition applied
+	type String TMPCAPPL()
+	
+	// cache common condition
+	type String TMPCCIF(),TMPCPRDT(),TMPCCID(),TMPCKCUS()
+	
+	// cache detail rule to exclude
+	type String TMPDRULE()
+	
+	// ZUTBLSUR033A
+	// R033,1 - Percent Difference
+	// R033,2 - Number of Previous Transactions
+	// R033,3 - Monitoring Period (Day)
+	
+	// Common condition
+	// format THR00X(RULE,SEQ)=VALUE
+	type Number THR00X()
+	
+	type Number ZLASTDD
+
+	// Number of days to rerun
+	set ZREDAYS=$G(ZREDAYS)
+	set ZREDAYS=+ZREDAYS
+	
+	do SYSVAR^SCADRV0()
+
+	lock +^ZMONCTRL("ZTRNCRIT"):5 else  quit
+	
+	type RecordZMONCTRL zsvrmctr=Db.getRecord("ZMONCTRL","PROCESSOR='ZTRNCRIT'",1)
+	set zsvrmctr.pid=$$DECHEX^%ZHEX(%ProcessID)
+	set zsvrmctr.sysdate=%CurrentDate
+	set zsvrmctr.startime=%CurrentTime
+	set zsvrmctr.stopdate=""
+	set zsvrmctr.stoptime=""
+	set zsvrmctr.stop=0
+	do zsvrmctr.bypassSave()
+	
+	
+	set DATE=%SystemDate-ZREDAYS
+	
+	//File ID: ZLKCRIT => Global Name: ZSVRCRIT
+	set ZLASTDD=Db.prevKey("ZLKCRIT","TJD=''")
+	
+	if ZLASTDD>DATE set DATE=ZLASTDD
+	
+
+	do INIT(.ZRULESW,.TMPCCIF,.TMPCPRDT,.TMPCCID,.TMPCKUS,.TMPCAPPL,.TMPDRULE,.THR00X)
+	
+	set EXIT=0
+	for  do { quit:EXIT
+		
+		type RecordZLKCRIT zlkcrit=Db.getRecord("ZLKCRIT","TJD=:DATE",1)
+		
+		set SEQ=Db.nextKey("ZANLYZTR","TJD=:DATE,SEQ=:zlkcrit.lstseq")
+					
+		if SEQ.isNull() do { quit
+			set EXIT=$$CTRLX 
+			
+			// find next date for ZANLYZTR
+			type ResultSet zrstr=Db.select("TJD","ZANLYZTR","TJD>:DATE")
+			if zrstr.next() set DATE=zrstr.getCol(1)
+			
+			hang MONTIME
+			}
+		 
+		type RecordZANLYZTR zanlyztr=Db.getRecord("ZANLYZTR","TJD=:DATE,SEQ=:SEQ")
+
+		if zanlyztr.fid="DTJ" do DTJ(DATE,zanlyztr.keys,.ZRULESW)
+		
+		set zlkcrit.lstseq=SEQ
+		do zlkcrit.bypassSave()
+		}
+
+	lock -^ZMONCTRL("ZTRNCRIT")
+	type RecordZMONCTRL zmonctrx=Db.getRecord("ZMONCTRL","PROCESSOR='ZTRNCRIT'")
+	set zmonctrx.stopdate=%CurrentDate
+	set zmonctrx.stoptime=%CurrentTime
+	do zmonctrx.bypassSave()
+	quit
+
+	
+DTJ(Date DATE, String KEYS, String ZRULESW())
+	/*
+	rule detection for DTJ
+	R033
+	*/
+
+	type public Cache %CACHE()
+
+	type Number CID,DATETIME,TSEQ
+	type String DETAIL,TSO()
+	
+	// Transaction amount (BAHT)
+	type Number ZTRAMT
+	catch error {
+		type String ET
+
+		set ET=error.type
+		if ET["%GTM-" do ZE^UTLERR
+		set ET=ET_"-"_error.thrownAt
+		set ET=ET_","_error.description
+
+		do LOG^ZSUREXC($T(+0),"*",%FN.get(),"",%ZTSEQ.get(),ET)
+		}
+
+	set DATETIME=KEYS.piece(",",1)
+	set CID=KEYS.piece(",",2)
+	set TSEQ=KEYS.piece(",",3)
+
+	type RecordDTJ dtj=Db.getRecord("DTJ","TJD=:DATE,DATETIME=:DATETIME,CID=:CID,TSEQ=:TSEQ")
+	
+	// set transaction amount in thai baht
+	set ZTRAMT=dtj.tot
+	if (dtj.crcd'="THB"),(+dtj.sysbase'=0) set ZTRAMT=+dtj.sysbase
+	
+	do OUT^UTSO(.TSO,dtj.tso)
+	
+	type RecordTRN trn=%CACHE("TRN").getRecord("TRN","ETC=:dtj.etc")
+	type RecordSCAU scau=Db.getRecord("SCAU","UID=:dtj.uid")
+	type RecordSCAU0 scau0=%CACHE("SCAU0").getRecord("SCAU0","UCLS=:scau.%ucls")
+
+	type RecordACN acn=Db.getRecord("ACN","CID=:dtj.cid")
+	type RecordCIF cif=Db.getRecord("CIF","ACN=:acn.acn")
+
+	// If Fee Transaction then quit
+	if $$CHKISFEE^ZSURUTL(dtj.etc) quit
+	// If this transaction don't need to Analyze in Surveillance then quit
+	if '$$CANLYZTR^ZSURUTL(.THR00X,scau.%ucls,scau0.zbatch,dtj.itc7) quit	
+			
+	type Number ZR005FLG,ZR016FLG,ZR017FLG,ZR032FLG
+	set (ZR005FLG,ZR016FLG,ZR017FLG,ZR032FLG)=""
+	
+	type Number ZR016TIM,ZR017TIM
+	set (ZR016TIM,ZR017TIM)=0
+	
+	// check rule switch for R033
+	if $$DETRULE("R033",acn,cif,ZTRAMT) do R033(.TSO,dtj,trn,scau,scau0,acn,cif,ZTRAMT,.THR00X)
+	
+	// Description of value of ZRXXXFLG (ZR005FLG, R032FLG)
+	// -If ZRXXXFLG=0 is excluded rule by Parameter Configuration
+	// -If ZRXXXFLG=1 is included rule by Parameter configuration but not passed condition of rule detection
+	// -If ZRXXXFLG=2 is included rule by Parameter configuration and passed condition of rule detection
+	set ZR005FLG=$$DETRULEM("R005",acn,cif,scau,dtj,ZTRAMT)
+	if ZR005FLG set ZR005FLG=$$R005CHK(acn,dtj)
+		
+	// Check Transaction that same Account ,Amount and User ID in Time Interval
+	set ZR016FLG=$$DETRULEM("R016",acn,cif,scau,dtj,ZTRAMT) 
+		
+	// Check Transaction that same Account and Amount But diff. User ID in Time Interval
+	set ZR017FLG=$$DETRULEM("R017",acn,cif,scau,dtj,ZTRAMT) 
+
+	set ZR032FLG=$$DETRULEM("R032",acn,cif,scau,dtj,ZTRAMT) 
+	if ZR032FLG set ZR032FLG=$$R032CHK(acn,dtj)
+	
+	if ZR005FLG!ZR016FLG!ZR017FLG!ZR032FLG do {
+		// Ignore ec. / reversed transaction. 
+		if +dtj.tamt'>0 quit
+		if dtj.histrval'="" quit 
+		// Check History of Account
+		if acn.grp="CD" do HISTSCD(.TSO,dtj,scau,acn,cif,.THR00X)
+		if '(acn.grp="CD") do RTIMHIST(.TSO,dtj,scau,acn,cif,.THR00X)
+		
+		if (ZR005FLG=2) do SUSPECT(.TSO,dtj,trn,scau,scau0,acn,cif,"R005")
+		if ZR016TIM>1 do SUSPECT(.TSO,dtj,trn,scau,scau0,acn,cif,"R016")
+		if ZR017TIM'<1 do SUSPECT(.TSO,dtj,trn,scau,scau0,acn,cif,"R017")
+		//if (ZR032FLG=2) do SUSPECT(.TSO,dtj,trn,scau,scau0,acn,cif,"R032")
+		if (ZR032FLG=2) do {
+			type String ZRFLG
+			set ZRFLG=""
+			do INISUR51^ZSURUTL("R032",.ZRFLG)
+			do SUSDTJ^ZSURUTL(.TSO,dtj,trn,scau,scau0,acn,cif,"R032",.ZRFLG)
+		}
+	} 
+	
+	//*********************Start-Surveillance52******************************//
+	// Check Channel of DTJ Transaction
+	do SURCHNL(.TSO,dtj,trn,scau,scau0,acn,cif,.THR00X)
+	//*********************End-Surveillance52******************************//		
+	quit
+	
+R005CHK(RecordACN acn,
+	RecordDTJ dtj)
+	// Check other condition of R005
+	// Detect only deposit Product Class
+	if '(acn.cls="D") quit 0
+
+	// Not detect error-correction transaction
+	type RecordHIST hist=Db.getRecord("HIST","CID=:dtj.cid,TSEQ=:dtj.tseq")
+	set REV=$S(hist.zitc6:1,hist.zitc12:1,1:0)  //Rachod - 05/06/10
+	// - exclude ec. reversed transaction.  both reversed and reveral
+	if REV quit 0
+	if +(hist.histrflg) quit 0
+	if +(hist.itc7) quit 0
+
+	// Pass checked condition of R005CHK then return included rule(1)
+	quit 1
+
+
+R032CHK(RecordACN acn,
+	RecordDTJ dtj)
+	// Check other condition of R032
+	// Detect only debit(0) transaction 
+	if dtj.itc quit 0
+	// If ETC is not SSB Transaction then it is not included R031
+	if '$$PRDSSB(dtj.etc) quit 0
+	quit 1
+
+DETRULE(String RULETYPE,
+	RecordACN acn,
+	RecordCIF cif,
+	String ZTRAMT)
+	
+	/*
+	determine rule check flag by checking 
+	1. Rule Switch is ON/OFF
+	*/
+
+	type Number ZRET
+	
+	set ZRET=1
+	
+	// rule switch
+	if '$D(ZRULESW(RULETYPE)) set ZRET=0
+	
+	// common condition
+	if ($G(TMPCAPPL(RULETYPE,1))=1),$D(TMPCCIF(acn.acn)) set ZRET=0
+	if ($G(TMPCAPPL(RULETYPE,2))=1),$D(TMPCPRDT(acn.type)) set ZRET=0
+	if ($G(TMPCAPPL(RULETYPE,3))=1),$D(TMPCCID(acn.cid)) set ZRET=0
+	if ($G(TMPCAPPL(RULETYPE,4))=1),$D(TMPCKCUS(cif.zktbccode)) set ZRET=0
+	
+	// Condition to exclude for each rule
+	if $D(TMPDRULE("ZUTBLSUXMIN",RULETYPE)) do { if ZRET=0 quit 0
+		type RecordZUTBLSUXMIN zsuxmin=Db.getRecord("ZUTBLSUXMIN","RULE=:RULETYPE")
+		if +zsuxmin.amt=0 quit
+		if ZTRAMT<zsuxmin.amt set ZRET=0
+	}
+	
+	
+	quit ZRET
+
+DETRULEM(String RULETYPE,
+	RecordACN acn,
+	RecordCIF cif,
+	RecordSCAU scau,
+	RecordDTJ dtj,
+	String ZTRAMT)
+	
+	/*
+	determine rule check flag by checking 
+	1. Rule Switch is ON/OFF
+	2. Common condition 
+	3. Condition to exclude for each rule
+	*/
+
+	type Number ZRET
+	
+	set ZRET=1
+	
+	// rule switch
+	if '$D(ZRULESW(RULETYPE)) set ZRET=0
+	
+	// common condition
+	if ($G(TMPCAPPL(RULETYPE,1))=1),$D(TMPCCIF(acn.acn)) set ZRET=0
+	if ($G(TMPCAPPL(RULETYPE,2))=1),$D(TMPCPRDT(acn.type)) set ZRET=0
+	if ($G(TMPCAPPL(RULETYPE,3))=1),$D(TMPCCID(acn.cid)) set ZRET=0
+	if ($G(TMPCAPPL(RULETYPE,4))=1),$D(TMPCKCUS(cif.zktbccode)) set ZRET=0
+
+	
+	if 'ZRET quit ZRET
+
+	
+	// Condition to exclude for each rule
+	if $D(TMPDRULE("ZUTBLSUXPRDT",RULETYPE)),(acn.type'=""),Db.isDefined("ZUTBLSUXPRDT","RULE=:RULETYPE,PRDT=:acn.type") quit 0
+	if $D(TMPDRULE("ZUTBLSUXUCLS",RULETYPE)),(scau.%ucls'=""),Db.isDefined("ZUTBLSUXUCLS","RULE=:RULETYPE,UCLS=:scau.%ucls") quit 0
+	if $D(TMPDRULE("ZUTBLSUXETC",RULETYPE)),(dtj.etc'=""),Db.isDefined("ZUTBLSUXETC","RULE=:RULETYPE,ETC=:dtj.etc") quit 0
+	if $D(TMPDRULE("ZUTBLSUXKCUS",RULETYPE)),(cif.zktbccode'=""),Db.isDefined("ZUTBLSUXKCUS","RULE=:RULETYPE,ZKTBCCODE=:cif.zktbccode") do { if ZRET=0 quit 0
+		set ZRET=0
+		if $D(TMPDRULE("ZUTBLSUICIF",RULETYPE)),(acn.acn'=""),Db.isDefined("ZUTBLSUICIF","RULE=:RULETYPE,ACN=:acn.acn") set ZRET=1
+		}
+	if $D(TMPDRULE("ZUTBLSUXCID",RULETYPE)),(acn.cid'=""),Db.isDefined("ZUTBLSUXCID","RULE=:RULETYPE,CID=:acn.cid") quit 0
+	if $D(TMPDRULE("ZUTBLSUXMIN",RULETYPE)) do { if ZRET=0 quit 0
+		type RecordZUTBLSUXMIN zsuxmin=Db.getRecord("ZUTBLSUXMIN","RULE=:RULETYPE")
+		if +zsuxmin.amt=0 quit
+		if (+ZTRAMT)<(+zsuxmin.amt) set ZRET=0
+		}
+	
+	quit ZRET	
+	
+DETRULEX(String RULETYPE,
+	RecordACN acn,
+	RecordCIF cif,
+	String ZHUCLS,
+	String ZHETC,
+	String ZTRAMT)
+	
+	/*
+	determine rule check flag by checking 
+	1. Rule Switch is ON/OFF
+	2. Common condition 
+	3. Condition to exclude for each rule
+	*/
+
+	type Number ZRET
+	
+	set ZRET=1
+	
+	// rule switch
+	if '$D(ZRULESW(RULETYPE)) set ZRET=0
+	/*
+	// common condition
+	if ($G(TMPCAPPL(RULETYPE,1))=1),$D(TMPCCIF(acn.acn)) set ZRET=0
+	if ($G(TMPCAPPL(RULETYPE,2))=1),$D(TMPCPRDT(acn.type)) set ZRET=0
+	if ($G(TMPCAPPL(RULETYPE,3))=1),$D(TMPCCID(acn.cid)) set ZRET=0
+	if ($G(TMPCAPPL(RULETYPE,4))=1),$D(TMPCKCUS(cif.zktbccode)) set ZRET=0
+	*/
+	
+	if 'ZRET quit ZRET
+	
+	
+	// Condition to exclude for each rule
+	if $D(TMPDRULE("ZUTBLSUXPRDT",RULETYPE)),(acn.type'=""),Db.isDefined("ZUTBLSUXPRDT","RULE=:RULETYPE,PRDT=:acn.type") quit 0
+	//if $D(TMPDRULE("ZUTBLSUXUCLS",RULETYPE)),(scau.%ucls'=""),Db.isDefined("ZUTBLSUXUCLS","RULE=:RULETYPE,UCLS=:scau.%ucls") quit 0
+	if $D(TMPDRULE("ZUTBLSUXUCLS",RULETYPE)),(ZHUCLS'=""),Db.isDefined("ZUTBLSUXUCLS","RULE=:RULETYPE,UCLS=:ZHUCLS") quit 0
+	//if $D(TMPDRULE("ZUTBLSUXETC",RULETYPE)),(dtj.etc'=""),Db.isDefined("ZUTBLSUXETC","RULE=:RULETYPE,ETC=:dtj.etc") quit 0
+	if $D(TMPDRULE("ZUTBLSUXETC",RULETYPE)),(ZHETC'=""),Db.isDefined("ZUTBLSUXETC","RULE=:RULETYPE,ETC=:ZHETC") quit 0
+	if $D(TMPDRULE("ZUTBLSUXKCUS",RULETYPE)),(cif.zktbccode'=""),Db.isDefined("ZUTBLSUXKCUS","RULE=:RULETYPE,ZKTBCCODE=:cif.zktbccode") do { if ZRET=0 quit 0
+		set ZRET=0
+		if $D(TMPDRULE("ZUTBLSUICIF",RULETYPE)),(acn.acn'=""),Db.isDefined("ZUTBLSUICIF","RULE=:RULETYPE,ACN=:acn.acn") set ZRET=1
+		}
+	if $D(TMPDRULE("ZUTBLSUXCID",RULETYPE)),(acn.cid'=""),Db.isDefined("ZUTBLSUXCID","RULE=:RULETYPE,CID=:acn.cid") quit 0
+	if $D(TMPDRULE("ZUTBLSUXMIN",RULETYPE)) do { if ZRET=0 quit 0
+		type RecordZUTBLSUXMIN zsuxmin=Db.getRecord("ZUTBLSUXMIN","RULE=:RULETYPE")
+		if +zsuxmin.amt=0 quit
+		if (+ZTRAMT)<(+zsuxmin.amt) set ZRET=0
+		}
+	
+	quit ZRET	
+	
+			
+CTRLX()
+	type RecordZMONCTRL zsvrmctr=Db.getRecord("ZMONCTRL","PROCESSOR='ZTRNCRIT'",1)
+	if zsvrmctr.stop quit 1
+	quit 0
+
+INIT(String ZRULESW(), 
+      String TMPCCIF(), 
+      String TMPCPRDT(), 
+      String TMPCCID(), 
+      String TMPCKUS(), 
+      String TMPCAPPL(),
+      String TMPDRULE(), 
+      Number THR00X())
+
+	// ZUTBLSURUCLS - User Class for Analyze Surveillance
+	type ResultSet zsurucls=Db.select("UCLS","ZUTBLSURUCLS")
+	while zsurucls.next() set THR00X("ZSURUCLS",zsurucls.getCol("UCLS"))=""
+	
+	// ZRULESW - switch for each rule
+	type ResultSet zrssw=Db.select("RULE","ZUTBLSURSW","FLG=1")
+	while zrssw.next() set ZRULESW(zrssw.getCol(1))=""
+	
+	// Load common condition
+	type ResultSet zrscom1=Db.select("ACN","ZUTBLSUCCIF")
+	while zrscom1.next() set TMPCCIF(zrscom1.getCol(1))=""
+	
+	type ResultSet zrscom2=Db.select("PRDT","ZUTBLSUCPRDT")
+	while zrscom2.next() set TMPCPRDT(zrscom2.getCol(1))=""
+	
+	type ResultSet zrscom3=Db.select("CID","ZUTBLSUCCID")
+	while zrscom3.next() set TMPCCID(zrscom3.getCol(1))=""
+
+	type ResultSet zrscom4=Db.select("ZKTBCCODE","ZUTBLSUCKCUS")
+	while zrscom4.next() set TMPCKCUS(zrscom4.getCol(1))=""
+	
+	
+	// Load rule - common condition applied
+	type ResultSet zrscap=Db.select("RULE,FLGC1,FLGC2,FLGC3,FLGC4","ZUTBLSUCOAPP")
+	while zrscap.next() do {
+		set TMPCAPPL(zrscap.getCol(1),1)=+zrscap.getCol(2)
+		set TMPCAPPL(zrscap.getCol(1),2)=+zrscap.getCol(3)
+		set TMPCAPPL(zrscap.getCol(1),3)=+zrscap.getCol(4)
+		set TMPCAPPL(zrscap.getCol(1),4)=+zrscap.getCol(5)		
+		}
+	
+	type ResultSet zrsd1=Db.select("RULE","ZUTBLSUXPRDT")
+	while zrsd1.next() set TMPDRULE("ZUTBLSUXPRDT",zrsd1.getCol(1))=""
+	
+	type ResultSet zrsd2=Db.select("RULE","ZUTBLSUXUCLS")
+	while zrsd2.next() set TMPDRULE("ZUTBLSUXUCLS",zrsd2.getCol(1))=""
+	
+	type ResultSet zrsd3=Db.select("RULE","ZUTBLSUXETC")
+	while zrsd3.next() set TMPDRULE("ZUTBLSUXETC",zrsd3.getCol(1))=""
+	
+	type ResultSet zrsd4=Db.select("RULE","ZUTBLSUXKCUS")
+	while zrsd4.next() set TMPDRULE("ZUTBLSUXKCUS",zrsd4.getCol(1))=""
+	
+	type ResultSet zrsd5=Db.select("RULE","ZUTBLSUICIF")
+	while zrsd5.next() set TMPDRULE("ZUTBLSUICIF",zrsd5.getCol(1))=""
+	
+	type ResultSet zrsd6=Db.select("RULE","ZUTBLSUXCID")
+	while zrsd6.next() set TMPDRULE("ZUTBLSUXCID",zrsd6.getCol(1))=""
+	
+	type ResultSet zrsd7=Db.select("RULE","ZUTBLSUXMIN")
+	while zrsd7.next() set TMPDRULE("ZUTBLSUXMIN",zrsd7.getCol(1))=""
+	
+	type ResultSet zrsd8=Db.select("RULE","ZUTBLSUIETC")
+	while zrsd8.next() set TMPDRULE("ZUTBLSUIETC",zrsd8.getCol("RULE"))=""
+
+	type ResultSet zrsd9=Db.select("RULE","ZUTBLSUICID")
+	while zrsd9.next() set TMPDRULE("ZUTBLSUICID",zrsd9.getCol("RULE"))=""
+		
+	type ResultSet zrsd10=Db.select("RULE","ZUTBLSUIUID")
+	while zrsd10.next() set TMPDRULE("ZUTBLSUIUID",zrsd10.getCol("RULE"))=""
+	
+	type ResultSet zrsxprdf=Db.select("RULE","ZUTBLSUXPRDF")
+	while zrsxprdf.next() set TMPDRULE("ZUTBLSUXPRDF",zrsxprdf.getCol("RULE"))=""
+	
+	//  load criteria to log
+	// R033
+	type RecordZUTBLSUR033A zcr033=Db.getRecord("ZUTBLSUR033A","RULE='R033'")
+	set THR00X("R033",1)=zcr033.perdif
+	set THR00X("R033",2)=zcr033.pcount
+	set THR00X("R033",3)=zcr033.monpd
+	
+	// Change THR00X("R016",1) to THR00X("ZSURNTIM","R016")
+	// R016,R017 
+	/*type ResultSet zrsd11=Db.select("RULE,MINUTE","ZUTBLSURNTIM")
+	while zrsd11.next() set THR00X(zrsd11.getCol(1),1)=zrsd11.getCol(2)	// Sec.
+	*/
+	// R032 Time Interval (day) - (ZUTBLSURNDAY), Transaction Count - (ZUTBLSURTCNT)
+		// THR00X("R032",1) = Time Interval (Day)
+		// THR00X("R032",2) = Transaction Count 
+		// THR00X("R032",3) = Limit Amount 
+	type ResultSet zrsd12=Db.select("RULE,DAYS","ZUTBLSURNDAY","RULE='R032'")
+	while zrsd12.next() set THR00X(zrsd12.getCol("RULE"),1)=zrsd12.getCol("DAYS")	
+	type ResultSet zrsd13=Db.select("RULE,TCOUNT","ZUTBLSURTCNT","RULE='R032'")
+	while zrsd13.next() set THR00X(zrsd13.getCol("RULE"),2)=zrsd13.getCol("TCOUNT")	
+	type ResultSet zrsd14=Db.select("RULE,LAMT","ZUTBLSURLAMT","RULE='R032'")
+	while zrsd14.next() set THR00X(zrsd14.getCol("RULE"),3)=zrsd14.getCol("LAMT")	
+
+	//***********************Start-Surveillance 52************************************/
+	// All Rule of Sur52 : R035, R038, R046, R048
+	// Channel Type Description of Surveillance(ZUTBLSURCHNL)
+	type ResultSet zrsrchnl=Db.select("CHNL,PRETLO,PRODFLG,DCHNLFLG","ZUTBLSURCHNL")
+	while zrsrchnl.next() set THR00X("ZSURCHNL",zrsrchnl.getCol("CHNL"))=zrsrchnl.getCol("PRETLO")_"|"_zrsrchnl.getCol("PRODFLG")_"|"_zrsrchnl.getCol("DCHNLFLG")
+
+	// R034,R036 - Surveillance Transaction Count(ZUTBLSURTCNT)
+	type ResultSet zrstcnt=Db.select("RULE,TCOUNT","ZUTBLSURTCNT")
+	while zrstcnt.next() set THR00X("ZSURTCNT",zrstcnt.getCol("RULE"))=zrstcnt.getCol("TCOUNT")
+	
+	// R035,R036,R038 - Surveillance Number of Days(ZUTBLSURNDAY)
+	type ResultSet zrsnday=Db.select("RULE,DAYS","ZUTBLSURNDAY")
+	while zrsnday.next() set THR00X("ZSURNDAY",zrsnday.getCol("RULE"))=zrsnday.getCol("DAYS")
+	// R035,R038 - Surveillance Limit Amount(ZUTBLSURLAMT)
+	type ResultSet zrslamt=Db.select("RULE,LAMT","ZUTBLSURLAMT")
+	while zrslamt.next() set THR00X("ZSURLAMT",zrslamt.getCol("RULE"))=zrslamt.getCol("LAMT")
+	
+	// R038 - Surveillance Percent Difference (ZUTBLSURPDIF)
+	type ResultSet zrspdif=Db.select("RULE,PERDIF","ZUTBLSURPDIF")
+	while zrspdif.next() set THR00X("ZSURPDIF",zrspdif.getCol("RULE"))=zrspdif.getCol("PERDIF")
+	// R038 - Number of Minimum Previous Transactions (ZUTBLSURNPT)
+	// R038 - Number of Maximum Previous Transactions (ZUTBLSURNPT)
+	type ResultSet zrsnpt=Db.select("RULE,MINPT,MAXPT","ZUTBLSURNPT")
+	while zrsnpt.next() set THR00X("ZSURNPT",zrsnpt.getCol("RULE"))=zrsnpt.getCol("MINPT")_"|"_zrsnpt.getCol("MAXPT")
+	// R016,R017,R044 - Number of Minutes (ZUTBLSURNTIM)
+	type ResultSet zrsntim=Db.select("RULE,MINUTE","ZUTBLSURNTIM")
+	while zrsntim.next() set THR00X("ZSURNTIM",zrsntim.getCol("RULE"))=zrsntim.getCol("MINUTE")
+	//***********************End-Surveillance 52*************************************/
+		
+	type Number DAYPUR1,DAYKEEP,DATEPUR
+	set DAYPUR1=""
+	set MONTIME=""
+	// general config
+	if Db.isDefined("ZUTBLTRANMOD","CO='KTB'") do {
+		type RecordZUTBLTRANMOD ztrmd=Db.getRecord("ZUTBLTRANMOD","CO='KTB'")
+		set DAYKEEP=ztrmd.daykeep1
+		set MONTIME=ztrmd.montime
+		}
+	if DAYKEEP="" set DAYKEEP=30
+	if MONTIME="" set MONTIME=5
+	
+	quit
+
+
+TIM(X)
+	/*
+	Convert extended $H to time stamp
+
+	Converts a $HOROLOG formatted date/time into a numeric date and
+	time stamp.
+ 
+	ARGUMENTS:
+	     . X	Time ($HOROLOG format)
+
+	RETURNS:
+	     . $$	Time stamp			/TYP=N/REQ/MECH=VAL
+
+	*/
+
+	if $G(X)="" set X=$H
+	quit X*1E5+$P(X,",",2)
+
+
+START	// Start monitor
+
+	do PRMT(1) quit:VFMQ="Q"
+	do JOB(0)
+	quit
+
+START2	// Start monitor without prompt
+	do JOB(0)
+	quit
+
+START3  // Start monitor with a specify days to rerun
+	type Number ZREDAYS
+	do PRMT2(.ZREDAYS) quit:VFMQ="Q"
+	do JOB(ZREDAYS)
+	quit
+
+JOB(Number ZREDAYS)	// External entry point to spawn monitor
+
+	type String PRCNAM
+	type Number X
+
+	set ZREDAYS=+ZREDAYS
+	
+	type RecordCUVAR cuvar=Db.getRecord("CUVAR")
+
+	if '$$PID.isNull() set ER=1,RM=$$^MSG(8364) quit
+	set PRCNAM="ZTRNCRIT_"_cuvar.ptmdirid
+
+	set X=$$^%ZJOB("MAIN^ZTRNCRIT("_ZREDAYS_")","PRO="_PRCNAM,1)
+
+	if X set RM(RM("").order(-1)+1)=$$^MSG(6800,PRCNAM)
+	else  set RM(RM("").order(-1)+1)=$$^MSG(6799,PRCNAM)
+	set ER="W"
+	quit
+
+
+STOP	// Issue a stop message to transaction monitor
+
+	if $$PID.isNull() set ER=1,RM=$$^MSG(8366) quit
+	do PRMT(0) quit:VFMQ="Q"
+
+	type RecordZMONCTRL zsvrmctr=Db.getRecord("ZMONCTRL","PROCESSOR='ZTRNCRIT'",1)
+	set zsvrmctr.stop=1
+	do zsvrmctr.bypassSave()
+
+	set ER="W"
+	quit
+
+STOP2	// Issue a stop message to transaction monitor without prompt
+	type Number ZOUT,ZZPID
+	type String ZCMD
+	if $$PID.isNull() set ER=1,RM=$$^MSG(8366) quit
+
+	type RecordZMONCTRL zsvrmctr=Db.getRecord("ZMONCTRL","PROCESSOR='ZTRNCRIT'",1)
+	set zsvrmctr.stop=1
+	set ZZPID=$$HEXDEC^%ZHEX(zsvrmctr.pid)		
+	do zsvrmctr.bypassSave()
+	
+	set ZCMD="ps -p "_ZZPID_"  1>/dev/null"
+	// wait until monitor stopped
+	set ZOUT=0
+	while 'ZOUT do {
+		type RecordZMONCTRL zsvrmctx=Db.getRecord("ZMONCTRL","PROCESSOR='ZTRNCRIT'",1)
+		if zsvrmctx.stoptime'="" set ZOUT=1 quit
+		// check whether process is alive or not. if not, quit			
+		if $$SYS^%ZFUNC(ZCMD) set ZOUT=1 quit
+			
+		// Wait for next time interval 
+                set X=$$WAIT^%ZFUNC(10)
+                
+		}
+	
+	quit
+
+
+PRMT(Number OPT)
+
+	/*
+	Prompts for startup/shutdown
+
+	ARGUMENTS:
+	     . OPT	Option		/LEN=1/REQ
+	     		0 = Stop
+	     		1 = Start
+	*/
+
+	type String %READ,%TAB()
+
+	set %TAB("CONT")=".CONT2"
+
+	set %READ="@@%FN,,,CONT/REQ"
+	do ^UTLREAD if VFMQ="Q" quit
+	if 'CONT set VFMQ="Q"
+	quit
+
+PRMT2(Number ZREDAYS)
+	/*
+	Prompt Date to rerun
+	
+	*/
+	
+	set %TAB("ZREDAYS")="/DES=Days to rerun/REQ/TYP=N/REQ/LEN=4"
+	
+	set %READ="@@%FN/REV/CEN,,,ZREDAYS"
+	 		
+	//Read from prompt
+	do ^UTLREAD if VFMQ="Q" quit
+	
+	
+	quit
+
+PID()	// Return process ID
+
+	type String PID
+
+	type RecordZMONCTRL zsvrmctr=Db.getRecord("ZMONCTRL","PROCESSOR='ZTRNCRIT'",1)
+	set PID=zsvrmctr.pid if PID.isNull() quit ""
+	set PID=$$HEXDEC^%ZHEX(PID)
+
+	if '$$VALID^%ZPID(PID) quit ""
+	quit PID
+
+RSUMHIST(String TSO(),
+	RecordDTJ dtj,
+	RecordTRN trn,
+	RecordSCAU scau,
+	RecordSCAU0 scau0,
+	RecordACN acn,
+	RecordCIF cif,
+	Number THR00X(),
+	String ZTRAMT)
+	
+	type Number AMT,CNT,ZREV
+	type String SUM()
+	
+	/* start comment for exclude rev,err
+	// exclude reversal and error-corrected transaction
+
+	ITC6
+	ITC Byte 6 - Error-Corrected Flag         1  L        N    Computed: $E([DTJ]ITC,6)
+	An indicator (Y/N) in the internal transaction code which is turned on
+	if the transaction either:
+	a) is an error correct, or
+	b) has been error corrected.
+	
+	if dtj.itc6 quit
+	
+	
+	ITC12
+	ITC Byte 12 - Reversal Flag               1  L        N    Computed: $E([DTJ]ITC,12)
+	An indicator (Y/N) in the internal transaction code which is turned on
+	if the transaction either:
+	a) is a reversal, or
+	b) has been reversed.
+	
+	if dtj.itc12 quit
+	
+	
+	HISTRVAL
+	Reversed/Error Corrected Indicator        1  N        N
+	Indicates whether the transaction was Error Corrected (1) or Reversed (2).
+	Pulled from [HISTR]REVFLG.       
+	
+	if +dtj.histrval'=0 quit
+	
+	end comment for exclude rev,err
+	*/
+
+	if acn.cls="D" do {
+		type Number AMT,ZTHRSH,ZTRF,ZAVR,ZDIF
+		
+		
+		if (acn.grp="DDA")!(acn.grp="SAV") do { quit
+			// ZTRF=1 count only ATM transaction for R033	
+			set ZTRF=1 
+			
+			// THR00X("R033",1) = Percent Difference
+			// THR00X("R033",2) = Number of Previous Transactions
+			// THR00X("R033",3) = Monitoring Period (Day)  
+			
+			do HISTTIME(.SUM,CID,dtj.tseq,100,THR00X("R033",2),THR00X("R033",3))
+			
+			
+			// R033 - only debit transaction
+			//if (dtj.itc1=0),(SUM("CNT",0,0,0)=THR00X("R033",2)) do {
+			if (dtj.itc1=0),(SUM("CNT",0,0,0)>0) do {
+				
+				set ZAVR=SUM("AMT",0,0,0).piece("#",1)/SUM("CNT",0,0,0)
+				set ZDIF=(ZAVR*THR00X("R033",1))/100
+				
+				if (ZTRAMT-ZAVR)>ZDIF do {
+					//do SUSPECT(.TSO,dtj,trn,scau,scau0,acn,cif,"R033")
+					type String ZRFLG
+					set ZRFLG=""
+					do INISUR51^ZSURUTL("R033",.ZRFLG)
+					do SUSDTJ^ZSURUTL(.TSO,dtj,trn,scau,scau0,acn,cif,"R033",.ZRFLG)
+				}
+				
+			}	// end if (dtj.itc1=0),(SUM("CNT",0,0,0)>0)
+		}
+			
+					
+	}	// end if acn.cls="D" 
+		
+	quit
+	
+	
+HISTTIME(String SUM(), Number CID, Number TSEQ, Number MAX, Number PCNT, Number TPERIOD)
+
+	/*
+	ARGUMENTS:
+	     . SUM	Summary array		/NOREQ/MECH=REFARR:W
+
+			SUM("AMT",ITC1,ITC7,REV)
+			SUM("CNT",ITC1,ITC7,REV)
+			
+			where ITC1 = Debit/Credit indicator
+			             0 = Debit
+			             1 = Credit
+
+			      ITC7 = System generated transaction indicator
+			             0 = Not a system generated transaction
+			             1 = System generated transaction
+
+			      REV  = E/C or reversal transaction indicator
+			             0 = Not a E/C or reversal transaction
+			             1 = E/C or reversal transaction
+
+	     . CID	Account number		/REQ/MECH=VAL
+
+	     . TSEQ	Transaction sequence	/REQ/MECH=VAL
+
+	     . DYS	Number of days		/NOREQ/MECH=VAL/DFT=1
+
+	     		1 = Today's activity
+	     		2 = Today's & yesterday's activity
+	     		3 = Today's & last 2 days activity
+	     		...
+
+	     . MAX	Maximum record count	/NOREQ/MECH=VAL/DFT=100
+	     
+	                The maximum number of history records to be
+	                summarized.  This argument provides a means
+	                to limit the summary, particularly for high
+	                volume accounts.  Note that only financial
+	                transactions are included in the count.
+	               
+	     . TPERIOD	Time period to count and sum transactions backward for the account (TPERIOD is time in seconds)
+	     		Applied only original credit transaction (not REV transaction)
+	     
+	     . ZTRF 	Transfer Flag
+	     		o - Calculate all transaction
+	     		1 - Calculate only transfer transaction
+	*/
+
+	type Number I,ITC1,ITC7,REV,ZTIME,ZDIFF,ZDATE,ZDOPER
+	type String TAMT
+	type Date XJD
+
+	if +DYS.get()=0 set DYS=1
+	if +MAX.get()=0 set MAX=100
+	if +TPERIOD.get()=0 set TPERIOD=0
+	if +ZTRF.get()=0 set ZTRF=0
+	
+	//set XJD=TJD-(TPERIOD-1)
+	set XJD=^CUVAR(2)-TPERIOD		//Change get SystemDate from TJD to ^CUVAR(2)
+	
+	set (ZTIME,ZDATE,ZDOPER)=0
+
+	for ITC1=0,1 for ITC7=0,1 for REV=0,1 set SUM("AMT",ITC1,ITC7,REV)="",SUM("CNT",ITC1,ITC7,REV)=""
+	
+	//type ResultSet rs=Db.select("TSEQ","HIST","CID=:CID AND (NOT TSEQ>:TSEQ) AND (TJD BETWEEN :XJD AND :TJD) AND NOT ITC1=''","TSEQ DESC")
+	type ResultSet rs=Db.select("TSEQ","HIST","CID=:CID AND (TSEQ<:TSEQ) AND TJD>:XJD AND NOT ITC1=''","TSEQ DESC")
+	
+	while rs.next() do { quit:ZDOPER
+		type String ZHUID,ZHUCLS
+		set ZHUCLS=""
+		
+		type RecordHIST hist=Db.getRecord("HIST","CID=:CID,TSEQ=rs.getCol(1)")
+		set REV=$S(hist.zitc6:1,hist.zitc12:1,1:0)  //Rachod - 05/06/10
+		set ITC7=''hist.itc7
+		set ITC1=+hist.itc1
+		set TAMT=hist.tamt
+		if hist.crcd'="THB",(+hist.sysbase'=0) set TAMT=+hist.sysbase
+		set ZHUID=hist.uid
+		
+		if ZHUID'="",(Db.isDefined("SCAU","UID=:ZHUID")) do {
+			type RecordSCAU zhscaux=Db.getRecord("SCAU","UID=:ZHUID")
+			set ZHUCLS=zhscaux.%ucls
+			}
+		
+		
+		// exclude ec. reversed transaction.  both reversed and reveral
+		if REV quit
+		if hist.histrflg quit
+		
+		if ITC1=1 quit		// only debit tran.
+		if ITC7 quit
+			
+		// If Fee Transaction then quit
+		if $$CHKISFEE^ZSURUTL(hist.etc) quit
+						
+		// check ATM transaction 
+		// 1. check product flag (only ATM  ,AT=ktb bank / PC=other bank)
+		// flag 0 = Not ATM transaction
+		//      1 = ATM transaction
+		if '$$PRDCHK(hist.etc) quit
+		
+		// 2. check Withdraw transaction (1=Credit , 0=Debit)
+		//if trn.dc quit	//check hist.itc1 already 
+			
+		/* 3. check TTX that Debit transaction or not (Dr. from customer a/c and Cr. to G/L a/c)
+		 flag 0 = Transfer Transaction
+		      1 = Withdraw Transaction
+		*/
+		//if ZTRF,'$$TRFCHK(hist.tjd,hist.brcd,hist.uid,hist.trc) quit
+		
+		
+		if TAMT["#" do {
+				for I=1:1:TAMT.length("#") set SUM("AMT",ITC1,ITC7,REV).piece("#",I)=SUM("AMT",ITC1,ITC7,REV).piece("#",I)+TAMT.piece("#",I)
+				}
+		else  do {
+			set SUM("AMT",ITC1,ITC7,REV).piece("#",1)=SUM("AMT",ITC1,ITC7,REV).piece("#",1)+TAMT
+			set SUM("AMT",ITC1,ITC7,REV).piece("#",2)=SUM("AMT",ITC1,ITC7,REV).piece("#",2)+TAMT
+			}
+		set SUM("CNT",ITC1,ITC7,REV)=SUM("CNT",ITC1,ITC7,REV)+1	
+		
+		if SUM("CNT",ITC1,ITC7,REV)=PCNT set ZDOPER=1
+				
+		
+	}	// end while rs.next()
+
+
+	quit
+	
+	
+	
+TRFCHK(Number ZTJD, Number ZBRCD, String ZUID, Number ZORTSEQ)
+	/*
+	check whether the transaction specified if transacfer transaction or not
+	determined by checking if there's another Non G/L transactino existed in TTX set,
+	the transaction will be determined as transfer transaction
+	input
+		ZTJD	Transactioin Date
+		ZBRCD	Trasaction branch code
+		ZUID	Post by user
+		ZORTSEQ	TTX TSEQ of the transaction. get from dtj.trc/hist.trc
+
+	Return
+		Boolean
+		0 - Transfer transaction 
+		1 - non trasfer transaction 
+	
+	*/
+	new ZRETURN,ZTSEQCHK
+	set ZRETURN=1
+	set (ZTSEQ,ZTSEQCHK)=(ZORTSEQ\1000)*1000
+	set ZTSEQCHK=ZTSEQCHK+999
+
+	for  set ZTSEQ=$O(^TTX(ZTJD,ZBRCD,ZUID,ZTSEQ)) quit:((ZRETURN=0)!(ZTSEQ>ZTSEQCHK)!(ZTSEQ=""))  do { 
+		new ZETC
+		
+		if ZTSEQ=ZORTSEQ quit
+		type RecordTTX zttx=Db.getRecord("TTX","TJD=:ZTJD,BRCD=:ZBRCD,UID=:ZUID,TSEQ=:ZTSEQ")
+		
+		// check Cr. is G/L account or not
+		// Ignore debit transaction
+		if zttx.itc1=0 quit
+		
+		set ZETC=zttx.etc
+		if Db.isDefined("TRN","ETC=:ZETC")
+		type RecordTRN ztrn=Db.getRecord("TRN","ETC=:ZETC",1)
+		if ztrn.getMode() do {
+			if ztrn.cls="D"!(ztrn.cls="L") set ZRETURN=0
+			
+			}
+		}
+	quit ZRETURN
+	
+	
+	
+SUSPECT(String TSO(),
+	RecordDTJ dtj,
+	RecordTRN trn,
+	RecordSCAU scau,
+	RecordSCAU0 scau0,
+	RecordACN acn,
+	RecordCIF cif,
+	String ZSUSPTYP)
+	
+	type String DESC,ZACNAME
+
+	// Cost Center
+	set ZBRCD=dtj.brcd
+	if 'Db.isDefined("UTBLBRCD","BRCD=:ZBRCD") quit
+	
+	type RecordUTBLBRCD zcc=Db.getRecord("UTBLBRCD","BRCD=:ZBRCD")
+	set ZCC=zcc.ccdef
+	
+	// Transaction current Date
+	type Date ZLOGDATE
+	type Number ZSUB
+	
+	set ZLOGDATE=$P($H,",",1)
+	if ZLOGDATE="" set ZLOGDATE=dtj.cdt
+	if ZLOGDATE="" set ZLOGDATE=dtj.tjd
+		
+	// start tp
+	do Runtime.start("BA")
+	
+	set TSEQ=Db.nextVal("ZSUSDLOG","DATE=:ZLOGDATE")
+
+	type RecordZSUSDLOG zsuspdtl=Db.getRecord("ZSUSDLOG","DATE=:ZLOGDATE,TSEQ=:TSEQ",1)
+
+	set ZSUB=""
+	set zsuspdtl.date=ZLOGDATE
+	// Transaction Seq
+	set zsuspdtl.tseq=TSEQ
+	// Transaction Time
+	set zsuspdtl.time=dtj.time
+	// Account Number
+	set zsuspdtl.cid=dtj.cid
+	if acn.grp="CD",(acn.zmaster'=acn.cid),(acn.zmaster'="") do {
+		set zsuspdtl.mastercid=acn.zmaster
+		}
+	
+	// Transaction Code
+	set zsuspdtl.etc=dtj.etc
+	// Transaction Type
+	set zsuspdtl.dc=$S(dtj.itc1=0:"D",1:"C")
+	// EC Flag
+	set zsuspdtl.ecflg=+dtj.itc6
+	// Reversal Flag
+	set zsuspdtl.revflg=+dtj.itc12
+	// Transaction Amount
+	set zsuspdtl.tamt=dtj.tot
+	// Transaction Comment
+	set zsuspdtl.tcmt=dtj.tcmt
+	// Ending Balance of this account
+	set zsuspdtl.endbal=dtj.endbal
+	// Terminal Location
+	set zsuspdtl.tlo=dtj.tlo
+	// Original Branch
+	set zsuspdtl.brcd=dtj.brcd
+	// User ID
+	set zsuspdtl.uid=dtj.uid
+	// Flag of KTB User
+	set zsuspdtl.uidktbflg=$$CHKUIDKTB^ZSURUTL(dtj.uid)
+	// Channel Reference
+	set zsuspdtl.chnref=""
+		
+	// Suspect Type
+	set zsuspdtl.susptype=ZSUSPTYP
+	
+	set zsuspdtl.cc=ZCC
+
+	set zsuspdtl.acn=acn.acn
+	
+	/* ---- Get override user id from SPV ---- */
+	type String ZOVRID
+	set ZOVRID=""
+	set ZOVRID=$$GOVRID^ZSURUTL(dtj.tjd,dtj.brcd,dtj.uid,dtj.trc,dtj.cid)
+	set zsuspdtl.ovrid=ZOVRID
+	// Authorized User ID Name (OVRID Name)
+	if ZOVRID'="",(Db.isDefined("SCAU","UID=:ZOVRID")) do {
+		type RecordSCAU ovrscau=Db.getRecord("SCAU","UID=:ZOVRID")
+		set zsuspdtl.ovrname=ovrscau.%ufn
+		}
+	
+	// transaction rate
+	set zsuspdtl.rate=dtj.rate
+	// transaction baseamount (THB)
+	set zsuspdtl.bseamt=+dtj.sysbase
+	// etc des
+	set zsuspdtl.trcdes=trn.des
+	// user fullname
+	set zsuspdtl.tlrname=scau.%ufn
+	// user branch
+	set zsuspdtl.tlrbrcd=scau.brcd
+	// user br des
+	set zsuspdtl.tlrbrdes=$$BRCDDES(scau.brcd)
+	// cif name
+	set zsuspdtl.cifname=cif.nam
+	// cid boo
+	set zsuspdtl.acbrcd=acn.boo
+	// cid boo des
+	set zsuspdtl.acbrdes=$$BRCDDES(acn.boo)
+	// transaction branch
+	set zsuspdtl.txbrcd=dtj.brcd
+	// transaction branch des
+	set zsuspdtl.txbrdes=$$BRCDDES(dtj.brcd)
+	// cif boo
+	set zsuspdtl.cifbrcd=cif.boo
+	// cif boo des
+	set zsuspdtl.cifbrdes=$$BRCDDES(cif.boo)
+	// account class
+	set zsuspdtl.cls=acn.cls
+	// transaction currency
+	if dtj.crcd="" set zsuspdtl.crcd="THB"
+	else  set zsuspdtl.crcd=dtj.crcd
+	// transaction trace number
+	set zsuspdtl.trc=dtj.trc
+	// hist seq
+	set zsuspdtl.histseq=dtj.tseq
+	// Transaction profile date
+	set zsuspdtl.pdate=dtj.tjd
+	
+	// account name
+	set ZACNAME=acn.title1
+	if acn.title2'="" set ZACNAME=ZACNAME_","_acn.title2
+	if acn.title3'="" set ZACNAME=ZACNAME_","_acn.title3
+	if acn.title4'="" set ZACNAME=ZACNAME_","_acn.title4
+			
+	set zsuspdtl.acname=ZACNAME
+	
+	do zsuspdtl.bypassSave()
+	
+	do Runtime.commit()
+	
+	
+	quit
+	
+BRCDDES(Number ZBRCD1)
+	type String ZBRNAME
+	set ZBRNAME=""
+	if ZBRCD1="" quit ZBRNAME
+	set ZBRCD1=+ZBRCD1
+	type RecordUTBLBRCD zbrcd1=Db.getRecord("UTBLBRCD","BRCD=:ZBRCD1",1)
+	set ZBRNAME=zbrcd1.desc
+	quit ZBRNAME
+
+
+R033(String TSO(),
+	RecordDTJ dtj,
+	RecordTRN trn,
+	RecordSCAU scau,
+	RecordSCAU0 scau0,
+	RecordACN acn,
+	RecordCIF cif,
+	String ZTRAMT,
+	Number THR00X())
+		
+	/* check ATM transaction (for this day)
+	 1. check product flag (only ATM  ,AT=ktb bank / PC=other bank)
+	 flag 0 = Not ATM transaction
+	      1 = ATM transaction
+	*/
+	if '$$PRDCHK(dtj.etc) quit
+	
+		
+	// 2. check Withdraw transaction (1=Credit , 0=Debit)
+	if trn.dc quit
+		
+			
+	/* 3. check TTX that Debit transaction or not (Dr. from customer a/c and Cr. to G/L a/c)
+	 flag 0 = Transfer Transaction
+	      1 = Withdraw Transaction
+	*/
+	//if '$$TRFCHK(dtj.tjd,dtj.brcd,dtj.uid,dtj.trc) quit
+	
+	// 4. check exclude ec. reversed transaction. 
+	if +dtj.tamt'>0 quit
+	if dtj.histrval'="" quit
+		
+	// Any rule need sum hist in a day
+	do RSUMHIST(.TSO,dtj,trn,scau,scau0,acn,cif,.THR00X,ZTRAMT)
+		
+	
+	quit
+
+PRDCHK(String ZETC)
+	
+	/*
+	Return	0 - Not ATM Transaction
+		1 - ATM Transaction
+	*/
+	
+	type Number ZRETURN
+	set ZRETURN=1 
+	
+	if Db.isDefined("ZUTBLTRCD","ETC=:ZETC") do {
+		
+		type RecordZUTBLTRCD trcd=Db.getRecord("ZUTBLTRCD","ETC=:ZETC")
+		if (trcd.prodflg'="AT"),(trcd.prodflg'="PC") set ZRETURN=0
+		if trcd.fee'="" set ZRETURN=0	// ignore Fee transaction
+		
+	}
+	else  set ZRETURN=0
+	
+	quit ZRETURN
+
+PRDSSB(String ZETC)
+	
+	/*
+	Return	0 - Not SSB Transaction
+		1 - SSB Transaction
+	*/
+	
+	type Number ZRETURN
+	set ZRETURN=1 
+	
+	if Db.isDefined("ZUTBLTRCD","ETC=:ZETC") do {
+		
+		type RecordZUTBLTRCD trcd=Db.getRecord("ZUTBLTRCD","ETC=:ZETC")
+		if (trcd.prodflg'="PB") set ZRETURN=0
+		
+	}
+	else  set ZRETURN=0
+	
+	quit ZRETURN
+			
+RTIMHIST(String TSO(),
+	RecordDTJ dtj,
+	RecordSCAU scau,
+	RecordACN acn,
+	RecordCIF cif,
+	Number THR00X())
+	
+	type Number TPERIOD,MAX,ZDIFF,TSEQ
+	set (TPERIOD,MAX,ZDIFF,TSEQ)=""
+	
+	set MAX=1000
+	set TSEQ=dtj.tseq
+	
+	type RecordCUVAR cuvar=Db.getRecord("CUVAR")
+	set XJD=cuvar.tjd-1	
+		
+	type Number BACDATE,ZR032CNT,ZR032AMT
+	set (BACDATE,ZR032CNT,ZR032AMT)=""
+	// Backword date of history for R032
+	if (ZR032FLG=1) set BACDATE=$G(THR00X("R032",1))
+	if '(BACDATE="") set XJD=cuvar.tjd-BACDATE
+	
+	/*
+	type Boolean CDFLG=0
+	if ZR016FLG!ZR017FLG do {
+		
+		if (acn.grp="CD") do HISTSCD(.TSO,dtj,scau,acn,cif,.THR00X) set CDFLG=1
+
+	}
+	if CDFLG=1 quit
+	*/
+	
+	type ResultSet rs=Db.select("TSEQ,TJD","HIST","CID=:CID AND (NOT TSEQ>:TSEQ) AND TJD>:XJD AND NOT ITC1=''","TSEQ DESC")
+	while rs.next() do { quit:MAX=0
+		type String ZHUID,ZHUCLS,REV,ITC7
+		set (ZHUID,ZHUCLS,REV,ITC7)=""
+		
+		set MAX=MAX-1
+
+		type RecordHIST hist=Db.getRecord("HIST","CID=:CID,TSEQ=rs.getCol(1)")
+	
+		set REV=$S(hist.zitc6:1,hist.zitc12:1,1:0)  //Rachod - 05/06/10
+		set ITC7=''hist.itc7
+		//set ITC1=+hist.itc1
+		set TAMT=+hist.tamt
+		set ZTIME=hist.time
+		if hist.crcd'="THB",(+hist.sysbase'=0) set TAMT=+hist.sysbase
+		set ZHUID=hist.uid
+		
+		if ZHUID'="",(Db.isDefined("SCAU","UID=:ZHUID")) do {
+			type RecordSCAU zhscaux=Db.getRecord("SCAU","UID=:ZHUID")
+			set ZHUCLS=zhscaux.%ucls
+			}
+		
+		// exclude ec. reversed transaction.  both reversed and reveral
+		if REV quit
+		if hist.histrflg quit
+
+		if ITC7 quit
+		
+		// If Fee Transaction then quit
+		if $$CHKISFEE^ZSURUTL(hist.etc) quit
+				
+		// Only rule detection of the same transaction date as history date
+		if (dtj.tjd=rs.getCol("TJD")) do {
+			if ZR016FLG do {
+
+				if '$$DETRULEX("R016",acn,cif,ZHUCLS,hist.etc,TAMT) quit
+				
+				set TPERIOD=$G(THR00X("ZSURNTIM","R016"))
+				set ZDIFF=(dtj.time)-TPERIOD
+				
+				if (dtj.cid=hist.cid),(dtj.tot=TAMT),(dtj.uid=ZHUID) do {
+					if ZTIME>ZDIFF set ZR016TIM=ZR016TIM+1
+					
+				} 
+			}
+			
+			if ZR017FLG do {
+				
+				if '$$DETRULEX("R017",acn,cif,ZHUCLS,hist.etc,TAMT) quit
+				
+				set TPERIOD=$G(THR00X("ZSURNTIM","R017"))
+				set ZDIFF=(dtj.time)-TPERIOD
+				
+				if (dtj.cid=hist.cid),(dtj.tot=TAMT),(dtj.uid'=ZHUID) do {
+					if ZTIME>ZDIFF set ZR017TIM=ZR017TIM+1
+					
+				}
+			}
+			
+			if (ZR005FLG=1) do {
+				// Find same account, date and non error-correct already 
+				
+				// If debit(0) transaction of DTJ then check credit(1) transaction of HIST
+				if (+dtj.itc1=0)&(+hist.itc1=0) quit
+				// If credit(1) transaction of DTJ then check debit(0) transaction of HIST
+				if (+dtj.itc1=1)&(+hist.itc1=1) quit
+				if dtj.tseq=hist.tseq quit
+				
+				// If amount of deposit transaction is as same as withdraw set ZR005FLG=2
+				if (+hist.sysbase)=(+dtj.sysbase) set ZR005FLG=2			
+			} //end of if (ZR005FLG=1)
+		} //end of if (dtj.tjd=rs.getCol("TJD"))
+		
+		if (ZR032FLG=1) do {
+			// Check debit(0) transaction from hist
+			if (+hist.itc1) quit
+			// If ETC is not SSB transaction then it is not included R031
+			if '$$PRDSSB(hist.etc) quit
+			if '$$DETRULEM("R032",acn,cif,scau,dtj,ZTRAMT) quit
+			
+			set ZR032CNT=ZR032CNT+1
+			set ZR032AMT=ZR032AMT+(+hist.tamt)
+			
+			// If count passed transaction of R032 condition more than determined count
+			if (ZR032CNT>$G(THR00X("R032",2)))&(ZR032AMT>$G(THR00X("R032",3))) set ZR032FLG=2 quit
+		} //end of if (ZR005FLG=1)
+		
+	} //end of while rs.next()	
+
+	quit
+	
+HISTSCD(String TSO(),
+	RecordDTJ dtj,
+	RecordSCAU scau,
+	RecordACN acn,
+	RecordCIF cif,
+	Number THR00X())	
+
+	if '(ZR016FLG!ZR017FLG!ZR005FLG) quit
+	
+	type Number ITC1,ITC7,REV,MASTCID
+	type Number TCID,TSEQ
+	type String TAMT,MAXTMP
+	type Date XJD
+
+	if +MAX.get()=0 set MAX=100
+	
+	set MAXTMP=MAX
+	
+	type RecordCUVAR cuvar=Db.getRecord("CUVAR")
+	set XJD=cuvar.tjd-1	
+	//set XJD=TJD-1
+	//set XJD=^CUVAR(2)-1		//Change get SystemDate from TJD to ^CUVAR(2)
+	
+	set TCID=dtj.cid
+	set TSEQ=dtj.tseq
+	set TDTJ=dtj.time
+	set TPERIOD=$G(THR00X("ZSURNTIM","R016"))
+	set ZDIFF=(TDTJ)-TPERIOD
+			
+	// find master a/c
+	type RecordDEP zdepcc=Db.getRecord("DEP","CID=:TCID")
+	set MASTCID=zdepcc.zmaster
+	//if MASTCID=TCID quit	
+	if MASTCID="" quit
+	
+	// Query all sub
+	type ResultSet zrsdep=Db.select("CID","DEP","ZMASTER=:MASTCID")
+	while zrsdep.next() do {
+		type Number ZSUBCID
+		set ZSUBCID=zrsdep.getCol(1)
+
+		set MAX=MAXTMP
+
+		//type ResultSet zrssub1=Db.select("TSEQ","HIST","CID=:ZSUBCID AND (NOT TSEQ>:TSEQ) AND TJD>:XJD AND NOT ITC1=''","TSEQ DESC")
+		type ResultSet zrssub1=Db.select("TSEQ","HIST","CID=:ZSUBCID AND TJD>:XJD AND NOT ITC1=''","TSEQ DESC")
+		while zrssub1.next() do { quit:MAX=0
+			set MAX=MAX-1
+			
+			type RecordHIST hist=Db.getRecord("HIST","CID=:ZSUBCID,TSEQ=zrssub1.getCol(1)")
+			set REV=$S(hist.zitc6:1,hist.zitc12:1,1:0) //Rachod - 05/06/10
+			set ITC7=''hist.itc7
+			set ITC1=+hist.itc1
+			// exclude ec. reversed transaction.  both reversed and reveral
+			if REV quit
+			if hist.histrflg quit
+			
+			// If Fee Transaction then quit
+			if $$CHKISFEE^ZSURUTL(hist.etc) quit
+									
+			set ZHUID=hist.uid
+		
+			if ZHUID'="",(Db.isDefined("SCAU","UID=:ZHUID")) do {
+				type RecordSCAU zhscaux=Db.getRecord("SCAU","UID=:ZHUID")
+				set ZHUCLS=zhscaux.%ucls
+				}
+			
+			set TAMT=+hist.tamt
+			if hist.crcd'="THB",(+hist.sysbase'=0) set TAMT=+hist.sysbase
+				
+			set ZTIMECD=hist.time							
+
+			if (ZR005FLG=1) do {
+				if MASTCID=ZSUBCID quit
+				// Find non error-correct already 
+				// If not same date then quit
+				if '(dtj.tjd=hist.tjd) quit
+				
+				// If debit(0) transaction of DTJ then check credit(1) transaction of HIST
+				if (+dtj.itc1=0)&(+hist.itc1=0) quit
+				// If credit(1) transaction of DTJ then check debit(0) transaction of HIST
+				if (+dtj.itc1=1)&(+hist.itc1=1) quit
+				
+				// If amount of deposit transaction is as same as withdraw set ZR005FLG=2
+				if (+hist.sysbase)=(+dtj.sysbase) set ZR005FLG=2			
+			} //end of if (ZR005FLG=1)
+			
+			if ZR016FLG do {
+				
+				if '$$DETRULEX("R016",acn,cif,ZHUCLS,hist.etc,TAMT) quit
+	
+				if (dtj.tot=TAMT),(dtj.uid=ZHUID) do {
+					if (ZTIMECD>ZDIFF),(ZTIMECD'>TDTJ) set ZR016TIM=ZR016TIM+1
+					
+				} 
+
+			}
+			
+			if ZR017FLG do {
+				
+				if '$$DETRULEX("R017",acn,cif,ZHUCLS,hist.etc,TAMT) quit
+				
+				if (dtj.tot=TAMT),(dtj.uid'=ZHUID) do {
+				
+					if (ZTIMECD>ZDIFF),(ZTIMECD'>TDTJ) set ZR017TIM=ZR017TIM+1
+				}
+			}
+		}
+	}
+	quit
+
+
+TSURCHNL(String DATE,
+	 String DATETIME,
+	 String CID,
+	 String TSEQ)
+	// Ex. to Run	: 
+	/*
+	For Test R034 :
+		D TSURCHNL^ZTRNCRIT(60873,6153462265,35,10984)
+		
+	For Test R046 :
+		W ^DTJ(60873,6153534142,2968,60)
+		K ^ZSVRCTTX("R046",60873,0,9999999999,15000)
+		D TSURCHNL^ZTRNCRIT(60873,6153534142,2968,60)
+	For Test R045 :
+		W ^DTJ(60963,6164954109,24511,577)	
+		D TSURCHNL^ZTRNCRIT(60963,6164954109,24511,577)
+	*/
+	type String ZRULESW,TMPCCIF,TMPCPRDT,TMPCCID,TMPCKUS,TMPCAPPL,TMPDRULE,THR00X
+	do INIT^ZTRNCRIT(.ZRULESW,.TMPCCIF,.TMPCPRDT,.TMPCCID,.TMPCKUS,.TMPCAPPL,.TMPDRULE,.THR00X)
+
+	type public Cache %CACHE()
+
+	type String TSO()
+	
+	// Transaction amount (BAHT)
+	type Number ZTRAMT
+	catch error {
+		type String ET
+
+		set ET=error.type
+		if ET["%GTM-" do ZE^UTLERR
+		set ET=ET_"-"_error.thrownAt
+		set ET=ET_","_error.description
+
+		do LOG^ZSUREXC($T(+0),"*",%FN.get(),"",%ZTSEQ.get(),ET)
+		}
+			
+	type RecordDTJ dtj=Db.getRecord("DTJ","TJD=:DATE,DATETIME=:DATETIME,CID=:CID,TSEQ=:TSEQ")
+	
+	// set transaction amount in thai baht
+	set ZTRAMT=dtj.tot
+	if (dtj.crcd'="THB"),(+dtj.sysbase'=0) set ZTRAMT=+dtj.sysbase
+		
+	do OUT^UTSO(.TSO,dtj.tso)
+	
+	type RecordTRN trn=%CACHE("TRN").getRecord("TRN","ETC=:dtj.etc")
+	type RecordSCAU scau=Db.getRecord("SCAU","UID=:dtj.uid")
+	type RecordSCAU0 scau0=%CACHE("SCAU0").getRecord("SCAU0","UCLS=:scau.%ucls")
+
+	type RecordACN acn=Db.getRecord("ACN","CID=:dtj.cid")
+	type RecordCIF cif=Db.getRecord("CIF","ACN=:acn.acn")
+	
+	do SURCHNL(.TSO,dtj,trn,scau,scau0,acn,cif,.THR00X)
+	quit
+
+SURCHNL(String TSO(),
+	RecordDTJ dtj,
+	RecordTRN trn,
+	RecordSCAU scau,
+	RecordSCAU0 scau0,
+	RecordACN acn,
+	RecordCIF cif,
+	String THR00X())
+	// Surveillance detects Channel Transaction
+	
+	// Check Channel of DTJ Transaction
+	type String ZRFLG
+	// set Channel
+	set ZRFLG("ZCHNL")=$$CHKCHNL^ZSURUTL(dtj.etc,dtj.tlo,.THR00X)
+	// Set Present Transaction Amount
+	set ZRFLG("ZTRAMT",dtj.itc1)=$G(ZTRAMT)
+	
+	if '($G(ZRFLG("ZCHNL"))="") do {
+		
+		// R034
+		set ZRFLG("R034")=$$R034CDBT(.acn,.cif,.scau,.dtj,ZTRAMT,.ZRFLG,.THR00X)
+		
+		// R035
+		set ZRFLG("R035")=$$R035CDBT(.acn,.cif,.scau,.dtj,ZTRAMT,.ZRFLG,.THR00X)
+		
+		// R036
+		set ZRFLG("R036")=$$R036CDBT(.acn,.cif,.scau,.dtj,ZTRAMT,.ZRFLG,.THR00X)
+		
+		// R037
+		set ZRFLG("R037")=$$R037CDBT(.acn,.cif,.scau,.dtj,ZTRAMT,.ZRFLG,.THR00X)
+		
+		// R038
+		set ZRFLG("R038")=$$R038CDBT(.acn,.cif,.scau,.dtj,ZTRAMT,.ZRFLG,.THR00X)
+		
+		// R044
+		set ZRFLG("R044")=$$R044CDBT(.acn,.cif,.scau,.dtj,ZTRAMT,.ZRFLG,.THR00X)
+		
+		// R045
+		set ZRFLG("R045")=$$R045CDBT(.acn,.cif,.scau,.dtj,ZTRAMT,.ZRFLG,.THR00X)
+		
+		// Check Credit Transaction of TTX
+		// - If one of the flag of rules is 1 then continue
+		do TTXCHK(dtj.tjd,dtj.brcd,dtj.uid,dtj.trc,.ZRFLG)
+		
+		// After check Transaction Set of DTJ Record
+		// - R034 : If Transaction Count > Limit Transaction Count then set the flag of rule to 2
+		if ($G(ZRFLG("R034"))=1) do {
+			if $G(ZRFLG("R034","ZSURTCNT","CAL"))>$G(ZRFLG("R034","ZSURTCNT")) set ZRFLG("R034")=2
+		}		
+		// - R035 : If Transaction amount > Limit Amount then set the flag of rule to 2
+		if ($G(ZRFLG("R035"))=1) do {
+			if '($G(ZRFLG("R035","ZSURNDAY","COUNT"))=$G(ZRFLG("R035","ZSURNDAY"))) quit
+			if $G(ZRFLG("R035","ZSURLAMT","CAL"))>$G(ZRFLG("R035","ZSURLAMT")) set ZRFLG("R035")=2
+		}
+		// - R036 : If Transaction Count > Limit Transaction Count then set the flag of rule to 2
+		if ($G(ZRFLG("R036"))=1) do {
+			if $G(ZRFLG("R036","ZSURTCNT","CAL"))>$G(ZRFLG("R036","ZSURTCNT")) set ZRFLG("R036")=2
+		}
+		// - R045 : If Transaction Count > Limit Transaction Count then set the flag of rule to 2
+		if ($G(ZRFLG("R045"))=1) do {
+			if $G(ZRFLG("R045","ZSURTCNT","CAL"))>$G(ZRFLG("R045","ZSURTCNT")) set ZRFLG("R045")=2
+		}
+			
+		// Check HIST of From Account(DTJ.CID)
+		do HISCHKF(.dtj,.ZRFLG)
+			
+		// If flag of each rule(ZRFLG(RULE)) is 2 then insert suslog record
+		if ($G(ZRFLG("R034"))=2) do SUSDTJ^ZSURUTL(.TSO,dtj,trn,scau,scau0,acn,cif,"R034",.ZRFLG)
+		
+		if ($G(ZRFLG("R035"))=2) do SUSDTJ^ZSURUTL(.TSO,dtj,trn,scau,scau0,acn,cif,"R035",.ZRFLG)
+		
+		if ($G(ZRFLG("R038"))=2) do SUSDTJ^ZSURUTL(.TSO,dtj,trn,scau,scau0,acn,cif,"R038",.ZRFLG)
+		
+		if ($G(ZRFLG("R044"))=2) do SUSDTJ^ZSURUTL(.TSO,dtj,trn,scau,scau0,acn,cif,"R044",.ZRFLG)
+		
+		if ($G(ZRFLG("R045"))=2) do SUSDTJ^ZSURUTL(.TSO,dtj,trn,scau,scau0,acn,cif,"R045",.ZRFLG)
+		
+		
+		type Number ZTCID,ZTTSEQ
+		// Set To-Account that get from TTX
+		if $G(ZRFLG("DTJKTOACC"))="" quit
+		set ZTCID=$P(ZRFLG("DTJKTOACC"),",",3)
+		set ZTTSEQ=$P(ZRFLG("DTJKTOACC"),",",4)
+		
+		// Check HIST of To-Account		
+		do HISCHKT(ZTCID,ZTTSEQ,.ZRFLG)
+			
+		// If flag of each rule(ZRFLG(RULE)) is 2 then insert suslog record
+		if ($G(ZRFLG("R036"))=2) do SUSDTJ^ZSURUTL(.TSO,dtj,trn,scau,scau0,acn,cif,"R036",.ZRFLG)
+		if ($G(ZRFLG("R037"))=2) do SUSDTJ^ZSURUTL(.TSO,dtj,trn,scau,scau0,acn,cif,"R037",.ZRFLG)
+		
+	}
+	quit
+	
+HISCHKF(RecordDTJ dtj,
+	String ZRFLG)
+	// Check HIST of From Account(ZCID) that hist.tseq<dtj.tseq
+	
+	// Check flag of each rule for analyze need to check TTX or not	
+	if '($G(ZRFLG("R034"))=1)&'($G(ZRFLG("R035"))=1)&'($G(ZRFLG("R038"))=1)&'($G(ZRFLG("R044"))=1)&'($G(ZRFLG("R045"))=1) quit
+	
+	type Number MAX
+	set MAX=100
+	
+	// Check history records are HIST.TSEQ<DTJ.TSEQ
+	type ResultSet rs=Db.select("TSEQ","HIST","CID=:dtj.cid AND (TSEQ<:dtj.tseq)","TSEQ DESC")
+	while rs.next() do { quit:MAX=0
+
+		set MAX=MAX-1
+		
+		type RecordHIST hist=Db.getRecord("HIST","CID=:CID,TSEQ=rs.getCol(1)")
+		
+		// Check Rejected, Error-Corrected or Reversal Transaction
+		// and Check ZRFLG("HISTSO","REV") : If it is History of Rejected Transaction then exit from check hist
+		if $$HISREV^ZSURUTL(hist.tseq,hist.zitc6,hist.zitc12,hist.tso,.ZRFLG) quit   //Rachod - 05/06/10
+		// If Fee Transaction then quit
+		if $$CHKISFEE^ZSURUTL(hist.etc) quit
+						
+		// CHERRY - Log For Check 
+		//set ^ZSVRRY("R034",CID,rs.getCol(1))="MAX:"_MAX_"|TJD:"_hist.tjd_"|CDT:"_hist.cdt_"|ITC1:"_hist.itc1_"|ETC:"_hist.etc_"|TOT:"_hist.tot
+		
+		// Check condition of each rule that need to check hist
+		// - R034 : If hist.tjd is equal or less than interested day then set parameter to exit from check hist
+		if (($G(ZRFLG("R034"))=1)&('(hist.tjd>$G(ZRFLG("R034","ZSURNDAY","CAL"))))) set ZRFLG("R034")=0
+		// - R035 : If hist.tjd is equal or less than interested day then set parameter to exit from check hist
+		if (($G(ZRFLG("R035"))=1)&('(hist.tjd>$G(ZRFLG("R035","ZSURNDAY","CAL"))))) set ZRFLG("R035")=0
+		// - R038 : If hist.tjd is equal or less than interested day then set parameter to exit from check hist
+		if (($G(ZRFLG("R038"))=1)&('(hist.tjd>$G(ZRFLG("R038","ZSURNDAY","CAL"))))) set ZRFLG("R038")=0
+		// - R044 : If time is equal or less than interested time then set parameter to exit from check hist
+		if (($G(ZRFLG("R044"))=1)&('($$CDTTIME^ZSURUTL(hist.tjd,hist.time)>$G(ZRFLG("R044","ZSURNTIM","CAL"))))) set ZRFLG("R044")=0
+		// - R045 : If time is equal or less than interested time then set parameter to exit from check hist
+		if (($G(ZRFLG("R045"))=1)&('($$CDTTIME^ZSURUTL(hist.tjd,hist.time)>$G(ZRFLG("R045","ZSURNTIM","CAL"))))) set ZRFLG("R045")=0
+		
+		// Exit from check hist(by set MAX=0) when flag of rule(ZRFLG("RULE")) is not inclued rule(1) (ZRFLG("RULE")!=1) 
+		if '($G(ZRFLG("R034"))=1)&'($G(ZRFLG("R035"))=1)&'($G(ZRFLG("R038"))=1)&'($G(ZRFLG("R044"))=1)&'($G(ZRFLG("R045"))=1) set MAX=0 quit
+		
+		// Check only Debit/Credit Transaction
+		if hist.itc1="" quit
+		
+		type String ZRFLGHIS
+		// Check Channel of hist record
+		set ZRFLGHIS("ZCHNL")=$$CHKCHNL^ZSURUTL(hist.etc,hist.tlo,.THR00X)		
+		if $G(ZRFLGHIS("ZCHNL"))="" quit 
+		
+		// set transaction amount in thai baht
+		type Number ZTRAMT
+		set ZTRAMT=hist.tot
+		if (hist.crcd'="THB"),(+hist.sysbase'=0) set ZTRAMT=+hist.sysbase
+		set ZRFLGHIS("ZTRAMT",hist.itc1)=ZTRAMT
+		type RecordACN acnh=Db.getRecord("ACN","CID=:hist.cid")
+		type RecordCIF cifh=Db.getRecord("CIF","ACN=:acnh.acn")
+		type RecordSCAU scauh=Db.getRecord("SCAU","UID=:hist.uid")
+
+		// Init value flag of each rule
+		set ZRFLGHIS("R034")=0
+		set ZRFLGHIS("R035")=0
+		set ZRFLGHIS("R038")=0
+		set ZRFLGHIS("R044")=0
+		set ZRFLGHIS("R045")=0		
+		
+		// R034 : Check Transfering Debit Transaction form hist record
+		// - If it isn't included R034 then quit and return 1 for continue next hist record
+		if ($G(ZRFLG("R034"))=1) set ZRFLGHIS("R034")=$$R034CDBH(.acnh,.cifh,.scauh,.hist,ZTRAMT,.ZRFLG,.ZRFLGHIS)
+		// R035 : Check Payment Debit Transaction form hist record
+		// - If it isn't included R035 then quit and return 1 for continue next hist record
+		if ($G(ZRFLG("R035"))=1) set ZRFLGHIS("R035")=$$R035CDBH(.acnh,.cifh,.scauh,.hist,ZTRAMT,.ZRFLG,.ZRFLGHIS)
+		// R038 : Check Transfering Debit Transaction form hist record
+		// - If it isn't included R038 then quit and return 1 for continue next hist record
+		if ($G(ZRFLG("R038"))=1) set ZRFLGHIS("R038")=$$R038CDBH(.acnh,.cifh,.scauh,.hist,ZTRAMT,.ZRFLG,.ZRFLGHIS)
+		// R044 : Check Debit Transaction form hist record
+		// - If it isn't included R044 then quit and return 1 for continue next hist record
+		if ($G(ZRFLG("R044"))=1) set ZRFLGHIS("R044")=$$R044CDBH(.acnh,.cifh,.scauh,.hist,ZTRAMT,.ZRFLG,.ZRFLGHIS)
+		// R045 : Check Debit Transaction form hist record
+		// - If it isn't included R045 then quit and return 1 for continue next hist record
+		if ($G(ZRFLG("R045"))=1) set ZRFLGHIS("R045")=$$R045CDBH(.acnh,.cifh,.scauh,.hist,ZTRAMT,.ZRFLG,.ZRFLGHIS)
+		
+		// Check Payment Credit Transaction of TTX
+		do TTXCHKHF(hist.tjd,hist.brcd,hist.uid,hist.trc,.ZRFLGHIS) 
+		
+		// R034 : Check Threshold Parameter (ZUTBLSURTCNT)
+		if $G(ZRFLGHIS("R034"))=1 do {
+			// CHERRY - Log For Check 
+			//set ^ZSVRRY("R034",$G(ZRFLG("R034","RULE")),dtj.tjd,dtj.datetime,dtj.cid,dtj.tseq,hist.tseq)=$G(ZRFLGHIS("R034","TOCIF"))
+			
+			if '($G(ZRFLG("R034","TOCIF"))=$G(ZRFLGHIS("R034","TOCIF"))) quit
+			set ZRFLG("R034","ZSURTCNT","CAL")=$G(ZRFLG("R034","ZSURTCNT","CAL"))+$G(ZRFLGHIS("R034","ZSURTCNT","CAL"))
+			
+			if $G(ZRFLG("R034","ZSURTCNT","CAL"))>$G(ZRFLG("R034","ZSURTCNT")) set ZRFLG("R034")=2 quit
+		}
+		// R035 : Check Threshold Parameter (ZUTBLSURLAMT)
+		if $G(ZRFLGHIS("R035"))=1 do {
+			set ZRFLG("R035","ZSURLAMT","CAL")=$G(ZRFLG("R035","ZSURLAMT","CAL"))+$G(ZRFLGHIS("R035","ZSURLAMT","CAL"))
+			// - Count Number of days
+			if (($G(ZRFLG("R035","ZSURNDAY","CHKDATE"))-1)=(+hist.tjd)) do {
+				set ZRFLG("R035","ZSURNDAY","COUNT")=ZRFLG("R035","ZSURNDAY","COUNT")+1
+				set ZRFLG("R035","ZSURNDAY","CHKDATE")=hist.tjd
+			}
+			// - If Account have been paymented continue N days(ZUTBLSURNDAY) and Summary Amount more than Limit Amount that is Suspected Transaction
+			if '($G(ZRFLG("R035","ZSURNDAY","COUNT"))=$G(ZRFLG("R035","ZSURNDAY"))) quit
+			if $G(ZRFLG("R035","ZSURLAMT","CAL"))>$G(ZRFLG("R035","ZSURLAMT")) set ZRFLG("R035")=2 quit
+		}
+		// CHERRY - Log For Check R035
+		/*type String SVRR035
+		set SVRR035="ZSURNDAY="_$G(ZRFLG("R035","ZSURNDAY"))_",CAL="_$G(ZRFLG("R035","ZSURNDAY","CAL"))_",CHKDATE="_$G(ZRFLG("R035","ZSURNDAY","CHKDATE"))_",COUNT="_$G(ZRFLG("R035","ZSURNDAY","COUNT"))_"|ZSURLAMT="_$G(ZRFLG("R035","ZSURLAMT"))_",CAL="_$G(ZRFLG("R035","ZSURLAMT","CAL"))	
+		set SVRR035=SVRR035_"|TJD="_hist.tjd_"|TLO="_hist.tlo_"|ITC="_hist.itc_"|ETC="_hist.etc_"|ZTAMT="_hist.tot
+		set ^ZSVRRY("R035",dtj.tjd,dtj.datetime,hist.cid,hist.tseq)=SVRR035*/
+		// R038 : Check Threshold Parameter (ZUTBLSURPDIF,ZUTBLSURNPT,ZUTBLSURNDAY)
+		if $G(ZRFLGHIS("R038"))=1 do {
+			// CHERRY - Log For Check R038
+			//set ^ZSVRRY("R038",hist.cid,hist.tseq)="TOT="_hist.tot_"|H-NPT="_$G(ZRFLGHIS("R038","ZSURNPT","CAL"))_"|H-ZTRAMT="_$G(ZRFLGHIS("R038","ZTRAMT","CAL"))_"|ETC="_hist.etc
+			// Calculate Previous Transaction 
+			set ZRFLG("R038","ZSURNPT","CAL")=$G(ZRFLG("R038","ZSURNPT","CAL"))+$G(ZRFLGHIS("R038","ZSURNPT","CAL"))
+			set ZRFLG("R038","ZTRAMT","CAL")=$G(ZRFLG("R038","ZTRAMT","CAL"))+$G(ZRFLGHIS("R038","ZTRAMT","CAL"))
+			
+			// - R038 : If Calculated Previous Transaction is equal or more than Minimum Previous Transaction then continue check
+			if '($G(ZRFLG("R038","ZSURNPT","CAL"))<$G(ZRFLG("R038","ZSURNPT","MINPT"))) do {
+				// - R038 : If Calculated Previous Transaction is more than Maximum Previous Transaction then set parameter to exit from check hist
+				if ($G(ZRFLG("R038","ZSURNPT","CAL"))>$G(ZRFLG("R038","ZSURNPT","MAXPT"))) set ZRFLG("R038")=0 quit
+				// Check Transfering Amount is more than limit or not?
+				if $$CHKMPDIF^ZSURUTL($G(ZRFLG("R038","ZSURPDIF")),$G(ZRFLG("R038","ZSURNPT","CAL")),$G(ZRFLG("R038","ZTRAMT","CAL")),$G(ZRFLG("ZTRAMT",0))) set ZRFLG("R038")=2 quit
+			}
+		}
+		// CHERRY - Log For Check R044
+		//S ^ZSVRRY("R044",hist.cid,hist.tseq)="ZRFLGHIS="_$G(ZRFLGHIS("R044"))_"|ITC="_hist.itc_"|TJD="_hist.tjd_"|TIME="_hist.time_"|AMT="_hist.tamt_"|ETC="_hist.etc_"|ATMREG="_$$GATMREG^ZSURUTL(hist.brcd)
+		// R044 : Check ATM Region is different
+		if $G(ZRFLGHIS("R044"))=1 do {
+			// If credit transaction is not inclued for R044
+			if hist.itc1=1 quit
+			// Check different ATM Region of Transaction (ZUTBLBRCD.ATMREG)
+			if ZRFLG("ATMREG")=$$GATMREG^ZSURUTL(hist.brcd) quit
+			
+			// If Different ATM Region that is Suspected Transaction
+			set ZRFLG("R044")=2
+		}
+		
+		// R045 : Check ATM Region is different
+		if $G(ZRFLGHIS("R045"))=1 do {
+			set ZRFLG("R045","ZSURTCNT","CAL")=$G(ZRFLG("R045","ZSURTCNT","CAL"))+$G(ZRFLGHIS("R045","ZSURTCNT","CAL"))
+			
+			if $G(ZRFLG("R045","ZSURTCNT","CAL"))>$G(ZRFLG("R045","ZSURTCNT")) set ZRFLG("R045")=2 quit
+		}
+	}	
+	quit
+
+TTXCHKHF(Number ZTJD, Number ZBRCD, String ZUID, Number  ZORTSEQ, String ZRFLGTTX)
+	// Check TTX for Hist of From Account
+	
+	// Check flag of each rule for analyze need to check TTX or not
+	if ('($G(ZRFLGTTX("R034"))=1)&'($G(ZRFLGTTX("R035"))=1)&'($G(ZRFLGTTX("R038"))=1)&'($G(ZRFLGTTX("R044"))=1)&'($G(ZRFLGTTX("R045"))=1)) quit
+	
+	// Initial Flag for each rule that is used in TTXCHK
+	set ZRFLGTTX("R034","TMPFLG")=0
+	set ZRFLGTTX("R035","TMPFLG")=0
+	set ZRFLGTTX("R038","TMPFLG")=0
+	set ZRFLGTTX("R044","TMPFLG")=0
+	set ZRFLGTTX("R045","TMPFLG")=0
+		
+	type Number ZTSEQ,ZTSEQCHK
+	set (ZTSEQ,ZTSEQCHK)=(ZORTSEQ\1000)*1000
+	set ZTSEQCHK=ZTSEQCHK+999
+	// Loop for find records in TTX
+	for  set ZTSEQ=$O(^TTX(ZTJD,ZBRCD,ZUID,ZTSEQ)) quit:((ZTSEQ>ZTSEQCHK)!(ZTSEQ=""))  do { 
+		
+		type RecordTTX ttx=Db.getRecord("TTX","TJD=:ZTJD,BRCD=:ZBRCD,UID=:ZUID,TSEQ=:ZTSEQ")
+		type Number ZTRAMT
+		// set transaction amount in thai baht
+		set ZTRAMT=ttx.tamt
+		if (ttx.crcd'="THB"),(+ttx.sysbase'=0) set ZTRAMT=+ttx.sysbase
+		
+		// Check Bank Transaction(GL Account)
+		if 'Db.isDefined("ACN","CID=:ttx.cid") do { quit
+			// Check only Credit(1) Transaction (R034,R035,R038)
+			if ttx.itc1 do {
+				// Check is it Credit of Debit Transaction by Transaction Amount
+				if '(+$G(ZRFLGTTX("ZTRAMT",0))=+ZTRAMT) quit 
+				// R044 - Check Withdraw Transaction
+				if ($G(ZRFLGTTX("R044"))=1) set ZRFLGTTX("R044","TMPFLG")=1
+				// R045 - Check Withdraw Transaction
+				if ($G(ZRFLGTTX("R045"))=1) set ZRFLGTTX("R045","TMPFLG")=1
+			}
+		}
+		
+		// Check only Customer Transaction
+		type RecordACN acn=Db.getRecord("ACN","CID=:ttx.cid")
+		type RecordCIF cif=Db.getRecord("CIF","ACN=:acn.acn")
+		type RecordSCAU scau=Db.getRecord("SCAU","UID=:ttx.uid")
+
+		// Check only Credit(1) Transaction (R034,R035,R038,R044)
+		if ttx.itc1 do {
+			// Check is it Credit of Debit Transaction by Transaction Amount
+			if '(+$G(ZRFLGTTX("ZTRAMT",0))=+ZTRAMT) quit
+					
+			if ($G(ZRFLGTTX("R034"))=1) set ZRFLGTTX("R034","TMPFLG")=($$R034CCRT(.ZRFLGTTX,acn,cif,scau,ttx,ZTRAMT))!$G(ZRFLGTTX("R034","TMPFLG"))
+			if ($G(ZRFLGTTX("R035"))=1) set ZRFLGTTX("R035","TMPFLG")=($$R035CCRT(.ZRFLGTTX,acn,cif,scau,ttx,ZTRAMT))!$G(ZRFLGTTX("R035","TMPFLG"))
+			if ($G(ZRFLGTTX("R038"))=1) set ZRFLGTTX("R038","TMPFLG")=($$R038CCRT(.ZRFLGTTX,acn,cif,scau,ttx,ZTRAMT))!$G(ZRFLGTTX("R038","TMPFLG"))
+			// R044 - Check Tranfering, Payment and ORFT Transaction
+			if ($G(ZRFLGTTX("R044"))=1) set ZRFLGTTX("R044","TMPFLG")=($$R044CCRT(.ZRFLGTTX,acn,cif,scau,ttx,ZTRAMT))!$G(ZRFLGTTX("R044","TMPFLG"))
+			// R045 - Check Tranfering, Payment and ORFT Transaction
+			if ($G(ZRFLGTTX("R045"))=1) set ZRFLGTTX("R045","TMPFLG")=($$R045CCRT(.ZRFLGTTX,acn,cif,scau,ttx,ZTRAMT))!$G(ZRFLGTTX("R045","TMPFLG"))
+		}
+	}
+	if ($G(ZRFLGTTX("R034"))=1) set ZRFLGTTX("R034")=$G(ZRFLGTTX("R034","TMPFLG"))
+	if ($G(ZRFLGTTX("R035"))=1) set ZRFLGTTX("R035")=$G(ZRFLGTTX("R035","TMPFLG"))
+	if ($G(ZRFLGTTX("R038"))=1) set ZRFLGTTX("R038")=$G(ZRFLGTTX("R038","TMPFLG"))
+	if ($G(ZRFLGTTX("R044"))=1) set ZRFLGTTX("R044")=$G(ZRFLGTTX("R044","TMPFLG"))
+	if ($G(ZRFLGTTX("R045"))=1) set ZRFLGTTX("R045")=$G(ZRFLGTTX("R045","TMPFLG"))
+
+	quit
+	
+R034CDBH(RecordACN acnh,
+	RecordCIF cifh,
+	RecordSCAU scauh,
+	RecordHIST hist,
+	String ZTRAMT,
+	String ZRFLG,
+	String ZRFLGHIS)
+
+	// Check condition of R034 with Transfering Debit Transaction(From Account) from hist
+	/*
+	Input:
+		RecordACN acnh,
+		RecordCIF cifh,
+		RecordSCAU scauh,
+		RecordHIST hist,
+		S ZTRAMT=1000
+		S ZRFLGHIS("ZCHNL"))="C"
+		S ZRULE="R034C"
+		S THR00X("ZSURNDAY",ZRULE)=3
+		S THR00X("ZSURTCNT",ZRULE)=5
+	Output:
+		0 - Excluded R034
+		1 - Included R034
+	*/	
+	type String ZRET, ZRULE
+	set ZRET=0
+	// If hist record is as same as channel of main transaction then continue
+	if '($G(ZRFLGHIS("ZCHNL"))=$G(ZRFLG("ZCHNL"))) quit ZRET
+	
+	// Check Number of Days - If out of Number of Days then don't continue check and return exclude rule
+	if '(hist.tjd>$G(ZRFLG("R034","ZSURNDAY","CAL"))) set ZRFLG("R034")=0 quit ZRET
+			
+	// - Check only debit(0) transaction 
+	if hist.itc1 quit ZRET
+		
+	// - If it is transfering transaction then continue.
+	if '$$CETCTRF^ZSURUTL(hist.etc) quit ZRET
+	
+	set ZRULE="R034"_$G(ZRFLGHIS("ZCHNL"))
+	// - Check Non-Monitoring Parameter of R034 with Transfering Transaction(From Account)
+	if '($$DETHIS^ZSURUTL(ZRULE,acnh,cifh,scauh,hist,ZTRAMT)) quit ZRET
+	
+	quit 1
+	
+R035CDBH(RecordACN acnh,
+	RecordCIF cifh,
+	RecordSCAU scauh,
+	RecordHIST hist,
+	String ZTRAMT,
+	String ZRFLG,
+	String ZRFLGHIS)
+
+	// Check condition of R035 with Payment Debit Transaction(From Account) from hist
+	/*
+	Input:
+		RecordACN acnh,
+		RecordCIF cifh,
+		RecordSCAU scauh,
+		RecordHIST hist,
+		S ZTRAMT=1000
+		S ZRFLGHIS("ZCHNL"))="C"
+		S ZRULE="R035C"
+		S THR00X("ZSURNDAY",ZRULE)=3
+		S THR00X("ZSURLAMT",ZRULE)=5
+	Output:
+		0 - Excluded R035
+		1 - Included R035	
+	*/	
+	type String ZRET, ZRULE
+	set ZRET=0
+	// If hist record is as same as channel of main transaction then continue
+	if '($G(ZRFLGHIS("ZCHNL"))=$G(ZRFLG("ZCHNL"))) quit ZRET
+	// Check Number of Days - If out of Number of Days then don't continue check and return exclude rule
+	if '(hist.tjd>$G(ZRFLG("R035","ZSURNDAY","CAL"))) set ZRFLG("R035")=0 quit ZRET
+			
+	// - Check only debit(0) transaction 
+	if hist.itc1 quit ZRET
+	
+	set ZRULE="R035"_$G(ZRFLGHIS("ZCHNL"))
+	// - Check Non-Monitoring Parameter of R035 with Payment Transaction(From Account)
+	if '($$DETHIS^ZSURUTL(ZRULE,acnh,cifh,scauh,hist,ZTRAMT)) quit ZRET
+	
+	// - Set Calculated Limit Amount
+	set ZRFLGHIS("R035","ZSURLAMT","CAL")=ZTRAMT
+	
+	quit 1
+
+R038CDBH(RecordACN acnh,
+	RecordCIF cifh,
+	RecordSCAU scauh,
+	RecordHIST hist,
+	String ZTRAMT,
+	String ZRFLG,
+	String ZRFLGHIS)
+
+	// Check condition of R038 with Transfering Debit Transaction(From Account) from hist
+	/*
+	Input:
+		RecordACN acnh,
+		RecordCIF cifh,
+		RecordSCAU scauh,
+		RecordHIST hist,
+		S ZTRAMT=1000
+		S ZRFLG("ZCHNL"))="D"
+		S ZRULE="R038D"
+		S THR00X("ZSURNDAY",ZRULE)=3
+	Output:
+		0 - Excluded R038
+		1 - Included R038
+	*/	
+	type String ZRET
+	set ZRET=0
+	// If hist record is as same as channel of main transaction then continue
+	if '($G(ZRFLGHIS("ZCHNL"))=$G(ZRFLG("ZCHNL"))) quit ZRET
+	// Check Number of Days - If out of Number of Days then don't continue check and return exclude rule
+	if '(hist.tjd>$G(ZRFLG("R038","ZSURNDAY","CAL"))) set ZRFLG("R038")=0 quit ZRET
+			
+	// - Check only debit(0) transaction 
+	if hist.itc1 quit ZRET
+		
+	// - If it is transfering transaction then continue.
+	if '$$CETCTRF^ZSURUTL(hist.etc) quit ZRET
+	
+	set ZRFLGHIS("R038","RULE")="R038"_$G(ZRFLG("ZCHNL"))
+	// - Check Non-Monitoring Parameter of R038 with Transfering Transaction(From Account)
+	if '($$DETHIS^ZSURUTL($G(ZRFLGHIS("R038","RULE")),acnh,cifh,scauh,hist,ZTRAMT)) quit ZRET
+
+	// - Set Customer Number for check From-Account is the same person
+	set ZRFLGHIS("R038","FROMCIF")=cifh.acn 
+	
+	// - Calculate Summary Amount of Previous Transaction
+	set ZRFLGHIS("R038","ZTRAMT","CAL")=$G(ZRFLGHIS("R038","ZTRAMT","CAL"))+ZTRAMT
+	
+	quit 1
+
+TTXCHK(Number ZTJD, Number ZBRCD, String ZUID, Number  ZORTSEQ, String ZRFLGTTX)
+	// Check TTX for Main Transaction
+	
+	// Check flag of each rule for analyze need to check TTX or not
+	if ('($G(ZRFLGTTX("R034"))=1)&'($G(ZRFLGTTX("R035"))=1)&'($G(ZRFLGTTX("R036"))=1)&'($G(ZRFLGTTX("R037"))=1)&'($G(ZRFLGTTX("R038"))=1)&'($G(ZRFLGTTX("R044"))=1)&'($G(ZRFLGTTX("R045"))=1)) quit
+	
+	// Initial Flag for each rule that is used in TTXCHK
+	set ZRFLGTTX("R034","TMPFLG")=0
+	set ZRFLGTTX("R035","TMPFLG")=0
+	set ZRFLGTTX("R036","TMPFLG")=0
+	set ZRFLGTTX("R037","TMPFLG")=0
+	set ZRFLGTTX("R038","TMPFLG")=0
+	set ZRFLGTTX("R044","TMPFLG")=0
+	set ZRFLGTTX("R045","TMPFLG")=0
+		
+	type Number ZTSEQ,ZTSEQCHK
+	set (ZTSEQ,ZTSEQCHK)=(ZORTSEQ\1000)*1000
+	set ZTSEQCHK=ZTSEQCHK+999
+	// Loop for find records in TTX
+	for  set ZTSEQ=$O(^TTX(ZTJD,ZBRCD,ZUID,ZTSEQ)) quit:((ZTSEQ>ZTSEQCHK)!(ZTSEQ=""))  do { 
+		
+		type RecordTTX ttx=Db.getRecord("TTX","TJD=:ZTJD,BRCD=:ZBRCD,UID=:ZUID,TSEQ=:ZTSEQ")
+		type Number ZTRAMT
+		// set transaction amount in thai baht
+		set ZTRAMT=ttx.tamt
+		if (ttx.crcd'="THB"),(+ttx.sysbase'=0) set ZTRAMT=+ttx.sysbase
+		
+		// Check Bank Transaction(GL Account)
+		if 'Db.isDefined("ACN","CID=:ttx.cid") do { quit
+			// Check only Credit(1) Transaction (R034,R035,R038)
+			if ttx.itc1 do {
+				// Check is it Credit of Debit Transaction by Transaction Amount
+				if '(+$G(ZRFLGTTX("ZTRAMT",0))=+ZTRAMT) quit 
+				// R044 - Check Withdraw Transaction
+				if ($G(ZRFLGTTX("R044"))=1) set ZRFLGTTX("R044","TMPFLG")=1
+				// R045 - Check Withdraw Transaction
+				if ($G(ZRFLGTTX("R045"))=1) set ZRFLGTTX("R045","TMPFLG")=1
+			}
+		}
+		
+		// Check only Customer Transaction
+		type RecordACN acn=Db.getRecord("ACN","CID=:ttx.cid")
+		type RecordCIF cif=Db.getRecord("CIF","ACN=:acn.acn")
+		type RecordSCAU scau=Db.getRecord("SCAU","UID=:ttx.uid")
+
+		// Check only Credit(1) Transaction (R034,R035,R036,R038,R044)
+		if ttx.itc1 do {
+			// R035 not need to check Credit of Debit Transaction by Transaction Amount for in case not waive fee
+			if ($G(ZRFLGTTX("R035"))=1) set ZRFLGTTX("R035","TMPFLG")=($$R035CCRT(.ZRFLGTTX,acn,cif,scau,ttx,ZTRAMT))!$G(ZRFLGTTX("R035","TMPFLG"))
+
+			// Check is it Credit of Debit Transaction by Transaction Amount
+			if '(+$G(ZRFLGTTX("ZTRAMT",0))=+ZTRAMT) quit
+			
+			// Get DTJ Keys of To Account
+			set ZRFLGTTX("DTJKTOACC")=$$TTXDTJC^ZSURUTL(ttx.tjd,ttx.brcd,ttx.uid,ttx.tseq,ttx.cid)
+			
+			if ($G(ZRFLGTTX("R034"))=1) set ZRFLGTTX("R034","TMPFLG")=($$R034CCRT(.ZRFLGTTX,acn,cif,scau,ttx,ZTRAMT))!$G(ZRFLGTTX("R034","TMPFLG"))
+			
+			if ($G(ZRFLGTTX("R036"))=1) set ZRFLGTTX("R036","TMPFLG")=($$R036CCRT(.ZRFLGTTX,acn,cif,scau,ttx,ZTRAMT))!$G(ZRFLGTTX("R036","TMPFLG"))
+			if ($G(ZRFLGTTX("R037"))=1) set ZRFLGTTX("R037","TMPFLG")=($$R037CCRT(.ZRFLGTTX,acn,cif,scau,ttx,ZTRAMT))!$G(ZRFLGTTX("R037","TMPFLG"))
+			if ($G(ZRFLGTTX("R038"))=1) set ZRFLGTTX("R038","TMPFLG")=($$R038CCRT(.ZRFLGTTX,acn,cif,scau,ttx,ZTRAMT))!$G(ZRFLGTTX("R038","TMPFLG"))
+			// R044 - Check Tranfering, Payment and ORFT Transaction
+			if ($G(ZRFLGTTX("R044"))=1) set ZRFLGTTX("R044","TMPFLG")=($$R044CCRT(.ZRFLGTTX,acn,cif,scau,ttx,ZTRAMT))!$G(ZRFLGTTX("R044","TMPFLG"))
+			// R045 - Check Tranfering, Payment and ORFT Transaction
+			if ($G(ZRFLGTTX("R045"))=1) set ZRFLGTTX("R045","TMPFLG")=($$R045CCRT(.ZRFLGTTX,acn,cif,scau,ttx,ZTRAMT))!$G(ZRFLGTTX("R045","TMPFLG"))
+		}
+	}
+	if ($G(ZRFLGTTX("R034"))=1) set ZRFLGTTX("R034")=$G(ZRFLGTTX("R034","TMPFLG"))
+	if ($G(ZRFLGTTX("R035"))=1) set ZRFLGTTX("R035")=$G(ZRFLGTTX("R035","TMPFLG"))
+	if ($G(ZRFLGTTX("R036"))=1) set ZRFLGTTX("R036")=$G(ZRFLGTTX("R036","TMPFLG"))
+	if ($G(ZRFLGTTX("R037"))=1) set ZRFLGTTX("R037")=$G(ZRFLGTTX("R037","TMPFLG"))
+	if ($G(ZRFLGTTX("R038"))=1) set ZRFLGTTX("R038")=$G(ZRFLGTTX("R038","TMPFLG"))
+	if ($G(ZRFLGTTX("R044"))=1) set ZRFLGTTX("R044")=$G(ZRFLGTTX("R044","TMPFLG"))
+	if ($G(ZRFLGTTX("R045"))=1) set ZRFLGTTX("R045")=$G(ZRFLGTTX("R045","TMPFLG"))
+
+	quit
+	
+	
+R034CCRT(String ZRFLGTTX,
+	RecordACN acn,
+	RecordCIF cif,
+	RecordSCAU scau,
+	RecordTTX ttx,
+	String ZTRAMT)
+	// Check condition of R034 with Transfering Credit Transaction(To Account)
+
+	// If credit(1) transaction then continue
+	if 'ttx.itc1 quit 0
+	
+	// If it is transfering transaction then continue.
+	//--if '$$CETCTRF^ZSURUTL(ttx.etc) quit 0
+	
+	type String ZRULE
+	set ZRULE="R034"_$G(ZRFLGTTX("ZCHNL"))
+	// Check Non-Monitoring Parameter
+	if '($$DETTTX^ZSURUTL(ZRULE,acn,cif,scau,ttx,ZTRAMT)) quit 0
+
+	// If From-Customer is as same as To-Customer then exclued rule
+	if ZRFLG("R034","FROMCIF")=cif.acn quit 0
+	
+	// Set Customer Number for check To-Account is the same person
+	set ZRFLGTTX("R034","TOCIF")=cif.acn 
+	
+	// Calculate Transaction Count(ZUTBLSURTCNT)
+	set ZRFLGTTX("R034","ZSURTCNT","CAL")=$G(ZRFLGTTX("R034","ZSURTCNT","CAL"))+1
+	
+	quit 1
+	
+R035CCRT(String ZRFLGTTX,
+	RecordACN acn,
+	RecordCIF cif,
+	RecordSCAU scau,
+	RecordTTX ttx,
+	String ZTRAMT)
+	// Check condition of R035 with Payment Credit Transaction(To Account)
+	// Non-Monitoring Parameter	
+	// 1.	Product Type: (ZUTBLSUXPRDT) 
+	// 2.	KTB Customer Code (ZUTBLSUXKCUS)
+	// 3.	User Class: Batch (ZUTBLSUXUCLS)
+	
+	// If credit transaction then continue
+	if 'ttx.itc1 quit 0
+	
+	// Check Credit Transaction(ttx.etc) is payment transaction
+	if '($$CETCPAY^ZSURUTL(ttx.etc)) quit 0
+	
+	type String ZRULE
+	set ZRULE="R035"_$G(ZRFLGTTX("ZCHNL"))
+	
+	// Check Non-Monitoring Parameter
+	if '($$DETTTX^ZSURUTL(ZRULE,acn,cif,scau,ttx,ZTRAMT)) quit 0
+	//set ZRFLGTTX("R035","ZSURLAMT","CAL")=$G(ZRFLGTTX("R035","ZSURLAMT","CAL"))+ZTRAMT
+	quit 1
+	
+R038CCRT(String ZRFLGTTX,
+	RecordACN acn,
+	RecordCIF cif,
+	RecordSCAU scau,
+	RecordTTX ttx,
+	String ZTRAMT)
+	// Check condition of R038 with Transfering Credit Transaction(To Account)
+
+	// If credit(1) transaction then continue
+	if 'ttx.itc1 quit 0
+	
+	// If Customer-From is as same as Customer-To then Transaction is exclued rule
+	if ZRFLGTTX("R038","FROMCIF")=cif.acn quit 0
+	
+	// If it is transfering transaction then continue.
+	//--if '$$CETCTRF^ZSURUTL(ttx.etc) quit 0
+	
+	// Check Non-Monitoring Parameter
+	if '($$DETTTX^ZSURUTL($G(ZRFLG("R038","RULE")),acn,cif,scau,ttx,ZTRAMT)) quit 0
+	
+	// Calculate Number of Previous Transactions (ZUTBLSURNPT)
+	set ZRFLGTTX("R038","ZSURNPT","CAL")=$G(ZRFLGTTX("R038","ZSURNPT","CAL"))+1
+	
+	quit 1
+					
+R035CDBT(RecordACN acn,
+	RecordCIF cif,
+	RecordSCAU scau,
+	RecordDTJ dtj,
+	String ZTRAMT,
+	String ZRFLG,
+	String THR00X)	
+	// Check condition of R035 with Payment Debit Transaction(From Account)
+	/*
+	Input:
+		RecordACN acn,
+		RecordCIF cif,
+		RecordSCAU scau,
+		RecordDTJ dtj,
+		S ZTRAMT=1000
+		S ZRFLG("ZCHNL"))="C"
+		S ZRULE="R035C"
+		S THR00X("ZSURNDAY",ZRULE)=3
+		S THR00X("ZSURLAMT",ZRULE)=5
+	Output:
+		0 - Excluded R035
+		1 - Included R035	
+	*/
+	type String ZRET, ZRULE
+	set ZRET=0
+	
+	set ZRULE="R035"_$G(ZRFLG("ZCHNL"))
+	set ZRFLG("R035","RULE")=ZRULE
+	
+	// - Check Rule Switch
+	if '$D(ZRULESW(ZRULE)) quit ZRET
+	
+	// - Check Common Filter
+	if '$$DETCOM^ZSURUTL(ZRULE,.acn,.cif) quit ZRET
+	
+	// - Check only Deposit Account
+	if '(acn.cls="D") quit ZRET
+	
+	// - Check only debit(0) transaction
+	if dtj.itc1 quit ZRET
+
+	// - Check Non-Monitoring Parameter of R035 with Payment Transaction(From Account)
+	if '($$DETDTJ^ZSURUTL(ZRULE,acn,cif,scau,dtj,ZTRAMT)) quit ZRET
+	
+	
+	// - Get Number of date from ZUTBLSURNDAY
+	set ZRFLG("R035","ZSURNDAY")=$G(THR00X("ZSURNDAY",ZRULE))
+	set ZRFLG("R035","ZSURNDAY","CAL")=dtj.tjd-$G(THR00X("ZSURNDAY",ZRULE))
+	// - Set Check Date for Check Count Number of days
+	set ZRFLG("R035","ZSURNDAY","CHKDATE")=dtj.tjd
+	// - Count Number of days
+	set ZRFLG("R035","ZSURNDAY","COUNT")=1
+	
+	// - Get Limit Amount from ZUTBLSURLAMT
+	set ZRFLG("R035","ZSURLAMT")=$G(THR00X("ZSURLAMT",ZRULE))
+	
+	// - Calculated Limit Amount
+	set ZRFLG("R035","ZSURLAMT","CAL")=ZTRAMT
+	quit 1
+
+R038CDBT(RecordACN acn,
+	RecordCIF cif,
+	RecordSCAU scau,
+	RecordDTJ dtj,
+	String ZTRAMT,
+	String ZRFLG,
+	String THR00X)	
+	// Check condition of R038 with Payment Debit Transaction(From Account)
+	/*
+	Input:
+		RecordACN acn,
+		RecordCIF cif,
+		RecordSCAU scau,
+		RecordDTJ dtj,
+		S ZTRAMT=1000
+		S ZRFLG("ZCHNL"))="D"
+		S ZRULE="R038D"
+		S THR00X("ZSURNDAY",ZRULE)=3
+		S THR00X("ZSURLAMT",ZRULE)=100000
+
+	Output:
+		0 - Excluded R038
+		1 - Included R038	
+	*/
+	type String ZRULE,ZRET
+	set ZRET=0
+	
+	set ZRULE="R038"_$G(ZRFLG("ZCHNL"))
+	set ZRFLG("R038","RULE")=ZRULE
+	
+	// - Check Rule Switch
+	if '$D(ZRULESW(ZRULE)) quit ZRET
+	
+	// - Check Common Filter
+	if '$$DETCOM^ZSURUTL(ZRULE,.acn,.cif) quit ZRET
+	
+	// - Check only Deposit Account
+	if '(acn.cls="D") quit ZRET
+	
+	// - Check only debit(0) transaction
+	if dtj.itc1 quit ZRET
+	
+	// - Check Limit Amount from ZUTBLSURLAMT
+	if ZTRAMT<$G(THR00X("ZSURLAMT",ZRULE)) quit ZRET
+	
+	// - If it is transfering transaction then continue.
+	if '$$CETCTRF^ZSURUTL(dtj.etc) quit ZRET
+	
+	//set ZRFLG("R038","RULE")="R038"_$G(ZRFLG("ZCHNL"))
+	// - Check Non-Monitoring Parameter of R038 with Transfer Transaction(From Account)
+	if '($$DETDTJ^ZSURUTL($G(ZRULE),acn,cif,scau,dtj,ZTRAMT)) quit ZRET
+	
+	// - Get Number of Minimum Previous Transactions (ZUTBLSURNPT)
+	// - Get Number of Maximum Previous Transactions (ZUTBLSURNPT)
+	if '$D(THR00X("ZSURNPT",$G(ZRULE))) quit ZRET
+	set ZRFLG("R038","ZSURNPT","MINPT")=$P(THR00X("ZSURNPT",$G(ZRULE)),"|",1)
+	set ZRFLG("R038","ZSURNPT","MAXPT")=$P(THR00X("ZSURNPT",$G(ZRULE)),"|",2)
+	// - Set Calculated Number of Previous Transaction to -1 for reduce number of current transaction
+	set ZRFLG("R038","ZSURNPT","CAL")=-1
+	// - Get Number of date from ZUTBLSURNDAY
+	set ZRFLG("R038","ZSURNDAY","CAL")=dtj.tjd-$G(THR00X("ZSURNDAY",$G(ZRULE)))
+	
+	// - Get Percent Difference from ZUTBLSURPDIF
+	set ZRFLG("R038","ZSURPDIF")=$G(THR00X("ZSURPDIF",$G(ZRULE)))
+
+	// - Set Customer Number for check From-Account is the same person
+	set ZRFLG("R038","FROMCIF")=cif.acn
+
+	quit 1	
+	
+R034CDBT(RecordACN acn,
+	RecordCIF cif,
+	RecordSCAU scau,
+	RecordDTJ dtj,
+	String ZTRAMT,
+	String ZRFLG,
+	String THR00X)	
+	// Check condition of R034 with Transfering Debit Transaction(From Account)
+	/*
+	Input:
+		RecordACN acn,
+		RecordCIF cif,
+		RecordSCAU scau,
+		RecordDTJ dtj,
+		S ZTRAMT=1000
+		S ZRFLG("ZCHNL"))="C"
+		S ZRULE="R034C"
+		S THR00X("ZSURNDAY",ZRULE)=3
+		S THR00X("ZSURLAMT",ZRULE)=5
+	Output:
+		0 - Excluded R034
+		1 - Included R034	
+	*/
+	type String ZRET, ZRULE
+	set ZRET=0
+	
+	set ZRULE="R034"_$G(ZRFLG("ZCHNL"))
+	set ZRFLG("R034","RULE")=ZRULE
+	
+	// - Check Rule Switch
+	if '$D(ZRULESW(ZRULE)) quit ZRET
+	
+	// - Check Common Filter
+	if '$$DETCOM^ZSURUTL(ZRULE,.acn,.cif) quit ZRET
+
+	// - Check only debit(0) transaction
+	if dtj.itc1 quit ZRET
+
+	// - If it is transfering transaction then continue.
+	if '$$CETCTRF^ZSURUTL(dtj.etc) quit ZRET
+	
+	// - Check Non-Monitoring Parameter of R034 with Payment Transaction(From Account)
+	if '($$DETDTJ^ZSURUTL(ZRULE,acn,cif,scau,dtj,ZTRAMT)) quit ZRET
+	
+	// - Get Number of date from ZUTBLSURNDAY
+	set ZRFLG("R034","ZSURNDAY","CAL")=dtj.tjd-$G(THR00X("ZSURNDAY",ZRULE))
+	
+	// - Get Transaction Count from ZUTBLSURTCNT
+	set ZRFLG("R034","ZSURTCNT")=$G(THR00X("ZSURTCNT",ZRULE))
+	
+	// - Set From-Customer
+	set ZRFLG("R034","FROMCIF")=cif.acn
+	quit 1
+
+R044CDBT(RecordACN acn,
+	RecordCIF cif,
+	RecordSCAU scau,
+	RecordDTJ dtj,
+	String ZTRAMT,
+	String ZRFLG,
+	String THR00X)	
+	// Check condition of R044 with Debit Transaction(From Account)
+	/*
+	Input:
+		RecordACN acn,
+		RecordCIF cif,
+		RecordSCAU scau,
+		RecordDTJ dtj,
+		S ZTRAMT=1000
+		S ZRFLG("ZCHNL"))="B"
+		S ZRULE="R044B"
+		S THR00X("ZSURNTIM",ZRULE)= 360
+
+	Output:
+		0 - Excluded R044
+		1 - Included R044	
+	*/
+	type String ZRULE,ZRET
+	set ZRET=0
+	
+	set ZRULE="R044"_$G(ZRFLG("ZCHNL"))
+	set ZRFLG("R044","RULE")=ZRULE
+	
+	// - Check Rule Switch
+	if '$D(ZRULESW(ZRULE)) quit ZRET
+	
+	// - Check Common Filter
+	if '$$DETCOM^ZSURUTL(ZRULE,.acn,.cif) quit ZRET
+
+	// - Check only debit(0) transaction
+	if dtj.itc1 quit ZRET
+	
+	// - Check Surveillance Product Flag Excluded (ZUTBLSUXPRDF)
+	if $$CHKPRDF^ZSURUTL(dtj.etc,ZRULE,.TMPDRULE) quit ZRET
+	
+	// - Check Non-Monitoring Parameter of R044 with Debit Transaction(From Account)
+	if '($$DETDTJ^ZSURUTL($G(ZRULE),acn,cif,scau,dtj,ZTRAMT)) quit ZRET
+	
+	// - Get Number of Minutes (ZUTBLSURNTIM)
+	if '$D(THR00X("ZSURNTIM",$G(ZRULE))) quit ZRET
+	// -- Convert Number of Minutes to Number of Second
+	set ZRFLG("R044","ZSURNTIM")=$G(THR00X("ZSURNTIM",$G(ZRULE)))*60
+	// -- Calculate Date and time to Second then subtract with Number of Second
+	set ZRFLG("R044","ZSURNTIM","CAL")=$$CDTTIME^ZSURUTL(dtj.tjd,dtj.time)-$G(ZRFLG("R044","ZSURNTIM"))
+
+	// - Get ATM Region of Transaction (ZUTBLBRCD.ATMREG)
+	set ZRFLG("ATMREG")=$$GATMREG^ZSURUTL(dtj.brcd)
+	if $G(ZRFLG("ATMREG"))="" quit ZRET
+
+	quit 1		
+
+R044CCRT(String ZRFLGTTX,
+	RecordACN acn,
+	RecordCIF cif,
+	RecordSCAU scau,
+	RecordTTX ttx,
+	String ZTRAMT)
+	// Check condition of R044 with Transfering Credit Transaction(To Account)
+
+	// If credit(1) transaction then continue
+	if 'ttx.itc1 quit 0
+	
+	// Check Non-Monitoring Parameter
+	if '($$DETTTX^ZSURUTL($G(ZRFLG("R044","RULE")),acn,cif,scau,ttx,ZTRAMT)) quit 0
+	
+	quit 1
+
+R044CDBH(RecordACN acnh,
+	RecordCIF cifh,
+	RecordSCAU scauh,
+	RecordHIST hist,
+	String ZTRAMT,
+	String ZRFLG,
+	String ZRFLGHIS)
+
+	// Check condition of R044 with Debit Transaction(From Account) from hist
+	/*
+	Input:
+		RecordACN acnh,
+		RecordCIF cifh,
+		RecordSCAU scauh,
+		RecordHIST hist,
+		S ZTRAMT=1000
+		S ZRFLG("ZCHNL"))="B"
+		S ZRULE="R044B"
+		;S THR00X("ZSURNDAY",ZRULE)=3
+		S TMPDRULE("ZUTBLSUXPRDF",ZRULE)=""
+	Output:
+		0 - Excluded R044
+		1 - Included R044
+	*/	
+	type String ZRET
+	set ZRET=0
+	// If hist record is as same as channel of main transaction then continue
+	if '($G(ZRFLGHIS("ZCHNL"))=$G(ZRFLG("ZCHNL"))) quit ZRET
+			
+	// - Check only debit(0) transaction 
+	if hist.itc1 quit ZRET
+		
+	set ZRFLGHIS("R044","RULE")="R044"_$G(ZRFLG("ZCHNL"))
+	
+	// - Check Surveillance Product Flag Excluded (ZUTBLSUXPRDF)
+	if $$CHKPRDF^ZSURUTL(hist.etc,$G(ZRFLGHIS("R044","RULE")),.TMPDRULE) quit ZRET
+	
+	// - Check Non-Monitoring Parameter of R044 with Debit Transaction(From Account)
+	if '($$DETHIS44^ZSURUTL($G(ZRFLGHIS("R044","RULE")),acnh,cifh,scauh,hist,ZTRAMT)) quit ZRET
+	
+	quit 1
+
+R045CDBT(RecordACN acn,
+	RecordCIF cif,
+	RecordSCAU scau,
+	RecordDTJ dtj,
+	String ZTRAMT,
+	String ZRFLG,
+	String THR00X)	
+	// Check condition of R045 with Debit Transaction(From Account)
+	/*
+	Input:
+		RecordACN acn,
+		RecordCIF cif,
+		RecordSCAU scau,
+		RecordDTJ dtj,
+		S ZTRAMT=1000
+		S ZRFLG("ZCHNL"))="F"
+		S ZRULE="R045F"
+		S THR00X("ZSURNTIM",ZRULE)= 360
+
+	Output:
+		0 - Excluded R045
+		1 - Included R045	
+	*/
+	type String ZRULE,ZRET
+	set ZRET=0
+	
+	set ZRULE="R045"_$G(ZRFLG("ZCHNL"))
+	set ZRFLG("R045","RULE")=ZRULE
+	
+	// - Check Rule Switch
+	if '$D(ZRULESW(ZRULE)) quit ZRET
+	
+	// - Check Common Filter
+	if '$$DETCOM^ZSURUTL(ZRULE,.acn,.cif) quit ZRET
+
+	// - Check only debit(0) transaction
+	if dtj.itc1 quit ZRET
+	
+	// - Check Non-Monitoring Parameter of R045 with Debit Transaction(From Account)
+	if '($$DETDTJ^ZSURUTL($G(ZRULE),acn,cif,scau,dtj,ZTRAMT)) quit ZRET
+	
+	// - Get Number of Minutes (ZUTBLSURNTIM)
+	if '$D(THR00X("ZSURNTIM",$G(ZRULE))) quit ZRET
+	// -- Convert Number of Minutes to Number of Second
+	set ZRFLG("R045","ZSURNTIM")=$G(THR00X("ZSURNTIM",$G(ZRULE)))*60
+	// -- Calculate Date and time to Second then subtract with Number of Second
+	set ZRFLG("R045","ZSURNTIM","CAL")=$$CDTTIME^ZSURUTL(dtj.tjd,dtj.time)-$G(ZRFLG("R045","ZSURNTIM"))
+
+	// - Get Transaction Count from ZUTBLSURTCNT
+	if '$D(THR00X("ZSURTCNT",$G(ZRULE))) quit ZRET
+	set ZRFLG("R045","ZSURTCNT")=$G(THR00X("ZSURTCNT",ZRULE))
+	
+	// - Get Transaction Count (ZUTBLSURTCNT)
+	set ZRFLG("R045","ZSURTCNT","CAL")=$G(ZRFLG("R045","ZSURTCNT","CAL"))+1
+	
+	quit 1		
+
+R045CCRT(String ZRFLGTTX,
+	RecordACN acn,
+	RecordCIF cif,
+	RecordSCAU scau,
+	RecordTTX ttx,
+	String ZTRAMT)
+	// Check condition of R045 with Transfering Credit Transaction(To Account)
+
+	// If credit(1) transaction then continue
+	if 'ttx.itc1 quit 0
+	
+	// - Check Common Filter
+	if '$$DETCOM^ZSURUTL($G(ZRFLG("R045","RULE")),.acn,.cif) quit 0
+	
+	// Check Non-Monitoring Parameter
+	if '($$DETTTX^ZSURUTL($G(ZRFLG("R045","RULE")),acn,cif,scau,ttx,ZTRAMT)) quit 0
+
+	// - Get Transaction Count (ZUTBLSURTCNT)
+	//set ZRFLGTTX("R045","ZSURTCNT","CAL")=$G(ZRFLGTTX("R045","ZSURTCNT","CAL"))+1
+		
+	quit 1
+
+R045CDBH(RecordACN acnh,
+	RecordCIF cifh,
+	RecordSCAU scauh,
+	RecordHIST hist,
+	String ZTRAMT,
+	String ZRFLG,
+	String ZRFLGHIS)
+
+	// Check condition of R045 with Debit Transaction(From Account) from hist
+	/*
+	Input:
+		RecordACN acnh,
+		RecordCIF cifh,
+		RecordSCAU scauh,
+		RecordHIST hist,
+		S ZTRAMT=1000
+		S ZRFLG("ZCHNL"))="F"
+		S ZRULE="R045F"
+	Output:
+		0 - Excluded R045
+		1 - Included R045
+	*/	
+	type String ZRET
+	set ZRET=0
+	// If hist record is as same as channel of main transaction then continue
+	if '($G(ZRFLGHIS("ZCHNL"))=$G(ZRFLG("ZCHNL"))) quit ZRET
+			
+	// - Check only debit(0) transaction 
+	if hist.itc1 quit ZRET
+		
+	set ZRFLGHIS("R045","RULE")="R045"_$G(ZRFLG("ZCHNL"))
+	
+	// - Check Common Filter
+	if '$$DETCOM^ZSURUTL($G(ZRFLGHIS("R045","RULE")),.acn,.cif) quit 0
+	
+	// - Check Non-Monitoring Parameter of R045 with Debit Transaction(From Account)
+	if '($$DETHIS^ZSURUTL($G(ZRFLGHIS("R045","RULE")),acnh,cifh,scauh,hist,ZTRAMT)) quit ZRET
+	
+	// - Get Transaction Count (ZUTBLSURTCNT)
+	set ZRFLGHIS("R045","ZSURTCNT","CAL")=$G(ZRFLGHIS("R045","ZSURTCNT","CAL"))+1
+	
+	quit 1
+
+R036CDBT(RecordACN acn,
+	RecordCIF cif,
+	RecordSCAU scau,
+	RecordDTJ dtj,
+	String ZTRAMT,
+	String ZRFLG,
+	String THR00X)	
+	// Check condition of R036 with Debit Transaction(From Account)
+	/*
+	Input:
+		RecordACN acn,
+		RecordCIF cif,
+		RecordSCAU scau,
+		RecordDTJ dtj,
+		S ZTRAMT=1000
+		S ZRFLG("ZCHNL"))="C"
+		S ZRULE="R036C"
+		S THR00X("ZSURNTIM",ZRULE)= 360
+
+	Output:
+		0 - Excluded R036
+		1 - Included R036	
+	*/
+	type String ZRET, ZRULE
+	set ZRET=0
+	
+	set ZRULE="R036"_$G(ZRFLG("ZCHNL"))
+	set ZRFLG("R036","RULE")=ZRULE
+	
+	// - Check Rule Switch
+	if '$D(ZRULESW(ZRULE)) quit ZRET
+	
+	// - Check Common Filter
+	if '$$DETCOM^ZSURUTL(ZRULE,.acn,.cif) quit ZRET
+
+	// - Check only debit(0) transaction
+	if dtj.itc1 quit ZRET
+
+	// - If it is transfering transaction then continue.
+	if '$$CETCTRF^ZSURUTL(dtj.etc) quit ZRET
+	
+	// - Check Non-Monitoring Parameter of R036 with Payment Transaction(From Account)
+	if '($$DETDTJ^ZSURUTL(ZRULE,acn,cif,scau,dtj,ZTRAMT)) quit ZRET
+	
+	// - Get Number of date from ZUTBLSURNDAY
+	set ZRFLG("R036","ZSURNDAY","CAL")=dtj.tjd-$G(THR00X("ZSURNDAY",ZRULE))
+	
+	// - Get Transaction Count from ZUTBLSURTCNT
+	set ZRFLG("R036","ZSURTCNT")=$G(THR00X("ZSURTCNT",ZRULE))
+	
+	// Set Customer Number for check From-Account is the same person
+	set ZRFLG("R036","FROMCIF")=cif.acn 
+	
+	quit 1		
+
+R036CCRT(String ZRFLGTTX,
+	RecordACN acn,
+	RecordCIF cif,
+	RecordSCAU scau,
+	RecordTTX ttx,
+	String ZTRAMT)
+	// Check condition of R036 with Transfering Credit Transaction(To Account)
+
+	// If credit(1) transaction then continue
+	if 'ttx.itc1 quit 0
+	
+	// If it is transfering transaction then continue.
+	//--if '$$CETCTRF^ZSURUTL(ttx.etc) quit 0
+	
+	type String ZRULE
+	set ZRULE="R036"_$G(ZRFLGTTX("ZCHNL"))
+	// Check Non-Monitoring Parameter
+	if '($$DETTTX^ZSURUTL(ZRULE,acn,cif,scau,ttx,ZTRAMT)) quit 0
+	
+	// - Check Common Filter
+	if '$$DETCOM^ZSURUTL(ZRULE,.acn,.cif) quit 0
+	
+	// - Check Transfer to other customer
+	if ZRFLG("R036","FROMCIF")=cif.acn quit 0
+	
+	// Calculate Transaction Count(ZUTBLSURTCNT)
+	set ZRFLGTTX("R036","ZSURTCNT","CAL")=$G(ZRFLGTTX("R036","ZSURTCNT","CAL"))+1
+	
+	quit 1		
+	
+
+HISCHKT(Number ZTCID,
+	Number ZTTSEQ,
+	String ZRFLG)
+	//Check HIST of To Account that hist.tseq<hist.tseq
+	
+	// Check flag of each rule for analyze need to check TTX or not	
+	if '($G(ZRFLG("R036"))=1)&'($G(ZRFLG("R037"))=1) quit
+	
+	type Number MAX
+	set MAX=100
+	
+	// Check history records are HIST.TSEQ<DTJ.TSEQ
+	type ResultSet rs=Db.select("TSEQ","HIST","CID=:ZTCID AND (TSEQ<:ZTTSEQ)","TSEQ DESC")
+	while rs.next() do { quit:MAX=0
+
+		set MAX=MAX-1
+		
+		type RecordHIST hist=Db.getRecord("HIST","CID=:ZTCID,TSEQ=rs.getCol(1)")
+		
+		// Check Rejected, Error-Corrected or Reversal Transaction
+		// and Check ZRFLG("HISTSO","REV") : If it is History of Rejected Transaction then exit from check hist
+		if $$HISREV^ZSURUTL(hist.tseq,hist.zitc6,hist.zitc12,hist.tso,.ZRFLG) quit  //Rachod - 05/06/10
+
+		// If Fee Transaction then quit
+		if $$CHKISFEE^ZSURUTL(hist.etc) quit
+								
+		// Check condition of each rule that need to check hist
+		// - R036 : If hist.tjd is equal or less than interested day then set parameter to exit from check hist
+		if (($G(ZRFLG("R036"))=1)&('(hist.tjd>$G(ZRFLG("R036","ZSURNDAY","CAL"))))) set ZRFLG("R036")=0
+		// - R037 : If hist.tjd is equal or less than interested day then set parameter to exit from check hist
+		if (($G(ZRFLG("R037"))=1)&('(hist.tjd>$G(ZRFLG("R037","ZSURNDAY","CAL"))))) set ZRFLG("R037")=0
+		
+		// Exit from check hist(by set MAX=0) when flag of rule(ZRFLG("RULE")) is not inclued rule(1) (ZRFLG("RULE")!=1) 
+		if '($G(ZRFLG("R036"))=1)&'($G(ZRFLG("R037"))=1) set MAX=0 quit
+		
+		// Check only Debit/Credit Transaction
+		if hist.itc1="" quit
+		
+		type String ZRFLGHIS
+		// Check Channel of hist record
+		set ZRFLGHIS("ZCHNL")=$$CHKCHNL^ZSURUTL(hist.etc,hist.tlo,.THR00X)		
+		if $G(ZRFLGHIS("ZCHNL"))="" quit 
+		
+		// set transaction amount in thai baht
+		type Number ZTRAMT
+		set ZTRAMT=hist.tot
+		if (hist.crcd'="THB"),(+hist.sysbase'=0) set ZTRAMT=+hist.sysbase
+		set ZRFLGHIS("ZTRAMT",hist.itc1)=ZTRAMT
+		type RecordACN acnh=Db.getRecord("ACN","CID=:hist.cid")
+		type RecordCIF cifh=Db.getRecord("CIF","ACN=:acnh.acn")
+		type RecordSCAU scauh=Db.getRecord("SCAU","UID=:hist.uid")
+
+		// Init value flag of each rule
+		set ZRFLGHIS("R036")=0
+		set ZRFLGHIS("R037")=0
+				
+		// R036 : Check Transfering Credit Transaction form hist record
+		// - If it isn't included R036 then quit and return 1 for continue next hist record
+		if ($G(ZRFLG("R036"))=1) set ZRFLGHIS("R036")=$$R036CCRH(.acnh,.cifh,.scauh,.hist,ZTRAMT,.ZRFLG,.ZRFLGHIS)
+		// R037 : Check Payment Credit Transaction form hist record
+		// - If it isn't included R037 then quit and return 1 for continue next hist record
+		if ($G(ZRFLG("R037"))=1) set ZRFLGHIS("R037")=$$R037CCRH(.acnh,.cifh,.scauh,.hist,ZTRAMT,.ZRFLG,.ZRFLGHIS)
+		
+		// Check Payment Debit Transaction of TTX
+		do TTXCHKHT(hist.tjd,hist.brcd,hist.uid,hist.trc,.ZRFLGHIS) 
+		
+		// R036 : Check Threshold Parameter (ZUTBLSURTCNT)
+		if $G(ZRFLGHIS("R036"))=1 do {
+			// CHERRY - Log For Check 
+			//set ^ZSVRRY("R036",$G(ZRFLG("R036","RULE")),dtj.tjd,dtj.datetime,dtj.cid,dtj.tseq,hist.tseq)=$G(ZRFLGHIS("R036","TOCIF"))
+			
+			if '($G(ZRFLG("R036","FROMCIF"))=$G(ZRFLGHIS("R036","FROMCIF"))) quit
+			set ZRFLG("R036","ZSURTCNT","CAL")=$G(ZRFLG("R036","ZSURTCNT","CAL"))+$G(ZRFLGHIS("R036","ZSURTCNT","CAL"))
+			
+			if $G(ZRFLG("R036","ZSURTCNT","CAL"))>$G(ZRFLG("R036","ZSURTCNT")) set ZRFLG("R036")=2 quit
+		}
+		// R037 : Check Customer-From of Main Transaction is as same as Customer-From of Hist
+		if $G(ZRFLGHIS("R037"))=1 do {
+			if '($G(ZRFLG("R037","FROMCIF"))=$G(ZRFLGHIS("R037","FROMCIF"))) quit	
+			set ZRFLG("R037")=2 quit
+		}
+		
+	}	
+	quit	
+	
+R036CCRH(RecordACN acnh,
+	RecordCIF cifh,
+	RecordSCAU scauh,
+	RecordHIST hist,
+	String ZTRAMT,
+	String ZRFLG,
+	String ZRFLGHIS)	
+	// Check condition of R036 with Transfering Credit Transaction(To Account)
+	
+	type String ZRET, ZRULE
+	set ZRET=0
+	// If hist record is as same as channel of main transaction then continue
+	if '($G(ZRFLGHIS("ZCHNL"))=$G(ZRFLG("ZCHNL"))) quit ZRET
+	
+	// Check Number of Days - If out of Number of Days then don't continue check and return exclude rule
+	if '(hist.tjd>$G(ZRFLG("R036","ZSURNDAY","CAL"))) set ZRFLG("R036")=0 quit ZRET
+	
+	// If credit(1) transaction then continue
+	if '(hist.itc1) quit ZRET
+	
+	// If it is transfering transaction then continue.
+	//--if '$$CETCTRF^ZSURUTL(ttx.etc) quit 0
+
+	set ZRULE="R036"_$G(ZRFLGHIS("ZCHNL"))
+	// Check Non-Monitoring Parameter
+	if '($$DETHIS^ZSURUTL(ZRULE,acnh,cifh,scauh,hist,ZTRAMT)) quit ZRET
+
+	quit 1			
+
+TTXCHKHT(Number ZTJD, Number ZBRCD, String ZUID, Number  ZORTSEQ, String ZRFLGTTX)
+	// Check TTX for Hist of To Account
+	
+	// Check flag of each rule for analyze need to check TTX or not
+	if ('($G(ZRFLGTTX("R036"))=1))&'($G(ZRFLGTTX("R037"))=1) quit
+	
+	// Initial Flag for each rule that is used in TTXCHK
+	set ZRFLGTTX("R036","TMPFLG")=0
+	set ZRFLGTTX("R037","TMPFLG")=0
+		
+	type Number ZTSEQ,ZTSEQCHK
+	set (ZTSEQ,ZTSEQCHK)=(ZORTSEQ\1000)*1000
+	set ZTSEQCHK=ZTSEQCHK+999
+	// Loop for find records in TTX
+	for  set ZTSEQ=$O(^TTX(ZTJD,ZBRCD,ZUID,ZTSEQ)) quit:((ZTSEQ>ZTSEQCHK)!(ZTSEQ=""))  do { 
+		
+		type RecordTTX ttx=Db.getRecord("TTX","TJD=:ZTJD,BRCD=:ZBRCD,UID=:ZUID,TSEQ=:ZTSEQ")
+		type Number ZTRAMT
+		// set transaction amount in thai baht
+		set ZTRAMT=ttx.tamt
+		if (ttx.crcd'="THB"),(+ttx.sysbase'=0) set ZTRAMT=+ttx.sysbase
+		
+		// Check Bank Transaction(GL Account)
+		if 'Db.isDefined("ACN","CID=:ttx.cid") quit
+		// Check only Customer Transaction
+		type RecordACN acn=Db.getRecord("ACN","CID=:ttx.cid")
+		type RecordCIF cif=Db.getRecord("CIF","ACN=:acn.acn")
+		type RecordSCAU scau=Db.getRecord("SCAU","UID=:ttx.uid")
+
+		// Check only Debit(0) Transaction (R036)
+		if '(ttx.itc1) do {
+			// Check is it Debit of Credit Transaction by Transaction Amount
+			if '(+$G(ZRFLGTTX("ZTRAMT",1))=+ZTRAMT) quit
+										   
+			if ($G(ZRFLGTTX("R036"))=1) set ZRFLGTTX("R036","TMPFLG")=($$R036CDBH(.ZRFLGTTX,acn,cif,scau,ttx,ZTRAMT))!$G(ZRFLGTTX("R036","TMPFLG"))								
+			if ($G(ZRFLGTTX("R037"))=1) set ZRFLGTTX("R037","TMPFLG")=($$R037CDBH(.ZRFLGTTX,acn,cif,scau,ttx,ZTRAMT))!$G(ZRFLGTTX("R037","TMPFLG"))								
+		}
+	}
+	if ($G(ZRFLGTTX("R036"))=1) set ZRFLGTTX("R036")=$G(ZRFLGTTX("R036","TMPFLG"))
+	if ($G(ZRFLGTTX("R037"))=1) set ZRFLGTTX("R037")=$G(ZRFLGTTX("R037","TMPFLG"))
+
+	quit	
+
+R036CDBH(String ZRFLGTTX,
+	RecordACN acnh,
+	RecordCIF cifh,
+	RecordSCAU scauh,
+	RecordTTX ttxh,
+	String ZTRAMT)
+	// Check Debit Transaction of Credit Transaction of TTX Record from History of To-Account
+
+	type String ZRULE
+	set ZRULE="R036"_$G(ZRFLGTTX("ZCHNL"))
+	
+	// - Check Common Filter
+	if '$$DETCOM^ZSURUTL(ZRULE,.acnh,.cifh) quit 0
+	
+	// Check Non-Monitoring Parameter
+	if '($$DETTTX^ZSURUTL(ZRULE,acnh,cifh,scauh,ttxh,ZTRAMT)) quit 0
+	
+	// - If it is transfering transaction then continue.
+	if '$$CETCTRF^ZSURUTL(ttxh.etc) quit ZRET
+	
+	set ZRFLGTTX("R036","FROMCIF")=cifh.acn
+	
+	// Calculate Transaction Count(ZUTBLSURTCNT)
+	set ZRFLGTTX("R036","ZSURTCNT","CAL")=$G(ZRFLGTTX("R036","ZSURTCNT","CAL"))+1
+	
+	quit 1
+
+R037CDBT(RecordACN acn,
+	RecordCIF cif,
+	RecordSCAU scau,
+	RecordDTJ dtj,
+	String ZTRAMT,
+	String ZRFLG,
+	String THR00X)	
+	// Check condition of R037 with Debit Transaction(From Account)
+	/*
+	Input:
+		RecordACN acn,
+		RecordCIF cif,
+		RecordSCAU scau,
+		RecordDTJ dtj,
+		S ZTRAMT=1000
+		S ZRFLG("ZCHNL"))="C"
+		S ZRULE="R037C"
+		--S THR00X("ZSURNTIM",ZRULE)= 360
+
+	Output:
+		0 - Excluded R037
+		1 - Included R037	
+	*/
+	type String ZRET, ZRULE
+	set ZRET=0
+	
+	set ZRULE="R037"_$G(ZRFLG("ZCHNL"))
+	set ZRFLG("R037","RULE")=ZRULE
+	
+	// - Check Rule Switch
+	if '$D(ZRULESW(ZRULE)) quit ZRET
+	
+	// - Check Common Filter
+	if '$$DETCOM^ZSURUTL(ZRULE,.acn,.cif) quit ZRET
+
+	// - Check only debit(0) transaction
+	if dtj.itc1 quit ZRET
+
+	// - Check Non-Monitoring Parameter of R037
+	if '($$DETDTJ^ZSURUTL(ZRULE,acn,cif,scau,dtj,ZTRAMT)) quit ZRET
+	
+	// - Get Number of date from ZUTBLSURNDAY
+	set ZRFLG("R037","ZSURNDAY","CAL")=dtj.tjd-$G(THR00X("ZSURNDAY",ZRULE))
+	
+	// - Get Transaction Count from ZUTBLSURTCNT
+	set ZRFLG("R037","ZSURTCNT")=$G(THR00X("ZSURTCNT",ZRULE))
+	
+	// Set Customer Number for check From-Account is the same person
+	set ZRFLG("R037","FROMCIF")=cif.acn 
+	
+	quit 1		
+	
+R037CCRT(String ZRFLGTTX,
+	RecordACN acn,
+	RecordCIF cif,
+	RecordSCAU scau,
+	RecordTTX ttx,
+	String ZTRAMT)
+	// Check condition of R037 with Transfering Credit Transaction(To Account)
+
+	// If credit(1) transaction then continue
+	if 'ttx.itc1 quit 0
+	
+	// If it is Payment Transaction then continue.
+	if '$$CETCPAY^ZSURUTL(ttx.etc) quit 0
+	
+	type String ZRULE
+	set ZRULE="R037"_$G(ZRFLGTTX("ZCHNL"))
+	// Check Non-Monitoring Parameter
+	if '($$DETTTX^ZSURUTL(ZRULE,acn,cif,scau,ttx,ZTRAMT)) quit 0
+	
+	// - Check Common Filter
+	if '$$DETCOM^ZSURUTL(ZRULE,.acn,.cif) quit 0
+	
+	type String TTXTSO
+	do OUT^UTSO(.TTXTSO,ttx.tso)
+	set ZRFLG("R037","ZREF1")=$G(TTXTSO("ZREF1"))
+	set ZRFLG("R037","ZREF2")=$G(TTXTSO("ZREF2"))
+	set ZRFLG("R037","ZTRAMT")=+$G(ZTRAMT)		
+	quit 1		
+
+R037CCRH(RecordACN acnh,
+	RecordCIF cifh,
+	RecordSCAU scauh,
+	RecordHIST hist,
+	String ZTRAMT,
+	String ZRFLG,
+	String ZRFLGHIS)	
+	// Check condition of R037 with Payment Credit Transaction(To Account)
+	
+	type String ZRET, ZRULE
+	set ZRET=0
+	// If hist record is as same as channel of main transaction then continue
+	if '($G(ZRFLGHIS("ZCHNL"))=$G(ZRFLG("ZCHNL"))) quit ZRET
+	
+	// Check Number of Days - If out of Number of Days then don't continue check and return exclude rule
+	if '(hist.tjd>$G(ZRFLG("R037","ZSURNDAY","CAL"))) set ZRFLG("R037")=0 quit ZRET
+	
+	// If credit(1) transaction then continue
+	if '(hist.itc1) quit ZRET
+	
+	type String TTXTSO
+	do OUT^UTSO(.TTXTSO,hist.tso)
+	// Check ZREF1 and ZREF2 of History are equal Main Transaction
+	if '($G(ZRFLG("R037","ZREF1"))=$G(TTXTSO("ZREF1"))) quit ZRET
+	if '($G(ZRFLG("R037","ZREF2"))=$G(TTXTSO("ZREF2"))) quit ZRET
+	if '($G(ZRFLG("R037","ZTRAMT"))=+$G(ZTRAMT)) quit ZRET
+	
+	// If it is Payment Transaction then continue.
+	if '$$CETCPAY^ZSURUTL(hist.etc) quit 0
+	
+	set ZRULE="R037"_$G(ZRFLGHIS("ZCHNL"))
+	// Check Non-Monitoring Parameter
+	if '($$DETHIS^ZSURUTL(ZRULE,acnh,cifh,scauh,hist,ZTRAMT)) quit ZRET
+	
+	quit 1	
+
+R037CDBH(String ZRFLGTTX,
+	RecordACN acnh,
+	RecordCIF cifh,
+	RecordSCAU scauh,
+	RecordTTX ttxh,
+	String ZTRAMT)
+	// Check Debit Transaction of Credit Transaction of TTX Record from History of To-Account
+
+	type String ZRULE
+	set ZRULE="R037"_$G(ZRFLGTTX("ZCHNL"))
+	
+	// - Check Common Filter
+	if '$$DETCOM^ZSURUTL(ZRULE,.acnh,.cifh) quit 0
+	
+	// Check Non-Monitoring Parameter
+	if '($$DETTTX^ZSURUTL(ZRULE,acnh,cifh,scauh,ttxh,ZTRAMT)) quit 0
+
+	// - Set Transfer to other customer
+	set ZRFLGTTX("R037","FROMCIF")=cifh.acn
+	
+	
+	quit 1		

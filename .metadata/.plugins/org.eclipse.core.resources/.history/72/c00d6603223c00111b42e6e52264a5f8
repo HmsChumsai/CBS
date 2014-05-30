@@ -1,0 +1,15 @@
+//DO NOT MODIFY  Procedure For Check UID from ZTLRJGL|ZCHCDI|||||||1
+
+ZCHK(UID)
+
+	set ZUID=UID
+	new ZRESULT
+	set (ZRESULT,EXIT)=0
+	
+	Type ResultSet rs = Db.select("UID","ZUTBLCHUID","CHTYPE IN ('MOB','INT')")
+	while rs.next() do { quit:EXIT
+		if (rs.getCol(1)=UID) set ZRESULT=1 ,EXIT=1	
+		
+		}
+		
+	quit ZRESULT

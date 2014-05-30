@@ -1,0 +1,72 @@
+//DO NOT MODIFY  Generating data for ZFCD1D734 report|ZBCHRFCD||||||DTJ|||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	do Db.fastDelete("ZTFREPFCD")
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	write "View TEMP FILE",!
+	type DbSet ds = Db.selectDbSet("ZTFREPFCD")
+	while ds.next() do {
+		type RecordZTFREPFCD ztmp = ds.getRecord("ZTFREPFCD")
+		write ztmp.type_" "_ztmp.CRCD,!
+	}
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	do PROC
+	quit
+	
+PROC
+	type RecordDTJ zdtj = Db.getRecord("DTJ","TJD,DATETIME,CID,TSEQ")
+	
+	set ZCID = zdtj.cid
+	set ZITC = zdtj.itc1
+	
+	type RecordDEP zdep = Db.getRecord("DEP","CID=:ZCID",1)
+	
+	set ZTYPE = zdep.type				//Product Type
+	set ZCRCD = zdep.crcd				//Currency
+	set ZBAL = zdep.bal	
+	set ZCO = zdep.co
+	
+	set SUMBAL = ZBAL + SUMBAL.get()		//Summary Amount
+	if itc1=1 set SUMCR = ZBAL + SUMCR.get()	//Summary Amount of Credit
+	if itc1=0 set SUMDR = ZBAL + SUMDR.get()	//Summary Amount of Debit
+	
+	type RecordPRODCTL zproc = Db.getRecord("PRODCTL","TYPE=:ZTYPE",1)
+	
+	set ZDES = zproc.des				//Product Description
+	
+	type RecordCRCD zcr = Db.getRecord("CRCD","CRCD=:ZCRCD and CO=:ZCO",1)
+	
+	set ZMIDR = zcr.midrate
+	set SUMTHBAL = SUMBAL * ZMIDR			//Summary THB Amount
+	
+	type RecordZTFREPFCD ztmp = Db.getRecord("ZTFREPFCD","TYPE=:ZTYPE and CRCD=:ZCRCD",1)
+
+	//set ztmp.type = ZTYPE
+	//set ztmp.crcd = ZCRCD
+	set ztmp.typedes = ZDES
+	set ztmp.drbal = SUMDR
+	set ztmp.crbal = SUMCR
+	set ztmp.bal = SUMBAL
+	set ztmp.thbal = SUMTHBAL
+	
+	do ztmp.bypassSave()
+	
+	quit
+
+---------- THREXIT ------ Section marker

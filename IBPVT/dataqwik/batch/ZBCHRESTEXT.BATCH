@@ -1,0 +1,83 @@
+//DO NOT MODIFY  Extract file of Restruct|ZBCHREST||||||LNPL3A|||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	do Db.fastDelete("TMPRPT5","KEY1='ZBCHREST'")
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	
+	type Date ZDATE
+	set ZDATE=%SystemDate.toString("YEARMMDD")
+	set ZPATH = $$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")  
+	//set ZPATH = "/ibdev/spool/testext"
+	
+	set header = "Branch Owners"_$C(9)_"Description"_$C(9)_"Customer Number"_$C(9)_"Primary Customer Name"_$C(9)_"Secondary Customer Name"_$C(9)
+	set header = header_"Product Type"_$C(9)_"Sub Type"_$C(9)_"Market Code"_$C(9)_"Grand Total Due"_$C(9)_"TDR Sequence"_$C(9)
+	set header = header_"TDR Negotiation Date"_$C(9)_"TDR Approval Date"_$C(9)_"TDR Contract Date"_$C(9)_"C-Class Aging Before TDR"_$C(9)_"Principal Amount TDR"_$C(9)
+	set header = header_"Profit Amount Before TDR"_$C(9)_"Fee Amount Before TDR"_$C(9)_"Profit Non-Book Before TDR"_$C(9)_"Late Charge Before TDR"_$C(9)_"Restructuring Flag"
+	
+	//File ZFINRES
+	type IO io=Class.new("IO")
+	//set io.directory=ZPATH
+	set io.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/ZFINRES_"_ZDATE_".xls"
+	set io.openParams="NEWV/WRITE"
+	do io.open()
+	
+	do io.write(header)
+	
+	type ResultSet rs = Db.select("DATA","TMPRPT5","KEY1='ZBCHREST'")
+	while rs.next() do {
+		type String output
+		set output =rs.getCol(1)
+		do io.write(output)
+	}
+	
+	//set IOTYP="RMS"
+	do io.close()
+	
+	quit
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	do PROC(CID,RSEQ)
+	quit
+	
+PROC(CID,RSEQ)
+
+	if 'Db.isDefined("LN","CID=:CID") quit
+	
+	type RecordLN zln = Db.getRecord("LN","CID=:CID")
+	set ZBOO = zln.boo
+	set ZTYPE = zln.type
+	
+	if '(zln.stat=0) quit
+
+	type RecordLNPL3A zlnpl = Db.getRecord("LNPL3A","CID,RSEQ")
+	
+	type RecordUTBLBRCD zbrcd = Db.getRecord("UTBLBRCD","BRCD=:ZBOO",1)
+	set BRDES = zbrcd.desc
+	
+	type RecordTMPRPT5 ztmp = Db.getRecord("TMPRPT5","PID=:%ProcessID,KEY1='ZBCHREST',KEY2=:ZBOO,KEY3=:ZTYPE,KEY4=:CID,KEY5=:RSEQ",1)
+	set input = ZBOO_$C(9)_BRDES_$C(9)_zln.acn_$C(9)_zln.title1_$C(9)_zln.title2_$C(9)
+	set input = input_ZTYPE_$C(9)_zln.subt_$C(9)_zln.zmktcd_$C(9)_zln.gtdue_$C(9)_zlnpl.rseq_$C(9)
+	set input = input_zlnpl.ZTDRNEGDT_$C(9)_zlnpl.ZTDRAPPDT_$C(9)_zlnpl.ZTDRCONDT_$C(9)_zlnpl.ZCLSBTDR_$C(9)_zlnpl.ZPABTDR_$C(9)
+	set input = input_zlnpl.ZIABTDR_$C(9)_zlnpl.ZFABTDR_$C(9)_zlnpl.ZINBBTDR_$C(9)_zlnpl.ZLCBTDR_$C(9)_zln.ZRESFLG
+	
+	set ztmp.data = input
+	do ztmp.save()
+	
+	quit
+
+---------- THREXIT ------ Section marker

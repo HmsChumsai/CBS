@@ -1,0 +1,76 @@
+//DO NOT MODIFY  TEST|ZMKORN|||||||1
+
+
+
+
+
+
+HW1(DATE,CID)
+	// HW1^ZMKORN(61906,2280056100)
+	
+	type Number CD,d,s,t,c,g,ti
+	type String n
+	set n = ""
+	set ti=0
+	set s = 0
+ 
+	
+	type ResultSet rst=Db.select("TJD,DATETIME,CID,GRP,BRCD,ITC1,TOT,TYPE,CLS","DTJ","CID=:CID AND TJD=:DATE")
+	while rst.next() do { 
+		set CD = rst.getCol(3)
+		set d = rst.getCol(1)
+		set s = s+rst.getCol(7)
+		set t = rst.getCol(8)
+		set c = rst.getCol(9)
+		set g = rst.getCol(4)
+		set ti = ti+1
+		}
+		
+	type ResultSet rs=Db.select("ACCTNAME","ACN","CID=:CID")
+		while rs.next() do { 
+		set n = rs.getCol(1)
+		
+		}
+	write "Result form d HW1^ZMKORN(61906,2280056100)",!	
+	write "Date "_d,!
+	write	"Account : ",CD," - ",n,!
+	write	"Class,GRP,TYPE :",c,",",g,",",t,!
+	
+	write	"Summary Amount :",s,!
+	write	"Number of Transaction in DATE : ",ti
+	quit
+HW2(DATE,CID)
+	
+	
+	type Number COUNTD,COUNTC,AMOUNT
+	set (COUNTD,COUNTC,AMOUNT)=0
+	type ResultSet rsdtj=Db.select("ITC1,TOT,ETC","HIST","TJD=:DATE AND CID=:CID")
+	while rsdtj.next() do {
+		if $$CHKTRCD^ZMKORN(rsdtj.getCol("ETC"))'=1  do {
+		if rsdtj.getCol("ITC1")=1 set COUNTC=COUNTC+1
+		if rsdtj.getCol("ITC1")=0 set COUNTD=COUNTD+1
+		set AMOUNT=AMOUNT+rsdtj.getCol("TOT")
+		}
+	}
+	type RecordACN acn=Db.getRecord("ACN","CID=:CID")	
+	write !,"Result form d HW2^ZMKORN(61906,2280056100)",!
+	write !,"Date : "_$$DAT^%ZM(DATE,"YEARMMDD")
+	write !,"Account : "_CID_"-"_acn.acctname
+	write !,"Class,GRP,TYPE : "_acn.cls_","_acn.grp_","_acn.type
+	write !,"Summary Amount : "_AMOUNT.zero($L(AMOUNT),4,0)
+	
+	type Number SUM
+	set SUM=COUNTC+COUNTD
+	write !,"Number of Transaction in DATE : Debit "_COUNTD_" + Credit "_COUNTC_"="_SUM
+	quit
+	
+CHKTRCD(TRCD)
+	type String Fee
+	set Fee=""
+	type ResultSet rsdtj=Db.select("FEE","ZUTBLTRCD","ETC=:TRCD")
+	
+	while rsdtj.next() do {
+		set Fee = rsdtj.getCol(1)
+		}
+		
+	quit FEE

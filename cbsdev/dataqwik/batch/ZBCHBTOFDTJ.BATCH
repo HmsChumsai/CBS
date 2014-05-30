@@ -1,0 +1,127 @@
+//DO NOT MODIFY  Extract file from DTJ|ZBTOFDTJ||||||DTJ|(TJD BETWEEN :ZINPUT2 AND :ZINPUT1) AND UID=:ZINPUT3||100|32000|ZINPUT,ZTJD,ZJOB|0|||10|10|||0||0
+---------- REVHIST ------ Section marker
+
+	Aug 18, 2008 - Noppakhun
+		Added a line tag "DELETETABLE" for call Schema.deleteTable
+---------- OPEN    ------ Section marker
+
+	new %READ,%TAB,VFMQ,ZINPUT,ZTJD,IOTYP
+	set ZINPUT1=%SystemDate-30
+	set ZINPUT2=%SystemDate-1
+	set ZINPUT3=90105
+	set ZJOB=%ProcessID
+	set %TAB("ZINPUT1")="/DES=Input Start Date/LEN=10/TYP=D"
+	set %TAB("ZINPUT2")="/DES=Input End Date/LEN=10/TYP=D"
+	
+	set %READ="@@%FN/REV/CEN,,,ZINPUT1,ZINPUT2"
+
+	do ^UTLREAD
+	if VFMQ="Q" quit
+	
+	set ZTJD=%SystemDate
+	set ZDJ=$$DAT^%ZM(ZTJD,"YYMMDD")
+	type IO io=Class.new("IO")
+	set io.fileName="BO"_ZDJ
+	set io.openParams="NEWV/WRITE"
+	set io.recordSize=98
+	do io.open()
+	set IOTYP="RMS"
+	do io.close()
+	
+	
+	
+---------- SCHINIT ------ Section marker
+
+	
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	new IOTYP
+	set ZTJD=%SystemDate
+	set ZDJ=$$DAT^%ZM(ZTJD,"YYMMDD")
+	type IO io=Class.new("IO")
+	set io.fileName="BO"_ZDJ
+	set io.openParams="NEWV/WRITE"
+	set io.recordSize=98
+	do io.open()
+	type ResultSet rs1=Db.select("REC","ZTMPDTJ")
+	while rs1.next() do {
+		set REC=rs1.getCol(1)
+		do io.write(.REC)
+	}
+	set IOTYP="RMS"
+	do io.close()
+	do Db.fastDelete("ZTMPDTJ")
+	// Aug 18, 2008 - Noppakhun
+	// do Schema.deleteTable("ZTMPDTJ")
+	do DELETETABLE("ZTMPDTJ")
+	quit
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	
+	new ZBATAC,ZBRCD,ZFRESP,ZNET,ZNART,ZPAN,ZPDATE,ZREF,ZRESPCT,ZTAMT,ZTSO
+
+	set FILL=""
+	
+
+	
+	do Schema.createTable("ZTMPDTJ","""ZDTJ"",JOB,ACCT,TSEQ","REC","ZTMP")
+	
+	type RecordDTJ dtj=Db.getRecord("DTJ","TJD,DATETIME,CID,TSEQ")
+	set ZPDATE=dtj.tjd
+	set ZPDATE=$$DAT^%ZM(ZPDATE,"YEARMMDD")
+	set ZBRCD=dtj.brcd
+	if Db.isDefined("ZUTBLBRCD","BRCD=:ZBRCD") do {
+		type RecordZUTBLBRCD zbrcd=Db.getRecord("ZUTBLBRCD","BRCD=:ZBRCD")
+		set ZBREG=zbrcd.treg
+	}
+	else  set ZBREG=FILL.blank(3)
+	set ZTSEQ=dtj.tseq
+	set ZTAMT=dtj.tamt
+	set ZTSO=dtj.tso
+	do OUT^UTSO(.ATSO,ZTSO)
+	set ZNET=ZTAMT
+	set ZBATAC=ATSO("ZBATAC")
+	set ZNART=ATSO("ZNARR")
+	if ZNART="" set ZNART="0000000000000000000"
+	set ZREF=ATSO("ZREFN")
+	if ZREF="" set ZREF="000000"
+	set ZPAN=$E(ZNART,1,19)
+	set ZORFED=$E(ZREF,1,6)
+	set ZFRESP="000"
+	set ZRESPCT=FILL.blank(5)_ZORFED.blank(6)_FILL.blank(6)
+	set REC=ZPDATE_ZBREG.zero(3)_ZBATAC.zero(10)_ZPAN.blank(19)_"+"_ZTAMT.zero(18,2,1)_"+"_ZNET.zero(18,2,1)
+	set REC=REC_ZFRESP_ZRESPCT
+	
+	type RecordZTMPDTJ zdtj=Class.new("RecordZTMPDTJ")
+	set zdtj.job=ZJOB
+	set zdtj.acct=ZBATAC
+	set zdtj.tseq=ZTSEQ
+	set zdtj.rec=REC
+	do zdtj.bypassSave()
+	//}	
+	quit
+EXC
+	if $G(DESC)="" set DESC="BTOF"
+	if $G(RM)="" set RM=$G(ET)
+	do LOG^UTLEXC($T(+0),"*",DESC,$G(CID),$G(%ZTSEQ),$G(RM))
+	kill RM,%ZTSEQ
+	
+	quit	
+		
+	// Aug 18, 2008 - Noppakhun
+DELETETABLE(String TABLENAME) 	
+	do Schema.deleteTable(TABLENAME)
+	quit
+
+	
+
+
+---------- THREXIT ------ Section marker

@@ -1,0 +1,193 @@
+//DO NOT MODIFY  Batch For Statement Extraction|ZBCHINTF||||||ZINTFIN|||100|32000|ZTJD|0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	new %TAB,%READ
+	set %TAB("ZTJD")="/DES=DATE/REQ/TYP=D/LEN=10"
+	set %READ="@@%FN,,ZTJD"
+	do ^UTLREAD if VFMQ="Q" quit
+	
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+	
+	type String header,detail,footer,zspace
+	type Date zdate
+	set zdate=ZTJD.toString("DD/MM/YYYY")
+	set zspace=""
+	set zspace=zpace.piece(" ",119)=" "
+	set header="H"_zdate_zpace
+	
+	set footer="T"
+	
+	
+	
+---------- THRINIT ------ Section marker
+	
+	do SYSVAR^SCADRV0()
+	
+	quit
+	
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+	
+	
+	type DbSet ds = Db.selectDbSet("ZINTFIN","SJD=:ZTJD AND KEY=:KEY")
+	while ds.next() do {
+		type String ZOUT,FWDTAG,PREVTAG
+		type Date sdate,edate
+		type Number zrange,NoDataFlg,isDetail,isFirst,isLast
+		set (NoDataFlg,isDetail)=0
+		set isFirst=1
+		set edate=ds.getRecord().ENDT
+		set sdate=ds.getRecord().STDT
+				
+		set zrange=edate-sdate
+		
+		for i=0:1
+		//Check HIST 
+		//if no hist trans. do Nodata
+		//else get previous,forward balance info.
+		
+		//
+		 
+		type ResultSet rs = Db.select("TJD,SEQ","HIST","CID=:KEY")
+			if rs.isEmpty() do NODATA(ZCID)
+			while rs.next() do {
+				
+				type Date ZTJD
+				type Number ZSEQ
+				set rs.getCol(1)=ZTJD
+				set rs.getCol(2)=ZSEQ
+				if (ZTJD'<sdate),(ZTJD'>edate) do {
+					if 'Db.isDefined("DEP","CID=:CID") quit
+					type RecordDEP dep = Db.getRecord("DEP","CID=:CID")
+					//Set up PreviousBal if this is the first sequence
+					if isFirst do {
+					 	type String ZDATA,openBalSgn,ACCTNAME,FILLER
+						type Date OPENDT
+						type Number openBalAmt
+
+						
+						set (ZDATA,openBalSgn,ACCTNAME,FILLER)=""
+	
+						set ACCTNAME=dep.ZEACTNAM
+						set RECTYPE="1"
+						set ACCTNO=KEY.zero(15,0,1,0)
+						set BANKNO="004"
+						set BRANCHNO=(dep.boo).zero(4,0,1,0)
+						set OPENDT=sdate
+						if (%SystemDate-sdate)<6 do {
+							
+							if %SystemDate-sdate=1 set openBalAmt=dep.EODBALAV
+							if %SystemDate-sdate=2 set openBalAmt=dep.EODBALAV2
+							if %SystemDate-sdate=3 set openBalAmt=dep.EODBALAV3
+							if %SystemDate-sdate=4 set openBalAmt=dep.EODBALAV4
+							if %SystemDate-sdate=5 set openBalAmt=dep.EODBALAV5
+						}
+	
+						else do {
+							ResultSet rsprev = Db.select("ENDBAL,SEQ","HIST","CID=:KEY AND TJD=ZTJD-1","SEQ DESC"
+						//openBalAmt=
+						}
+						
+						if openBalAmt>0 set openBalSgn = "C"
+						else set openBalSgn = "D"
+						
+						if (%SystemDate-edate)<6 do {
+							if %SystemDate-edate=1 set endBalAmt=dep.EODBALAV
+							if %SystemDate-edate=2 set endBalAmt=dep.EODBALAV2
+							if %SystemDate-edate=3 set endBalAmt=dep.EODBALAV3
+							if %SystemDate-edate=4 set endBalAmt=dep.EODBALAV4
+							if %SystemDate-edate=5 set endBalAmt=dep.EODBALAV5
+						}
+						set FILER.piece(50," ")=" "
+
+						
+					//do DETAILTAG(KEY,edate,sdate,.FWDTAG,.PREVTAG)
+						 
+					//set ZOUT=$$GETDATA(ZCID,SEQ)
+				}
+		
+			}
+		//if 'Db.isDefined("HIST",
+				
+	
+	}
+	
+	quit
+	
+NODATA(ZCID)
+
+	type String ZDATA,ZSPACE
+	
+	set ZSPACE=""
+	set ZSPACE.piece(" ",105)=" "
+	
+	set ZDATA="1"_ZCID_"NO DATA"_ZSPACE
+	
+	quit ZDATA
+
+DETAILTAG(Number KEY,
+	  Date edate,
+	  Date sdate,
+	  Number FWDTAG,
+	  Number PREVTAG)
+
+	type String ZDATA,openBalSgn,endBalSgn,ACCTNAME,FILLER
+	type Date OPENDT,ENDDT
+	type Number openBalAmt,endBalAmt
+	if 'Db.isDefined("DEP","CID=:CID") quit
+	type RecordDEP dep = Db.getRecord("DEP","CID=:CID")
+	
+	set (ZDATA,openBalSgn,endBalSgn,ACCTNAME,FILLER)=""
+	
+	set ACCTNAME=dep.ZEACTNAM
+	set RECTYPE="1"
+	set ACCTNO=KEY.zero(15,0,1,0)
+	set BANKNO="004"
+	set BRANCHNO=(dep.boo).zero(4,0,1,0)
+	set OPENDT=sdate
+	set ENDDT=edate
+	if (%SystemDate-sdate)<6 do {
+		if %SystemDate-sdate=1 set openBalAmt=dep.EODBALAV
+		if %SystemDate-sdate=2 set openBalAmt=dep.EODBALAV2
+		if %SystemDate-sdate=3 set openBalAmt=dep.EODBALAV3
+		if %SystemDate-sdate=4 set openBalAmt=dep.EODBALAV4
+		if %SystemDate-sdate=5 set openBalAmt=dep.EODBALAV5
+	}
+	
+	else do {
+		
+		//openBalAmt=
+	}
+	
+	if openBalAmt>0 set openBalSgn = "C"
+	else set openBalSgn = "D"
+	
+	if (%SystemDate-edate)<6 do {
+		if %SystemDate-edate=1 set endBalAmt=dep.EODBALAV
+		if %SystemDate-edate=2 set endBalAmt=dep.EODBALAV2
+		if %SystemDate-edate=3 set endBalAmt=dep.EODBALAV3
+		if %SystemDate-edate=4 set endBalAmt=dep.EODBALAV4
+		if %SystemDate-edate=5 set endBalAmt=dep.EODBALAV5
+	}
+	set FILER.piece(50," ")=" "
+	quit 
+
+GETDATA(ZCID,SEQ)
+	 
+
+	type String ZDATA
+	
+	
+	
+	quit
+		
+---------- THREXIT ------ Section marker

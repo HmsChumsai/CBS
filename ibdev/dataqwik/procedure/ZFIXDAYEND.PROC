@@ -1,0 +1,95 @@
+//DO NOT MODIFY  Fix DAYENDINP for DEP account|ZFIXDAYE|||||||1
+	
+	/* Created By Ravipong.Ch 2012/04/17
+	*/
+	
+	
+	quit
+	
+001
+
+	type Number ZFIXID = 500
+	kill ^ZFIXL(ZFIXID)
+
+	do SYSVAR^SCADRV0()
+	
+	type DbSet ds = Db.selectDbSet("DEP","CLS='D' AND GRP='CD' AND TYPE=3003")
+	while ds.next() do {
+		
+		type String ZIPF,OIPF
+		type Number CID
+		type Date ZMLD,OINP,ZINP
+		
+		//type RecordDEP dep = ds.getRecord("DEP")
+		set CID=ds.getRecord().CID
+		type RecordDEP dep = Db.getRecord("DEP","CID=:CID",1)
+		
+		
+		if dep.zstatcd'=0 quit
+		if dep.dftmdt'="K470" quit
+		if dep.ipf'="1MAE" quit
+
+		//set CID = dep.cid
+
+		set OIPF=dep.ipf
+		set OINP=dep.inp
+		set ZMLD=dep.mld.toString("DD/MM/YEAR")
+		set ZMLD=ZMLD.piece("/",1)
+		//update dep.ipf = 1MA## where ##=MLD
+		set ZIPF="1MA"_ZMLD
+		
+		
+		set dep.ipf=ZIPF
+		
+		//update dep.inp, DAYENDINP by bump ZINP with 1MA##
+		set ZINP=%SystemDate.nextFreqDate(ZIPF)
+		set dep.inp=ZINP
+		set ^DAYEND(ZINP,"INP",CID,0)=""
+		
+		do dep.save()
+		//Logs changing and recent value
+		set ^ZFIXL(ZFIXID,"MAIN","OK",CID)=OIPF_"|"_ZIPF_"|"_OINP.toString("DD/MM/YEAR")_"|"_ZINP.toString("DD/MM/YEAR")
+	}
+
+	quit
+	
+
+BOD
+
+	type Date ZTJD
+
+	do SYSVAR^SCADRV0()
+	
+	set ZTJD=%SystemDate.toString("DD/MM/YEAR")
+	type ResultSet ds = Db.select("CID","DEP","MLD=:%SystemDate")
+	while ds.next() do {
+
+		type String ZIPF
+		type Number CID
+		type Date ZINP
+		
+		//type RecordDEP dep = ds.getRecord("DEP")
+		set CID=ds.getCol(1)
+		type RecordDEP dep = Db.getRecord("DEP","CID=:CID",1)
+		if 'dep.getMode() quit
+		if dep.type'=3003 quit
+		if dep.ipf'="1MAE" quit
+		
+		set ZIPF="1MA"_ZTJD.piece("/",1)
+		set ZINP=%SystemDate.nextFreqDate(ZIPF)
+		set dep.ipf=ZIPF
+		set dep.inp=ZINP
+		//set CID=dep.cid
+		
+		set ^DAYEND(ZINP,"INP",CID,0)=""
+		
+		do dep.save()
+	}
+	
+	quit
+
+
+	
+
+
+	

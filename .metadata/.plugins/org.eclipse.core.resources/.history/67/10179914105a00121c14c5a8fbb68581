@@ -1,0 +1,581 @@
+//DO NOT MODIFY  Litgation Web-Service|ZLITIGAT|||||||1
+
+DEPINQ(input)
+
+	do SYSVAR^SCADRV0()
+	type Number ER,total,zcount,seq,EXIT,ZQUIT
+	set (ER,total,zcount,seq,EXIT,ZQUIT,ZEXCEED,zCnt,ZNOOUT) = 0
+	type String RM,More,output
+	set (RM,output) = ""
+	set MORE="N"
+
+	set header 		= input.piece("|",1,10)
+	set FunctionFlg	 	= input.piece("|",11)
+	set Cif			= input.piece("|",12)
+	set AcctId		= input.piece("|",13)
+	set LastAcctId		= input.piece("|",14)
+	set CurrentPage		= input.piece("|",15)
+	set RecordPerPage 	= input.piece("|",16)
+	set TotRec		= input.piece("|",17)
+
+	if FunctionFlg="C" do {
+		if Cif.isNull() set ER=1,RM="CIF Required" quit
+		if 'Db.isDefined("DEP","ACN=:Cif") set ER=1,RM="Account Not Found" quit
+		set WHERE="ACN="_Cif_" AND ZCHECKOD not=1"
+	}
+	else do {
+		if AcctId.isNull() set ER=1,RM="CID Required" quit
+		if 'Db.isDefined("DEP","CID=:AcctId") set ER=1,RM="Account Not Found" quit
+		set WHERE="CID="_AcctId_" AND ZCHECKOD not=1"
+	}
+
+	if ER quit header_"|1|"_RM
+	type ResultSet rs = Db.select("CID","DEP",WHERE)
+	if rs.isEmpty() quit header_"|1"
+	while rs.next() do { quit:ZQUIT
+
+		type String ztmp
+		set ztmp=""
+		//type Number CID
+		set CID=rs.getCol(1)
+		set zcount=zcount+1
+		if TotRec=0 do { quit:EXIT
+			//if (zcount'>(CurrentPage*RecordPerPage)),
+			if (zcount>((CurrentPage+1)*RecordPerPage)) quit
+			set seq=zcount
+			set ztmp=$$DEPDETAIL(CID)
+			set output=output_ztmp_124.char()
+			set zCnt=zCnt+1
+			write !,"Count "_zCnt
+			//if zcount=RecordPerPage set EXIT=1
+
+
+		}
+
+		else do { quit:EXIT
+			if (zcount>(CurrentPage*RecordPerPage)) do {
+				if (zcount>((CurrentPage+1)*RecordPerPage)) set ZQUIT=1,MORE="Y" quit
+				set seq=zcount
+				set ztmp=$$DEPDETAIL(CID)
+				set output=output_ztmp_124.char()
+				set zCnt=zCnt+1
+				write !,"Count "_zCnt
+			}
+			//if zcount=RecordPerPage set (EXIT,ZQUIT)=1 quit
+		}
+
+		if seq<zcount set MORE="Y"
+		if TotRec'=0,zcount<TotRec set MORE="Y"
+
+
+
+	}
+
+	if ZEXCEED,(output="") quit header_"|1|"
+	if ER quit header_"|1|"_RM
+	if TotRec'=0 set Total = TotRec
+	else set Total = zcount
+
+
+	quit header_"|0|"_Total_"|"_output_CID_"|"_seq_"|"_MORE
+
+LNINQ(input)
+
+	//w $$LNINQ^ZLITIGAT("||||||||||C|16|||0|10|0|")
+	do SYSVAR^SCADRV0()
+	type Number ER,total,zcount,seq,EXIT,ZQUIT
+	set (ER,total,zcount,seq,EXIT,ZEXCEED,ZQUIT,zCnt) = 0
+	type String RM,More,output
+	set (RM,output) = ""
+	set MORE="N"
+
+	set header 		= input.piece("|",1,10)
+	set FunctionFlg	 	= input.piece("|",11)
+	set Cif			= input.piece("|",12)
+	set AcctId		= input.piece("|",13)
+	set LastAcctId		= input.piece("|",14)
+	set CurrentPage		= input.piece("|",15)
+	set RecordPerPage 	= input.piece("|",16)
+	set TotRec		= input.piece("|",17)
+
+	if FunctionFlg="C" do {
+		if Cif.isNull() set ER=1,RM="CIF Required" quit
+		if 'Db.isDefined("LN","ACN=:Cif") set ER=1,RM="Loan Account Not Found" quit
+		set WHERE="ACN="_Cif
+	}
+	else do {
+
+		if AcctId.isNull() set ER=1,RM="CID Required" quit
+		if 'Db.isDefined("LN","CID=:AcctId") set ER=1,RM="Loan Account Not Found" quit
+		set WHERE="CID="_AcctId
+	}
+
+	if ER quit header_"|1|"_RM
+
+	type ResultSet rs = Db.select("CID,CLS,ZCHECKOD","ACN",WHERE)
+	while rs.next() do { quit:ZQUIT
+		type String ztmp
+		set ztmp=""
+		set CID=rs.getCol(1)
+		set CLS=rs.getCol(2)
+		set ZOD=rs.getCol(3)
+		//set ZACN=rs.getCol(4)
+		if CLS="D",ZOD'=1 quit
+		set zcount=zcount+1
+		if TotRec=0 do { quit:EXIT
+			//if (zcount'>(CurrentPage*RecordPerPage)),
+			if (zcount>((CurrentPage+1)*RecordPerPage)) quit
+			set seq=zcount
+			set ztmp=$$LNDETAIL(CID,CLS)
+			set output=ztmp_output
+			set zCnt=zCnt+1
+			//write !,"Count "_zCnt
+			//if zcount=RecordPerPage set EXIT=1
+
+
+		}
+		else do { quit:EXIT
+			if (zcount>(CurrentPage*RecordPerPage)) do {
+				if (zcount>((CurrentPage+1)*RecordPerPage)) set ZQUIT=1,MORE="Y" quit
+				set seq=zcount
+				set ztmp=$$LNDETAIL(CID,CLS)
+				set output=ztmp_output
+				set zCnt=zCnt+1
+
+			}
+			//if zcount=RecordPerPage set (EXIT,ZQUIT)=1 quit
+
+		}
+		//if Db.isDefined("ACN",ACN=:ZACN"
+
+		if seq<zcount set MORE="Y"
+		if TotRec'=0,zcount<TotRec set MORE="Y"
+	}
+	/*
+	type ResultSet zacn
+	type String zfooter,ZREL
+
+	set ZREL="",zfooter=""
+	if FunctionFlg="C" set zacn = Db.select("DISTINCT ACN","RELACN","ACN=:Cif")
+	else set zacn = Db.select("ACN","RELACN","CID=:AcctId")
+	//set zacn = Db.select("ACN","RELACN",WHERE)
+
+	set ZRELCNT=0
+	while zacn.next() do {
+
+		set ZRELCNT=ZRELCNT+1
+		set ZACN=zacn.getCol(1)
+		type RecordCIF zrel = Db.getRecord("CIF","ACN=:ZACN")
+		set ZREL.piece("|",1) = zrel.acn
+		set ZREL.piece("|",2) = zrel.ZTITLE
+		set ZREL.piece("|",3) = zrel.FNAME
+		set ZREL.piece("|",4) = zrel.LNM
+		set zfooter=zfooter_"|"_ZREL
+
+	}
+
+
+	set zfooter = ZRELCNT_zfooter
+	*/
+	//set output=output_"|"_zfooter
+
+	if ZEXCEED,(output="") quit header_"|1|"
+	if ER quit header_"|1|"_RM
+	if TotRec'=0 set Total = TotRec
+	else set Total = zcount
+
+
+
+	quit header_"|0|"_Total_"|"_output_CID_"|"_seq_"|"_MORE
+
+DEPDETAIL(CID)
+
+	type String zstatdes,zgrpdes,zacnreldes,output
+	set (zstatdes,zgrpdes,zacnreldes)=""
+	type RecordDEP dep = Db.getRecord("DEP","CID=:CID")
+	set output.piece("|",1)=CID
+	set output.piece("|",2)=dep.BOO
+	set output.piece("|",3)=dep.cc
+	set output.piece("|",4)=dep.crcd
+	set output.piece("|",5)=dep.zstatcd
+
+	type ResultSet zstatcd = Db.select("DES","ZUTBLSTATD","ZSTATCD=:dep.zstatcd")
+	if zstatcd.next() set zstatdes=zstatcd.getCol(1)
+
+	set output.piece("|",6)=zstatdes
+	set output.piece("|",7)=dep.cls
+	set output.piece("|",8)=dep.grp
+	type ResultSet STBLGRP = Db.select("DES","STBLGRP","CLS=:dep.CLS AND GRP=:dep.GRP")
+	if STBLGRP.next() set zgrpdes=STBLGRP.getCol(1)
+
+	set output.piece("|",9)=zgrpdes
+	set output.piece("|",10)=dep.acnrelc
+
+	type ResultSet UTBLREL2 = Db.select("DESC","UTBLREL2","GRP=:dep.GRP AND KEY=:dep.ACNRELC")
+	if UTBLREL2.next() set zacnreldes=UTBLREL2.getCol(1)
+
+	set output.piece("|",11)=zacnreldes
+	set output.piece("|",12)=dep.balavl
+	set output.piece("|",13)=dep.bal
+	//set output.piece("|",16) = dep.negacr+dep.negacr
+
+	quit output
+
+LNDETAIL(CID,CLS)	
+	
+	type String output
+	set output.piece("|",28)=""
+	
+	if CLS="L" do {
+	
+		type String zstatdes,zgrpdes,zacnreldes,zmktdesc,ZFWOSDES,ZLEGFDES
+		set (zstatdes,zgrpdes,zacnreldes,zmktdesc,ZFWOSDES,ZLEGFDES)=""
+		type RecordLN ln = Db.getRecord("LN","CID=:CID")
+		set output.piece("|",1)= CID
+		set output.piece("|",2)= ln.boo
+		set output.piece("|",3)= ln.CC
+		set output.piece("|",4)= ln.CRCD
+		set output.piece("|",5)= ln.STAT
+
+		type ResultSet zstatcd = Db.select("DESC","STBLSTATL","STAT=:ln.stat")
+		if zstatcd.next() set zstatdes=zstatcd.getCol(1)
+
+		set output.piece("|",6)= zstatdes
+		set output.piece("|",7)= ln.cls
+		set output.piece("|",8)= ln.grp
+
+		type ResultSet STBLGRP = Db.select("DES","STBLGRP","CLS=:ln.CLS AND GRP=:ln.GRP")
+		if STBLGRP.next() set zgrpdes=STBLGRP.getCol(1)
+
+		set output.piece("|",9)= zgrpdes
+		set output.piece("|",10)= ln.ZMKTCD
+
+		type ResultSet ZMKTCD = Db.select("DESC","ZUTBLMKTCD","GRP=:ln.grp AND SUBT=:ln.subt AND CODE=:ln.ZMKTCD")
+		if ZMKTCD.next() set zmktdesc=ZMKTCD.getCol(1)
+
+		set output.piece("|",11)= zmktdesc
+		set output.piece("|",12)= ln.ACNRELC
+
+		type ResultSet UTBLREL2 = Db.select("DESC","UTBLREL2","GRP=:ln.GRP AND KEY=:ln.ACNRELC")
+		if UTBLREL2.next() set zacnreldes=UTBLREL2.getCol(1)
+
+		set output.piece("|",13)= zacnreldes
+		set output.piece("|",14)= ln.crlmt
+		set output.piece("|",15)= ln.bal
+		if ln.ZDELSTAT=1 set output.piece("|",16) = ln.acr
+
+		else do {
+			type ResultSet lnfee = Db.select("FEEREM","LNFEE","FEETYP='INTREC1' OR FEETYP='INTREC2'")
+			if lnfee.next()  set output.piece("|",16) = lnfee.getCol(1)
+		}
+		//set output.piece("|",16)= ln.
+		set output.piece("|",17)= ln.LCHG
+		set output.piece("|",18)= ln.TDUE
+		set output.piece("|",19)= ln.SCHSEQ
+		set output.piece("|",20)= ln.DSEQ
+		set output.piece("|",21)= ln.LPDT.toString("DD/MM/YEAR")
+		set output.piece("|",22)= ln.ZFWOS
+		type ResultSet ZFWOS = Db.select("DESC","ZUTBLWOSTAT","CODE=:ln.ZFWOS")
+		if ZFWOS.next() set ZFWOSDES=ZFWOS.getCol(1)
+		set output.piece("|",23)= ZFWOSDES
+		set output.piece("|",24)= ln.ZRESFLG
+		set output.piece("|",25)= ln.ZLEGF
+		type ResultSet ZLEGF = Db.select("DESC","ZUTBLLEGAL","CODE=:ln.ZLEGF")
+		if ZLEGF.next() set ZLEGFDES=ZLEGF.getCol(1)
+		//set output.piece("|",26)="TESTTEST"
+		set output.piece("|",26)= ZLEGFDES
+		set output.piece("|",27)= ln.subt
+		type ResultSet ZSUBT = Db.select("DESC","UTBLSUBT","GRP=:ln.GRP AND KEY=:ln.subt")
+		if ZSUBT.next() set output.piece("|",28)= ZSUBT.getCol(1)
+		//else set output.piece("|",28)= ""
+
+	}
+	else do {
+		type RecordDEP dep = Db.getRecord("DEP","CID")
+
+		set output.piece("|",1)=CID
+		set output.piece("|",2)=dep.BOO
+		set output.piece("|",3)=dep.cc
+		set output.piece("|",4)=dep.crcd
+		set output.piece("|",5)=dep.zstatcd
+		set output.piece("|",16) = dep.negacr+dep.negacr
+		//set output.piece("|",26)="TESTTEST"
+
+	}
+
+	type ResultSet zacn = Db.select("ACN","RELACN","CID=:CID")
+	type Number ZRELCNT
+	type String ZREL,ZFOOTER
+	set (ZREL,ZFOOTER)=""
+	set ZRELCNT=0
+	while zacn.next() do {
+
+		set ZRELCNT=ZRELCNT+1
+		set ZACN=zacn.getCol(1)
+		type RecordCIF zrel = Db.getRecord("CIF","ACN=:ZACN")
+		set ZREL.piece("|",1) = zrel.acn
+		set ZREL.piece("|",2) = zrel.ZTITLE
+		set ZREL.piece("|",3) = zrel.FNAME
+		set ZREL.piece("|",4) = zrel.LNM
+		set ZFOOTER=ZREL_"|"_ZFOOTER
+
+	}
+	//set ZRELTMP="Total Footer =: "_ZRELCNT
+
+	set ZFOOTER = ZRELCNT_"|"_ZFOOTER
+
+	//set output.piece("|",27)=""
+
+	quit output_"|"_ZFOOTER
+
+
+ADDACN
+
+	do SYSVAR^SCADRV0()
+	type Date ZEXTDAT
+	set ZEXTDAT=(%SystemDate).toString("YEARMMDD")
+	type Number ER,EXIT,i
+	set (ER,EXIT,i)=0
+	//set ZFID =$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXT")_"/LS/FromLS/ACCOUNTLIST_"_ZEXTDAT_".txt"
+	set ZFID =$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTCMS")_"/FromCMS/LS_ACCOUNTLIST_"_ZEXTDAT_".txt"
+	//set ZFID="/gsbpvt/spool/extract/LS/FromLS/ACCOUNTLIST_"_ZEXTDAT_".txt"
+	// Check whether the file exists or not.
+	do CHKIO(ZFID)
+	if ER =1 set RM =$$^MSG(2799,ZFID) quit
+
+	type IO io =Class.new("IO")
+	set io.fileName =ZFID
+	set io.openParams ="READ"
+	set io.recordSize =1024
+	do io.open()
+
+
+	for  set REC =io.read() { quit:EXIT
+		type String output
+		write !,REC
+		if REC[$C(13) set REC=$TR(REC,$C(13),"")
+		if REC="" quit
+		catch error {
+			new ET,RM
+			set ET=error.type
+			set RM=error.description
+			set FROM=error.thrownAt
+			write !,RM
+			write !,REC
+			write !,"From ACN Row "_i
+			do ^UTLERR
+		}
+
+		set ZCHECK=REC.piece("|",1)
+		if ZCHECK["Total" set EXIT=1 quit
+		set ZCID = REC
+		if ZCID[" " set ZCID=$TR(ZCID," ","")
+		if Db.isDefined("ACN","CID=:ZCID") do {
+			if '$D(^ZLITIGAT("CID",ZCID))=1 set ^ZLITIGAT("CID",ZCID)=ZEXTDAT
+		}
+	}
+
+	quit
+
+
+LTG003(inp)
+	//w $$LTG003^ZLITIGAT("||||||||||C|CI||8|||TH|0|0|0|")
+	//set ^ZTESTLTG("INPUT")=inp
+	type String output
+	//set inp=inp_"|"_"LS"
+	//set output="test test test"
+	set output=$$CUSTIND^ZCAPCIF(inp_"LS")
+	set ^ZTESTLTG("OUTPUT")=output
+	quit output
+
+LTG004(inp)
+
+	type String output
+
+	set output=$$CUSTCORP^ZCAPCIF(inp_"LS")
+
+	quit output
+
+GENACN
+
+	do SYSVAR^SCADRV0()
+	//type Date ZEXTDAT
+	set ZEXTDAT=(%SystemDate-1).toString("YEARMMDD")
+	type Number i
+
+	type IO out =Class.new("IO")
+	//set out.fileName =$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTCMS")_"/ToCMS/ACN_"_ZEXTDAT_".txt"
+	set out.fileName =$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTCMS")_"/ToCMS/LS_ACN_"_ZEXTDAT_".txt"
+	//set out.fileName ="/gsbpvt/spool/extract/LS/ToLS/ACN_"_ZEXTDAT_".txt"
+	set out.openParams ="NEWV/WRITE"
+	set out.recordSize =1024
+	do out.open()
+
+	set acnHead.piece("|",1)="ACN"
+	set acnHead.piece("|",2)="PRODUCT_CLASS"
+	set acnHead.piece("|",3)="ACCT_RELINFO"
+	set acnHead.piece("|",4)="ACCT_RELINFO_DESC"
+	set acnHead.piece("|",5)="PRODUCT_GRP"
+	set acnHead.piece("|",6)="PRODUCT_GRP_DESC"
+	set acnHead.piece("|",7)="ACCT_STATUS"
+	set acnHead.piece("|",8)="ACCT_STATUS_DESC"
+	set acnHead.piece("|",9)="MARKET_CD"
+	set acnHead.piece("|",10)="MARKET_CD_DESC"
+	set acnHead.piece("|",11)="LEDGER_BALANCE"
+	set acnHead.piece("|",12)="AVAILABLE_BALANCE"
+	set acnHead.piece("|",13)="LIMIT_AMOUNT"
+	set acnHead.piece("|",14)="OUTSTANDING_BALANCE"
+	set acnHead.piece("|",15)="INTEREST_RECEIVABLE"
+	set acnHead.piece("|",16)="TDU_AMOUNT"
+	set acnHead.piece("|",17)="LAST_PAID_DT"
+	set acnHead.piece("|",18)="WRITE_OFF_FLG"
+	set acnHead.piece("|",19)="WRITE_OFF_DESC"
+	set acnHead.piece("|",20)="TDR_FLG"
+	set acnHead.piece("|",21)="LEGAL_STATUS"
+	set acnHead.piece("|",22)="LEGAL_DESC"
+	set acnHead.piece("|",23)="LATE_CHARGE_DUE"
+	set acnHead.piece("|",24)="SCHEDULED_INTERNALBILL"
+	set acnHead.piece("|",25)="INTERNALBILL_NEXTDUE"
+	set acnHead.piece("|",26)="BRANCH_CD"
+
+	do out.write(acnHead)
+
+	set i=0
+
+	set ZPOINT=$O(^ZLITIGAT("OUT",""))
+	while 'ZPOINT.isNull() do {
+		type String ZDATA
+		set ZDATA = ^ZLITIGAT("OUT",ZPOINT)
+		do out.write(ZDATA)
+		set ZPOINT=$O(^ZLITIGAT("OUT",ZPOINT))
+		set i=i+1
+	}
+	do out.write("Total "_i)
+	do out.close()
+
+	quit
+
+CHKIO(X)
+	// CHECK WHETHER THE FILE EXISTS OR NOT
+	set z =$$FILE^%ZOPEN(X,"READ",5)
+	if 'z do {
+		set ER =1
+		set RM =$P(z,"|",2)
+	}
+	close X
+
+	quit
+
+TEST(INP)
+
+	set INP(1)="TEST"
+	set INP(2)="TEST"
+
+	quit
+	
+UPDTK
+
+	type String REC,INFILE,CMT
+	type Number CID,ACTENTR,COLLST,ZUID
+	type Date EXTDT,JD,WJD
+
+	//Initial system variables
+	do SYSVAR^SCADRV0()
+	set %UserID = 1
+
+	set EXTDT = %SystemDate
+	set EXTDT = EXTDT.toString("YEARMMDD")
+	set EXTSTR = "_"_EXTDT.year()_"_"_EXTDT.month()_"_"_EXTDT.day()_".TXT"
+
+	// set INFILE = "DCMS_TK"_EXTSTR
+	set INFILE = "LS_COLLECTION_STATUS_"_EXTDT_".txt"
+
+	type IO io = Class.new("IO")
+	set io.directory = $$TRNLNM^%ZFUNC("SCAU_SPOOL")
+	// set io.directory = $$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")
+	set io.fileName = INFILE
+	set io.openParams = "READ"
+
+	catch iox {
+
+      		// if device has been opened, close it
+      		if io.device'="" do io.close()
+
+	}
+
+	do io.open()
+
+	for  set REC = io.read() do {
+		
+		catch error {
+			//new ET,RM
+			set ET=error.type
+			set RM=error.description
+			set FROM=error.thrownAt
+
+			if $TLevel do Runtime.rollback()
+			set RM="UPDTK Error: "_CID.get()_":"_RM.get()
+			do EXC
+			set ER=0
+		}
+		
+		set CID = REC.piece("|",1).trim()
+		//set JD = REC.piece("|",2).trim()
+		set JD = $$FDAT^%ZM(REC.piece("|",2).trim(),"DDMMYEAR")
+		//set WJD = REC.piece("|",3).trim()
+		set WJD = $$FDAT^%ZM(REC.piece("|",3).trim(),"DDMMYEAR")
+		set ACTENTR = REC.piece("|",5).trim()		
+		set COLLST = REC.piece("|",6).trim()
+		set CMT = REC.piece("|",7).trim()
+		set ZUID = REC.piece("|",8).trim()
+
+		set ER=0
+		do Runtime.start("BA")
+		do {
+
+			//Update Collection work file
+			type RecordQCOLLWK qcwk = Class.new("RecordQCOLLWK")
+			
+			set qcwk.cid = CID
+			set qcwk.seq = Db.nextVal("QCOLLWK","CID")
+			
+			if 'JD.isNull() do {
+				set qcwk.tjd = JD.piece(" ",1).toDate("YEAR-MM-DD")
+				set qcwk.ctime = JD.piece(" ",2).toTime()	
+			}
+			
+			if 'WJD.isNull() set qcwk.zwrkdte  = WJD.toDate("YEAR-MM-DD")
+	
+			set qcwk.actentr = ACTENTR
+			set qcwk.zcollst = COLLST
+			set qcwk.com1 = CMT.extract(1,60)				
+			set qcwk.com2 = CMT.extract(61,120)				
+			set qcwk.com3 = CMT.extract(121,180)				
+			set qcwk.com4 = CMT.extract(181,240)				
+			set qcwk.com5 = CMT.extract(241,300)				
+			set qcwk.uid = ZUID
+			do qcwk.save("/NOTRIGBEF")
+			if 'ER.get() do {	
+				do Runtime.commit()
+			}
+			else  do {
+				do Runtime.rollback()
+			}
+
+		}
+		set ER=0
+		set RM=""
+	}
+	
+	quit
+	
+EXC	//	LOG ERROR TO DAYEND
+
+	set RM=RM.get()
+	if DESC.get().isNull() set DESC=$$^MSG(979,"ZPEDCMS")
+	if RM.isNull() set RM=ET.get()
+
+	do LOG^UTLEXC($T(+0),"*",DESC,,%FN.get(),RM)
+	kill %ZTSEQ
+	quit	
+	

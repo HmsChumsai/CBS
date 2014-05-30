@@ -1,0 +1,243 @@
+//DO NOT MODIFY  MRPC for CAP,IFM,CRM|ZMRPC777|||||||1
+ZMRPC777(return,versn,input,interface)
+ 	/*
+	 ORIG: 1 - 04/11/2011
+	 DESC: 
+	
+	 ---- Comments --------------------------------------------------------
+	
+	 ---- Revision History ------------------------------------------------
+	
+	 ****** Consider using setAuditFlag for all objects in this procedure
+	   example :do dep.setAuditFlag(1)
+	
+	*/
+	
+	/* 
+	 Input parameter	
+	   versn     : version number
+	   interface : Interface name which relate to
+	   input     : The Input string which contains variable length format string
+	   
+	 Output parameter
+	   return    : The Output string
+	*/
+	catch error {
+		set ET=error.type
+		set RM="[MAIN]"_error.description
+		set FROM=error.thrownAt
+		if error.type["%GTM-" do ZE^UTLERR
+		do EXC
+		quit
+	}
+	do WRLOG^ZNUTIL("ZMRPC777 input:"_input,111)
+	//Drop null message (no reply)	
+	if $G(input)="" quit ""
+	
+	do Runtime.rollback()
+	
+	do SYSVAR^SCADRV0()
+	new INTRFACE,MSGID,OM
+	if $G(interface)="" set INTRFACE="JDBC777"
+	else  set INTRFACE=interface
+	
+	// Initialize variables
+	do INIT(INTRFACE)
+	
+	set OM=""
+	// Process transaction
+	do PROC(input,.OM)
+	
+	// Unique message sequence for NSMLOG
+	set MSGID=OM.piece("|",8)
+	
+	// Log Messages. If TRollback occured in application, issue new TStart
+	if $TLevel=0 do {  if 1
+		TStart ():transactionid="CS"
+		do NSMLOG^PBSNSM(INTRFACE,MSGID,input,OM,$E($G(RM),1,40))
+		TCommit:$TLevel
+	}
+	else  do NSMLOG^PBSNSM(INTRFACE,MSGID,input,OM,$E($G(RM),1,40))
+	
+	set OM=OM_"|"
+	set return=$$V2LV^ZMSG(.OM)
+	
+	quit ""
+	
+INIT(INTRFACE)
+	set ER=0
+	set (RM,MSGID,OM)=""
+	
+	set (FINPRE,NETWORK,PCID,POS,POSADJ,REPEAT,RESPONSE,REV,STF,VALID)=0
+	set (AMT2,AUTCODE,CC,CRCD,ETCCR,ETCDR,FCID,MID,MSGHDR,OM,PAMT,PRCD)=""
+	set (SETAMT,SPR,TAMT,TCID,TCMT,TCODE,TRACE,TRTYP,TSO,VLB,TLO)=""
+
+	type RecordUTBLEXTINT extint
+
+	set extint=Db.getRecord("UTBLEXTINT","INTRFACE=:INTRFACE")
+
+	set %SessionID=""			// Token, required for STFHOST
+	set %UserID=extint.uid			// Teller id for ATM processing
+	set BRCD=extint.brcd			// Branch code
+	set SAFUCLS=extint.safucls		// Store and forward userclass
+	set RT=extint.rt			// Hold table
+	set BCAL=extint.bcal			// Business day calendar
+	set NETID=extint.iin			// Network id
+	set PHDAYS=extint.phdays		// Permanent hold days
+	set PHC=extint.phc			// Permanent hold code
+	set DELDUP=extint.dupmsg		// Delete ATMDUP entries
+	set PSTDYS=extint.srchdays		// Number of search days
+	set PRE=extint.preauth			// Pre-authorizations only
+	set DEFAULT=extint.defacct		// Default account type
+	set REGETYPE=extint.trmlocfmt		// Terminal location format
+	//set BITFMT=extint.misc1		// Bit data element format
+	set CUTOFF=extint.hldcuttim		// Hold cutoff time
+	set TLO="BATCH"
+
+	// Use default values if not defined
+	if SAFUCLS="" set SAFUCLS=Db.getOneRow("DFTSTFUCLS","CUVAR")
+	if SAFUCLS="" set SAFUCLS="MGR"
+	if PHC="" set PHC=92
+	if PSTDYS="" set PSTDYS=1
+	if PRE="" set PRE=0
+	// Default account - Checking
+	if DEFAULT="" set DEFAULT=20
+	if REGETYPE="" set REGETYPE=1
+	//if BITFMT="" set BITFMT="000"
+
+	set %UserClass=Db.getOneRow("%UCLS","SCAU","%UID")
+	set %STFHOST=$G(%STFHOST)
+	
+	quit
+	
+PROC(IM,OM)
+	catch error {
+		set ET=error.type
+		set RM="[PROC]"_error.description
+		set FROM=error.thrownAt
+		if error.type["%GTM-" do ZE^UTLERR
+		do EXC
+		quit
+	}
+	
+	set TPFCD=""
+	set TPFCD=IM.piece("|",1)
+	set ZMAXOCC=""
+	set ZMAXOCC=IM.piece("|",8)
+	set IM=IM.extract(8,IM.length())
+	
+	do WRLOG^ZNUTIL("ZMRPC777 TPFCD:"_TPFCD,111)
+	 do {
+	 	type RecordZUTBLTRAN ztran=Db.getRecord("ZUTBLTRAN","TPF=:TPFCD",1)
+	 	if ztran.zchkrefflg=1 quit
+		set ZEFD=""
+		set ZEFD=%CurrentDate
+		set ZCHNL=""
+		set ZCHNL=IM.piece("|",10)
+		set ZREFID=""
+		set ZREFID=IM.piece("|",9)
+		set ZREVFLG=""
+		do {
+			if TPFCD="CRS003" set ZREVFLG=$$DEBREVFLG^ZIFM(IM) quit
+			if TPFCD="HPS001" set ZREVFLG=$$PYMREVFLG^ZIFM(IM) quit
+			set ZREVFLG=0
+		}
+		
+		type Number ZNEWMSG
+		set ZNEWMSG=0
+		if 'Db.isDefined("ZCHKREF","EFD=:ZEFD,CHL=:ZCHNL,TPF=:TPFCD,REFID=:ZREFID,REVFLG=:ZREVFLG") do {
+			if 'Db.isDefined("ZCHKREF","EFD=:(ZEFD-1),CHL=:ZCHNL,TPF=:TPFCD,REFID=:ZREFID,REVFLG=:ZREVFLG") do {
+				type RecordZCHKREF zchkref=Class.new("RecordZCHKREF")
+				set zchkref.efd=ZEFD
+				set zchkref.chl=ZCHNL
+				set zchkref.tpf=TPFCD
+				set zchkref.refid=ZREFID
+				set zchkref.revflg=ZREVFLG
+				set zchkref.respatmm=IM.piece("|",8)
+				do zchkref.bypassSave()
+				set ZNEWMSG=1
+			}
+		}
+		if ZNEWMSG=0 do {
+			new ZMSGTYP,ZMSGID
+			type RecordZCHKREF zchkref=Db.getRecord("ZCHKREF","EFD=:ZEFD,CHL=:ZCHNL,TPF=:TPFCD,REFID=:ZREFID,REVFLG=:ZREVFLG",1)
+			if 'zchkref.getMode() set zchkref=Db.getRecord("ZCHKREF","EFD=:(ZEFD-1),CHL=:ZCHNL,TPF=:TPFCD,REFID=:ZREFID,REVFLG=:ZREVFLG",1)
+			if 'zchkref.getMode() quit
+			set ZMSGTYP="JDBC777"
+			set ZMSGID=zchkref.respatmm
+			type RecordNSMLOG nsmlog=Db.getRecord("NSMLOG","MSGTYP=:ZMSGTYP,MSGID=:ZMSGID",1)
+			new von1,TYP
+			set TYP="2"
+			set von1=""
+			for  set von1=$O(^NSMLOG(ZMSGTYP,ZMSGID,TYP,von1)) quit:von1=""  set OM=OM_^NSMLOG(ZMSGTYP,ZMSGID,TYP,von1)
+			if (OM.piece("|",12)'=0)!(OM.piece("|",14)'=0) do {
+				set OM=""
+				type RecordZCHKREF zchkref=Db.getRecord("ZCHKREF","EFD=:ZEFD,CHL=:ZCHNL,TPF=:TPFCD,REFID=:ZREFID,REVFLG=:ZREVFLG",1)
+				set zchkref.respatmm=IM.piece("|",8)
+				do zchkref.bypassSave()
+			}
+		}
+	}
+	
+	if OM'="" quit
+	
+	
+	if (TPFCD.get()="")!(TPFCD.length()'=6)!('Db.isDefined("ZUTBLTRAN","TPF=:TPFCD")) do {
+		set ER=1
+		set RM="Invalid Trancode"
+		do UPDRESPHEAD(ER,RM,.IM)
+		set OM=IM
+	}
+	else  do {
+		type RecordZUTBLTRAN ztran=Db.getRecord("ZUTBLTRAN","TPF=:TPFCD",1)
+		if (ZMAXOCC>ztran.maxocc) do {
+			new ZNEWHDR
+			set ZNEWHDR=IM.piece("|",1,6)_"|"_ztran.maxocc_"|"_IM.piece("|",8,10)
+			set IM=ZNEWHDR_IM.extract(ZNEWHDR.length()+1,IM.length())
+		}
+		type Number ZTP777
+		set ZTP777=+ztran.tpapp
+		if ZTP777 do Runtime.start("CS")
+		do WRLOG^ZNUTIL("ZMRPC777 procnam:"_ztran.procnm,111)
+		set X="set OM="_ztran.procnm_"(IM)"
+		XECUTE X
+		do WRLOG^ZNUTIL("ZMRPC777 EXECUTE:"_X,111)
+		if ZTP777 do {
+			if ER.get() do Runtime.rollback()
+			else  do Runtime.commit()
+		} 
+		if ER.get() do EXC
+	}
+	
+	quit
+	
+UPDRESPHEAD(ER,RM,IM)
+	new ZDATE,ZTIM,HDR,I
+	set (ZDATE,ZTIM,HDR,I)=""
+	//set ZDATE=$$DAT^%ZM(%SystemDate,"YEAR-MM-DD")
+	//set ZTIM=$$TIM^%ZM(%CurrentTime,"24:60:SS")
+	set ZDATE=%CurrentDate
+	set ZTIM=%CurrentTime
+	for I=1:1:10 do {
+		set HDR=HDR_IM.piece("|",I)_"|"
+	}
+	
+	//set IM=HDR_"|"_ZDATE_ZTIM_((HDR.piece("|",2)).extract(20,(HDR.piece("|",2).length())))_"|"_ER_"|"_RM_"|"_"|"_"|"_IM.extract(HDR.length()+1,IM.length())
+	set IM=HDR_ZDATE_":"_ZTIM_"|"_ER_"|"_RM_"|"_"|"_"|"_IM.extract(HDR.length()+1,IM.length())
+	
+	quit
+	
+EXC	//LOG ERROR TO DAYEND
+	new INTF
+	if $G(INTRFACE)="" set INTF="JDBC777"
+	else  set INTF=$G(INTRFACE)
+	set ZINPUTL=input.replace("|",",")
+	set ZLOGINF=$G(TPFCD)_":"_$G(ZINPUTL)
+	set MSGID=ZINPUTL.piece(",",8)
+	
+	do LOG^UTLEXC(INTF,"*",,$G(ZLOGINF),$G(MSGID),$G(RM),$G(ET))
+	kill ET,ZETSEQ,ZECID
+	set ER=0
+	set (RM,ZINPUTL,ZLOGINF)=""
+      
+      quit

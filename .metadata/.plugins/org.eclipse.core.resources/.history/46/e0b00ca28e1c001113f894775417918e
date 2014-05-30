@@ -1,0 +1,41 @@
+//DO NOT MODIFY  Utility for CIF Extract|ZEXTUTIL|||||||1
+
+
+
+
+
+
+CBS(ZACN)
+	
+	set Result=0
+	set EXIT=0
+	set ZCID=""
+	
+	type ResultSet cid = Db.select("CID","ACN","ACN=:ZACN") 
+	if cid.next() set ZCID = cid.getCol(1)		
+	type DbSet ds = Db.selectDbSet("ZCOL")
+	
+
+	while ds.next() do { quit:EXIT
+	set ZCOLLCID 	= ds.getRecord().cid
+	set ZCOLLCOLL 	= ds.getRecord().coll
+	set ZPACN	= ds.getRecord().pacn
+	//Case 5
+	if 'ZPACN.isNull(),ZPACN=ZACN set EXIT = 1,Result = 1 quit
+	//Case 4
+	if 'ZCID.isNull(),'ZCOLLCID.isNull() do {
+	
+		if (ZCOLLCID=ZCID) set EXIT = 1,Result = 1 quit
+	//Case 1
+	type ResultSet coll =  Db.select("CID","ZACNCTRCOL","COLL=:ZCOLLCOLL")	
+	if coll.next(),coll.getCol(1)=ZCID 	set EXIT = 1,Result = 1 quit	
+		}
+	
+	//Case 2
+	type ResultSet zcolown = Db.select("COLL","ZCOLOWNLINK","ACN=:ZACN AND COLL=:ZCOLLCOLL")
+	if zcolown.next() set EXIT = 1,Result = 1 quit
+	
+	
+	}
+
+	quit Result

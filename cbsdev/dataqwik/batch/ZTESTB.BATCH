@@ -1,0 +1,56 @@
+//DO NOT MODIFY  Test|ZTESTB||||||TTX|TJD>=:ZBTJD AND TJD<=:ZETJD||100|32000|ZBTJD,ZETJD|0|||10|10|0||0||0|
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	type String %TAB,%READ,VFMQ
+	
+	set %TAB("ZBTJD")="/DES=From Date/LEN=10/TYP=D"
+	set %TAB("ZETJD")="/DES=To Date/LEN=10/TYP=D"
+	set %READ="@@%FN/REV/CEN,,,ZBTJD/REQ,ZETJD/REQ"
+	do ^UTLREAD
+	if VFMQ="Q" set %BatchExit=1 quit
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	type DbSet ds1 = Db.selectDbSet("TTX","TJD>=:ZBTJD AND TJD<=:ZETJD AND ETC LIKE 'CW%' AND ETC NOT IN ('CW','CWOTT','CWOTH')")
+	if ds1.isEmpty() quit
+	set j=0
+	while ds1.next() do {
+		type RecordTTX zttx = ds1.getRecord("TTX")
+		set i=0
+		set ZFEE3=""
+		set ZWFEE3=""
+		set ZFEE2=""
+		set ZWFEE2=""
+		while i<10 do {
+			set i=i+1
+			set ZTSEQ1=zttx.tseq+i
+			type RecordTTX zttx2=Db.getRecord("TTX","TJD=:zttx.tjd,BRCD=:zttx.brcd,UID=:zttx.uid,TSEQ=:ZTSEQ1",1)
+			if 'zttx2.getMode() set i=10
+			if zttx2.etc="FEE3" set ZFEE3=zttx2.tamt
+			if zttx2.etc="WFEE3" set ZWFEE3=zttx2.tamt
+			if zttx2.etc="FEE2" set ZFEE2=zttx2.tamt
+			if zttx2.etc="WFEE2" set ZWFEE2=zttx2.tamt
+		}
+		if ZFEE3'>0 quit
+		set j=j+1
+		set ZTJD1=$$DAT^%ZM(zttx.tjd,"DD/MM/YEAR")
+		set ^ZTESTB(j)=ZTJD1_"|"_zttx.brcd_"|"_zttx.uid_"|"_zttx.tseq_"|"_zttx.etc_"|"_zttx.cid_"|"_zttx.tamt_"|"_ZFEE3_"|"_ZWFEE3_"|"_ZFEE2_"|"_ZWFEE2
+	}
+	
+	quit
+
+---------- THREXIT ------ Section marker

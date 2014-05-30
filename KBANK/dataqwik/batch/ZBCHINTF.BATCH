@@ -1,0 +1,216 @@
+//DO NOT MODIFY  Interest Additional Future rate|ZINTF||||||LN||5|100|32000|XJOB,XTJD,SYSDATE|0|||10|10|||0||0
+---------- REVHIST ------ Section marker
+
+	ORIG: Wipawan Karnwiwat     02 November 2004 
+	DESC: This Batch is used for Extract Data from LN 
+	      and send file to CRP
+	      CRP-08
+	      File Name: CRP.LONCBS.GDGBACK.INTFMLY(+1)
+	      Interest Additional Future rate :  Send  Monthly all Account,have Future rate 
+	      
+
+	---- Revision History ------------------------------------------------
+		
+		15/06/11  Sarochinee R.
+			  Modified Code : MARGIN value.
+		19/08/08  Noppakhun
+			  Added a line tag "DELETETABLE" for call Schema.deleteTable
+		14/09/06  Rapeepan Y.
+		  	  Check length of Field amount by Use ZPZERO
+		13/09/06  Rapeepan Yougjuy
+			  Check field Amount to length in format
+			  Add ADDERR for get error field to T ZERRNUM
+		23/09/05  Kunvadee Varakulsiripunth
+			  Removed the condition which future date must greater than system date.
+		19/07/05  Wipawa Karnwiwat
+			  Add Loan Account Type Summay Control File	
+		05/04/05  Wipawan Karnwiwat
+			  Modify to get LN.INDEX and LN.INTSPR
+		10/01/05  Wipawan Karnwiwat
+		          Modify in EXEC Section When it have multiple record in EFD Table
+	
+---------- OPEN    ------ Section marker
+
+	
+	set SYSDATE=%SystemDate-1
+	set XJOB=%ProcessID
+			
+	set XTJD=$ZD(SYSDATE,"YEARMMDD")
+	
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	// Write output file for CRP - Interest Additional Future rate
+	new IOTYP,REC
+	new RECCNT,CNT
+		
+	set RECCNT=0
+	type IO iointf=Class.new("IO")
+	set iointf.fileName="CRP.LONCBS.GDGBACK.INTFMLY"
+	set iointf.directory=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")
+	set iointf.openParams="NEWV/WRITE"
+	set iointf.recordSize=57
+	do iointf.open()
+
+	type ResultSet rsintf=Db.select("REC","ZTMPINTF","JOB=:XJOB")
+	while rsintf.next() do {		
+		set REC=rsintf.getCol(1)
+		set REC=$E(REC,1,57)
+		do iointf.write(REC)
+		set RECCNT=RECCNT+1
+	}
+		
+	do Db.fastDelete("ZTMPINTF","JOB=:XJOB")
+	// Aug 19, 2008 - Noppakhun
+	// do Schema.deleteTable("ZTMPINTF")
+	do DELETETABLE("ZTMPINTF")
+	
+	
+	// Write Control File of DWH
+	type IO ioinctrl=Class.new("IO")
+	set ioinctrl.fileName="LONINTF_CTRL"_XTJD_".TXT"
+	set ioinctrl.directory=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")
+	set ioinctrl.openParams="NEWV/WRITE"
+	set ioinctrl.recordSize=16
+	do ioinctrl.open()
+	
+	set REC=XTJD_RECCNT.zero(8)
+	do ioinctrl.write(REC)	
+	
+	set IOTYP="RMS"
+	do iointf.close()
+	do ioinctrl.close()
+				
+	quit
+	
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	//For check length
+	new SMARGIN,NMARGIN
+	set NMARGIN="MARGIN"
+
+	type RecordLN ln=Db.getRecord("LN","CID=:CID")
+	
+		
+	do INTFEXT(CID,ln)
+	
+	quit
+
+INTFEXT(CID,RecordLN ln)
+
+	new CMTNO,EFD,REC,INTCD,SIGN,MARGIN,ZZTCMT2,ZZZTCMT2,ZTCMT1,ZTCMT2,CHQCNT,TCMT
+	set (EFD,REC,INTCD,ZZTCMT2,ZZZTCMT2,MARGIN,SIGN)=""	
+	set EFDTAB="LN"
+	set (CMTNO,EFD,INTCD,MARGIN)=""
+	
+	do Schema.createTable("ZTMPINTF","""ZINTF"",JOB,CID,EFD","REC","TMP")	
+		
+	// 23/09/05 - Removed the condition which future date must greater than system date.
+	//type ResultSet rsefd=Db.select("EFDATE,EFDTCMT1,EFDTCMT2","EFD","EFDATE>:SYSDATE AND TABLE=:EFDTAB AND AKEY=:CID")
+	type ResultSet rsefd=Db.select("EFDATE,EFDTCMT1,EFDTCMT2","EFD","TABLE=:EFDTAB AND AKEY=:CID")
+	if rsefd.isEmpty() quit
+	
+	while rsefd.next() do {
+		set EFD=rsefd.getCol(1)	
+		set ZTCMT1=rsefd.getCol(3)
+		
+		if (ZTCMT1["LN.INDEX")!(ZTCMT1["LN.INTSPR") do {				
+			set CHQCNT=1							
+			while $P(ZTCMT1,"<~~>",CHQCNT)'="" do {
+				set TCMT=$P(ZTCMT1,"<~~>",CHQCNT)
+				if (TCMT["LN.INDEX") set INTCD=$$TRIM^%ZS($P(TCMT,":",2))
+				if (TCMT["LN.INTSPR") set MARGIN=$$TRIM^%ZS($P(TCMT,":",2))				
+				set CHQCNT=CHQCNT+1
+			}
+			
+			set INTCD=INTCD.blank(6)
+						
+			//if $G(MARGIN)="" set MARGIN=MARGIN.blank(11)
+			//else  set MARGIN=MARGIN.zero(11,7,1,1)
+			set CID=CID.zero(12)
+						
+			new SMARGIN,NMARGIN
+			set NMARGIN="MARGIN"
+						
+			if $G(MARGIN)="" set MARGIN=MARGIN.blank(11)
+			//else  set MARGIN=$S(MARGIN>999.9999999:"+9999999999",MARGIN<-999.9999999:"-9999999999",1:MARGIN.zero(11,7,1,1))
+			else  do {
+				
+				// 15/06/11  Sarochinee R.
+				/*
+				//chk. sign
+				if MARGIN<0 set SMARGIN="-"
+				else  set SMARGIN="+"
+				
+				set MARGIN=SMARGIN.blank(1)_$$ZPZERO(MARGIN,10,7,CID,NMARGIN)
+				*/
+				set MARGIN=MARGIN.zero(11,5,1,1)
+			}  	
+			set EFD=$ZD(EFD,"YEARMMDD")
+		
+			set CMTNO=ln.ccl
+			set CMTNO=CMTNO.zero(12)
+						
+			set REC=XTJD_CMTNO_CID_EFD_INTCD_MARGIN
+			
+			type RecordZTMPINTF zintf=Class.new("RecordZTMPINTF")
+			set zintf.job=XJOB
+			set zintf.cid=CID
+			set zintf.efd=EFD
+			set zintf.rec=REC	
+			do zintf.bypassSave()							
+		}				
+	}	// End While	
+	quit
+
+ZPZERO(ZNUMX,ZLEN,ZDEC,KEY,NFIELD)
+	new VAL1
+	set VAL1=ZNUMX
+	if ZNUMX<0 set ZNUMX=-ZNUMX
+	set ZDEC=+$G(ZDEC)
+	set ZNUMX=+ZNUMX                 
+	set ZNUMX=ZNUMX.zero(ZLEN,ZDEC,1)
+	//if $L(ZNUMX)>ZLEN quit "0".zero(ZLEN)
+	if $L(ZNUMX)>ZLEN do { quit ZNUMX.blank(ZLEN)
+		do ADDERR(KEY,NFIELD,VAL1)	
+	}
+	
+	quit ZNUMX
+
+
+ADDERR(KEY1,NAMFIELD,VALFIELD)  	
+	
+	//Add new Record in ZERRNUM
+	new zerrnum
+	type RecordZERRNUM zerrnum=Class.new("RecordZERRNUM")
+	
+	do zerrnum.setAuditFlag(1)
+					
+	set zerrnum.tjd=SYSDATE
+	set zerrnum.pk1=KEY1          //A/C No.
+	set zerrnum.pk2="-"           //set for no value key	
+	set zerrnum.pk3="-"		 
+	set zerrnum.fname="Interest Future Rate File"
+	set zerrnum.errnam=NAMFIELD
+	set zerrnum.errval=VALFIELD
+	
+	do zerrnum.save()
+
+	quit
+
+	// Aug 19, 2008 - Noppakhun
+DELETETABLE(String TABLENAME) 	
+	do Schema.deleteTable(TABLENAME)
+	quit
+	
+	
+---------- THREXIT ------ Section marker

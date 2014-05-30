@@ -1,0 +1,50 @@
+//DO NOT MODIFY  Cherry|ZCHERRY|||||||1
+
+	quit
+	
+ISCOLLA(Date ZTJD, Number ZCOLL)
+	/* 
+	W $$ISCOLLA^ZCHERRY(61922,1707622) -> 1
+	W $$ISCOLLA^ZCHERRY(61920,1707622) -> 0
+	If Add Collateral in ZTJD Date
+	*/
+	if '(Db.isDefined("ZCOLH","COLL=:ZCOLL,SEQ=:1")) quit 0
+	type RecordZCOLH zcolh=Db.getRecord("ZCOLH","COLL=:ZCOLL,SEQ=:1")
+	if (zcolh.tjd=ZTJD),(zcolh.tcmt["Collateral created") quit 1
+	quit 0
+	
+SCCOLL(Date ZTJD, Number ZCOLL)
+	/*
+ 	W $$SCCOLL^ZCHERRY(61922,1707622) -> "A"
+	W $$SCCOLL^ZCHERRY(61920,1707622) -> ""
+	W $$SCCOLL^ZCHERRY(61923,2196936) -> "U"
+	*/
+	if $$ISCOLLA^ZCHERRY(ZTJD,ZCOLL) quit "A"
+	
+	type String ZSCOLL
+	type Number ZEXIT
+	set ZSCOLL=""
+	set ZEXIT=0
+	
+	type ResultSet rscolh=Db.select("TJD","ZCOLH","COLL=:ZCOLL","SEQ DESC")
+	while rscolh.next() do { quit:ZEXIT
+		if rscolh.getCol("TJD")=ZTJD set ZSCOLL="U" set ZEXIT=1 quit
+		if rscolh.getCol("TJD")<ZTJD set ZEXIT=1 quit
+		}
+	quit ZSCOLL
+	
+SCCIF(Date ZTJD, Number ZCIF)
+	/*
+ 	W $$SCCIF^ZCHERRY(61916,29959886) -> "A"
+	W $$SCCIF^ZCHERRY(61940,29959886) -> ""
+	W $$SCCIF^ZCHERRY(61943,29959886) -> "U"
+	*/
+	if Db.isDefined("CIFNEW","TJD=:ZTJD,TYPE=:0,ACN=:ZCIF") quit "A"
+	if Db.isDefined("CIFNEW","TJD=:ZTJD,TYPE=:1,ACN=:ZCIF") quit "A"
+	
+	type String ZSCCIF
+	set ZSCCIF=""
+	
+	type ResultSet rscolh=Db.select("TJD","CIFD","TJD=:ZTJD AND ACN=:ZCIF","SEQ DESC")
+	if rscolh.next() set ZSCCIF="U"
+	quit ZSCCIF

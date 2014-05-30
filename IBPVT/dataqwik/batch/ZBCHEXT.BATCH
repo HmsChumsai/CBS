@@ -1,0 +1,487 @@
+//DO NOT MODIFY  generate Financing Account & CIF rel.|ZBCHEXT||||||LN|||100|32000||0|1000|1000|10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+	/*
+	 ORIG: Yadah Sk.		May 16, 2012
+	 DESC: generate Financing Account & CIF rel.
+
+	---- Comments --------------------------------------------------------
+
+	---- Revision History ------------------------------------------------
+
+	*/
+
+---------- OPEN    ------ Section marker
+
+	do Db.fastDelete("ZTMPEXT1")
+	do Db.fastDelete("ZTMPEXT2")
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	set ZDATE=$$DAT^%ZM(%SystemDate-1,"YEARMMDD")
+	set ZPATH = $$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")  
+	//set ZPATH = "/ibdev/spool/testext"
+	
+	//File SR0002 from ZTMPEXT2
+	type IO io1=Class.new("IO")
+	set io1.fileName="SR0002_"_ZDATE_".TXT"
+	set io1.directory=ZPATH
+	set io1.openParams="WRITE/NEWV"
+	do io1.open()
+	
+	new header 
+	set header = "Account Officer ID|Branch|Customer Number|Account Title|Customer Code|"
+	set header = header_"Description|Account Number|Ledger Balance|Status|Credit Limit"
+	
+	do io1.write(header)
+	
+	type Dbset ds1 = Db.selectDbSet("ZTMPEXT2")
+	while ds1.next() do {
+		type RecordZTMPEXT2 ztmp = ds1.getRecord("ZTMPEXT2")
+		set ZACN = ztmp.ACN
+		type RecordCIF zcif = Db.getRecord("CIF","ACN=:ZACN")
+		set ZKTBCD = zcif.ZKTBCCODE
+		
+		if ZKTBCD="" set KTBCUDES=""
+		else if ZKTBCD'="" do {
+			if 'Db.isDefined("ZUTBLKTBCUST","KTBCCODE=:ZKTBCD") set KTBCUDES=""
+			else  do {
+				type RecordZUTBLKTBCUST zktbcust = Db.getRecord("ZUTBLKTBCUST","KTBCCODE=:ZKTBCD")
+				set KTBCUDES = zktbcust.DESC
+			}
+		}
+		
+		new ZREC
+		set ZREC = ztmp.ZACCOID_"|"_ztmp.BOO_"|"_ztmp.ACN_"|"_ztmp.TITLE1
+		set ZREC = ZREC_"|"_zcif.ZKTBCCODE
+		set ZREC = ZREC_"|"_KTBCUDES
+		set ZREC = ZREC_"|"_ztmp.CID_"|"_ztmp.BAL_"|"_ztmp.STAT_"|"_ztmp.CRLMT
+		
+		do io1.write(ZREC)
+		
+	}
+	
+	set IOTYP="RMS"
+	do io1.close()
+	
+	//File SR0016 from ZTMPEXT2
+	type IO io2=Class.new("IO")
+	set io2.fileName="SR0016_"_ZDATE_".TXT"
+	set io2.directory=ZPATH
+	set io2.openParams="WRITE/NEWV"
+	do io2.open()
+	
+	new header 
+	set header = "Branch Code|Description|Account Number|Type|Product Type Description|"
+	set header = header_"Sub Type|Sub-Type Description|Market Code|Market Code Description|Account Receivable|"
+	set header = header_"Credit Limit Current|Ledger Balance|Current UEI Amount|P&I Payment|Current Profit|"
+	set header = header_"Uncollected Profit|Int/Div Rate|Maturity Date|Customer Name|Class|"
+	set header = header_"Last NPL Date|Customer Number|Account Officer ID|Original Disbursement Date|Group|"
+	set header = header_"Distribution Last Date|Next Due|Current Principal|Uncollected Principal|Late Charge Due|"
+	set header = header_"Miscellaneou Charge Due|Grand Total Due|Dealer|Dealer Description|Int/Div Paid|"
+	set header = header_"Penalty Paid|Principal Paid|Salary|Cust type|Cust type Description|"
+	set header = header_"Total Disbursement Amount|Requested Amount|Reversed Profit Income|Date Opened|Occupation|"
+	set header = header_"Sub Occupation|Home Phone|Business Phone|Alternate Phone|Status|ISIC Code|Personal Consuption|Description"
+	
+	do io2.write(header)
+	
+	type Dbset ds2 = Db.selectDbSet("ZTMPEXT2")
+	while ds2.next() do {
+		type RecordZTMPEXT2 ztmp = ds2.getRecord("ZTMPEXT2")
+		set ZACN = ztmp.ACN
+		set ZBOO = ztmp.BOO
+		set ZGRP = ztmp.GRP
+		set ZSUBT = ztmp.SUBT
+		set ZZMKTCD = ztmp.ZMKTCD
+		set ZZDLRCD = ztmp.ZDLRCD
+		set ZTYPE = ztmp.TYPE
+		set ZZPERCONS = ztmp.ZPERCONS
+		
+		type RecordCIF zcif = Db.getRecord("CIF","ACN=:ZACN")
+		set ZINC = zcif.INC
+		set ZKTBCD = zcif.ZKTBCCODE
+		set ZZOCC = zcif.ZOCC
+		set ZZSOCC = zcif.ZSOCC
+		
+		if 'Db.isDefined("UTBLBRCD","BRCD=:ZBOO") quit
+		type RecordUTBLBRCD zbrcd = Db.getRecord("UTBLBRCD","BRCD=:ZBOO")
+		
+		if 'Db.isDefined("UTBLSUBT","GRP=:ZGRP and KEY=:ZSUBT") set SUBTDES = ""
+		else  do {
+			type RecordUTBLSUBT zsubt = Db.getRecord("UTBLSUBT","GRP=:ZGRP and KEY=:ZSUBT")
+			set SUBTDES = zsubt.DESC
+		}
+		
+		if 'Db.isDefined("ZUTBLMKTCD","CODE=:ZZMKTCD and GRP=:ZGRP and SUBT=:ZSUBT") set MKTDES = ""
+		else  do {
+			type RecordZUTBLMKTCD zmktcd = Db.getRecord("ZUTBLMKTCD","CODE=:ZZMKTCD and GRP=:ZGRP and SUBT=:ZSUBT")
+			set MKTDES = zmktcd.DESC
+		}
+			
+		/*
+		if ZGRP="" do {
+			set SUBTDES = ""
+			set MKTDES = ""
+		}
+		else if ZGRP'="" do {
+			if ZSUBT="" do {
+				set SUBTDES = ""
+				set MKTDES = ""
+			}
+			
+			else if ZSUBT'="" do {
+				if 'Db.isDefined("UTBLSUBT","GRP=:ZGRP and KEY=:ZSUBT") set SUBTDES = ""
+				else  do {
+					type RecordUTBLSUBT zsubt = Db.getRecord("UTBLSUBT","GRP=:ZGRP and KEY=:ZSUBT")
+					set SUBTDES = zsubt.DESC
+				}
+				
+				if ZZMKTCD="" set MKTDES = ""
+				else if ZZMKTCD'="" do {
+					if 'Db.isDefined("ZUTBLMKTCD","CODE=:ZZMKTCD and GRP=:ZGRP and SUBT=:ZSUBT") set MKTDES = ""
+					else  do {
+						type RecordZUTBLMKTCD zmktcd = Db.getRecord("ZUTBLMKTCD","CODE=:ZZMKTCD and GRP=:ZGRP and SUBT=:ZSUBT")
+						set MKTDES = zmktcd.DESC
+					}
+				}
+			}
+		}
+		*/
+		if ZZDLRCD="" set DLDES = ""
+		else if ZZDLRCD'="" do {
+			if 'Db.isDefined("ZUTBLDEALER","DLCD=:ZZDLRCD") set DLDES = ""
+			else  do {
+				type RecordZUTBLDEALER zdealer = Db.getRecord("ZUTBLDEALER","DLCD=:ZZDLRCD")
+				set DLDES = zdealer.DESC
+			}
+		}
+		
+		if ZINC="" set INCDES = ""
+		else if ZINC'="" do {
+			if 'Db.isDefined("UTBLIC","INC=:ZINC") set INCDES = ""
+			else  do {
+				type RecordUTBLIC zlic = Db.getRecord("UTBLIC","INC=:ZINC")
+				set INCDES = zlic.DESC
+			}
+		}
+		
+		if 'Db.isDefined("ZUTBLKTBCUST","KTBCCODE=:ZKTBCD") set KTBCUDES = ""
+		else  do {
+			type RecordZUTBLKTBCUST zktbcust = Db.getRecord("ZUTBLKTBCUST","KTBCCODE=:ZKTBCD")
+			set KTBCUDES = zktbcust.DESC
+		}
+		
+		if ZZOCC="" do {
+			set OCTDES = ""
+			set SOCTDES = ""
+		}
+		else if ZZOCC'="" do {
+			if 'Db.isDefined("ZUTBLOC","OCC=:ZZOCC") set OCTDES = ""
+			else  do {
+				type RecordZUTBLOC zoc = Db.getRecord("ZUTBLOC","OCC=:ZZOCC")
+				set OCTDES = zoc.TDES
+			}
+			
+			if ZZSOCC="" set SOCTDES = ""
+			else if ZZSOCC'="" do {
+				if 'Db.isDefined("ZUTBLSOC","OCC=:ZZOCC and SOCC=:ZZSOCC") set SOCTDES = ""
+				else  do {
+					type RecordZUTBLSOC zsoc = Db.getRecord("ZUTBLSOC","OCC=:ZZOCC and SOCC=:ZZSOCC")
+					set SOCTDES = zsoc.TDES
+				}
+			}
+		}
+		
+		if ZTYPE="" set PERCDES = ""
+		else if ZTYPE'="" do {
+			if ZZPERCONS="" set PERCDES = ""
+			else if ZZPERCONS'="" do {
+				if 'Db.isDefined("ZUTBLPERCONS","TYPE=:ZTYPE and CODE=:ZZPERCONS") set PERCDES = ""
+				else  do {
+					type RecordZUTBLPERCONS zperc = Db.getRecord("ZUTBLPERCONS","TYPE=:ZTYPE and CODE=:ZZPERCONS")
+					set PERCDES = zperc.DESC
+				}
+			}
+		}
+		
+		new ZREC
+		set ZREC = ztmp.BOO_"|"_zbrcd.DESC
+		set ZREC = ZREC_"|"_ztmp.CID_"|"_ztmp.TYPE_"|"_ztmp.TYPEDES_"|"_ztmp.SUBT
+		set ZREC = ZREC_"|"_SUBTDES_"|"_ztmp.ZMKTCD_"|"_MKTDES_"|"_ztmp.ZAR
+		set ZREC = ZREC_"|"_ztmp.CRLMT_"|"_ztmp.BAL_"|"_ztmp.ZCURUEI_"|"_ztmp.PMTPI
+		set ZREC = ZREC_"|"_ztmp.CUIN_"|"_ztmp.UNIN_"|"_ztmp.IRN_"|"_ztmp.MDT
+		set ZREC = ZREC_"|"_zcif.NAM_"|"_ztmp.ZRESCLS_"|"_ztmp.ZNPLLDT_"|"_ZACN
+		set ZREC = ZREC_"|"_ztmp.ZACCOID_"|"_ztmp.ODT_"|"_ZGRP_"|"_ztmp.DIST1LD
+		set ZREC = ZREC_"|"_ztmp.DIST1ND_"|"_ztmp.CUPR_"|"_ztmp.UNPR_"|"_ztmp.LCHG_"|"_ztmp.MCHG_"|"_ztmp.GTDUE_"|"_ztmp.ZDLRCD
+		set ZREC = ZREC_"|"_DLDES_"|"_ztmp.IYTD_"|"_ztmp.PYTD_"|"_ztmp.PRNRPD
+		set ZREC = ZREC_"|"_INCDES_"|"_zcif.ZKTBCCODE_"|"_KTBCUDES
+		set ZREC = ZREC_"|"_ztmp.TDR_"|"_ztmp.ZREQAMT_"|"_ztmp.ZREVINT_"|"_ztmp.ODT
+		set ZREC = ZREC_"|"_OCTDES_"|"_SOCTDES_"|"_zcif.HPH_"|"_zcif.BPH_"|"_zcif.APH
+		set ZREC = ZREC_"|"_ztmp.STAT_"|"_ztmp.ZISIC_"|"_ztmp.ZPERCONS_"|"_PERCDES
+		
+		do io2.write(ZREC)
+	}
+	
+	set IOTYP="RMS"
+	do io2.close()
+		
+	//File SR0034 from ZTMPEXT1
+	type IO io3=Class.new("IO")
+	set io3.fileName="SR0034_"_ZDATE_".TXT"
+	set io3.directory=ZPATH
+	set io3.openParams="WRITE/NEWV"
+	do io3.open()
+	
+	new header
+	set header = "Branch Owners|Product Type|Sub Type|Market Code|Description|"
+	set header = header_"Product Type Description|Account Number|Customer Number|Credit Limit Current|Date Opened|"
+	set header = header_"Amount Requested|P&I Payment|Last Payment Date|Date of First Payment|Last NPL start date|"
+	set header = header_"Account Receivable|Selling Price|Ledger Balance|Account Class|Officer ID|"
+	set header = header_"Dealer Code|Grand Total Due|SCHSEQ-(DSEQ-1)|Payment Amount|Payment Partial Amount|"
+	set header = header_"Days Delinquent|Financing Delinquency Period in Months|Int/Div Index|Int/Div Spread|Int/Div Rate|"
+	set header = header_"Principal Repaid|CIF #|Customer Name|City|Province|"
+	set header = header_"Home Phone|Business Phone|Alternate Phone|Citizen ID|Occupation|"
+	set header = header_"Sub Occupation|Address Line 1 (Mailing)|Address Line 2|Address Line 3"
+	
+	do io3.write(header)
+	
+	type Dbset ds3 = Db.selectDbSet("ZTMPEXT1")
+	while ds3.next() do {
+		type RecordZTMPEXT1 ztmp = ds3.getRecord("ZTMPEXT1")
+		set ZACN = ztmp.ACN
+		set ZZMKTCD = ztmp.ZMKTCD
+		set ZGRP = ztmp.GRP
+		set ZSUBT = ztmp.SUBT
+		set ZDSEQ = ztmp.DSEQ-1
+		set ZSCHSEQ = ztmp.SCHSEQ-ZDSEQ
+		
+		if ZGRP="" set MKTDES = ""
+		else if ZGRP'="" do {
+			if ZSUBT="" set MKTDES = ""
+			else if ZSUBT'="" do {
+				if 'Db.isDefined("ZUTBLMKTCD","CODE=:ZZMKTCD and GRP=:ZGRP and SUBT=:ZSUBT") set MKTDES = ""
+				else  do {
+					type RecordZUTBLMKTCD zmktcd = Db.getRecord("ZUTBLMKTCD","CODE=:ZZMKTCD and GRP=:ZGRP and SUBT=:ZSUBT")
+					set MKTDES = zmktcd.DESC
+				}
+			}
+		}
+		
+		type RecordCIF zcif = Db.getRecord("CIF","ACN=:ZACN")
+		type RecordCIF cif = Db.getRecord("CIF",1)
+		
+		new ZREC
+		set ZREC = ztmp.BOO_"|"_ztmp.TYPE_"|"_ztmp.SUBT_"|"_ztmp.ZMKTCD
+		set ZREC = ZREC_"|"_MKTDES
+		set ZREC = ZREC_"|"_ztmp.TYPEDES_"|"_ztmp.CID_"|"_ztmp.ACN_"|"_ztmp.CRLMT_"|"_ztmp.ODT_"|"_ztmp.AMTREQ
+		set ZREC = ZREC_"|"_ztmp.PMTPI_"|"_ztmp.LPDT_"|"_ztmp.DFP_"|"_ztmp.ZNPLLDT_"|"_ztmp.ZAR_"|"_ztmp.ZSP
+		set ZREC = ZREC_"|"_ztmp.BAL_"|"_ztmp.DARCLS_"|"_ztmp.ZACCOID_"|"_ztmp.ZDLRCD_"|"_ztmp.GTDUE
+		set ZREC = ZREC_"|"_ZSCHSEQ_"|"_ztmp.PMT_"|"_ztmp.PPA_"|"_ztmp.DAYSDELQ_"|"_ztmp.ZDELPERM
+		set ZREC = ZREC_"|"_ztmp.INDEX_"|"_ztmp.INTSPR_"|"_ztmp.IRN_"|"_ztmp.PRNRPD
+		set ZREC = ZREC_"|"_zcif.ACN_"|"_zcif.NAM_"|"_cif.MCITY_"|"_cif.MSTATE
+		set ZREC = ZREC_"|"_cif.HPH_"|"_cif.BPH_"|"_cif.APH_"|"_cif.ZCIZID_"|"_cif.ZOCC_"|"_cif.ZSOCC
+		set ZREC = ZREC_"|"_cif.MAD1_"|"_cif.MAD2_"|"_cif.MAD3
+		
+		do io3.write(ZREC)
+	}
+	
+	set IOTYP="RMS"
+	do io3.close()
+	
+	//File SR_RELCIF from ZTMPEXT2
+	type IO io4=Class.new("IO")
+	set io4.fileName="SR_RELCIF_"_ZDATE_".TXT"
+	set io4.directory=ZPATH
+	set io4.openParams="WRITE/NEWV"
+	do io4.open()
+	
+	new header
+	set header = "Customer Number|Account Number|Class"
+	
+	do io4.write(header)
+	
+	type Dbset ds4 = Db.selectDbSet("ZTMPEXT2")
+	while ds4.next() do {
+		type RecordZTMPEXT2 ztmp = ds4.getRecord("ZTMPEXT2")
+		set ZCID = ztmp.CID
+		set ZACN = ztmp.ACN
+		
+		if 'Db.isDefined("RELACN","CID=:ZCID,ACN=:ZACN") quit
+		type RecordRELACN zrel = Db.getRecord("RELACN","CID=:ZCID,ACN=:ZACN")
+		
+		new ZREC
+		set ZREC = ztmp.ACN_"|"_zrel.CID_"|"_ztmp.CLS
+		
+		do io4.write(ZREC)
+		
+	}
+	
+	set IOTYP="RMS"
+	do io4.close()
+	
+	quit
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	type RecordLN zln=Db.getRecord("LN","CID")
+	set ZACN = zln.ACN
+	set ZAMTREQ = zln.AMTREQ
+	set ZBAL = zln.BAL
+	set ZBOO = zln.BOO
+	set ZCLS = zln.CLS
+	set ZCRLMT = zln.CRLMT
+	set ZCUIN = zln.CUIN
+	set ZCUPR = zln.CUPR
+	set ZDARCLS = zln.DARCLS
+	set ZDAYSDELQ = zln.DAYSDELQ
+	set ZDIST1LD = zln.DIST1LD
+	set ZDIST1ND = zln.DIST1ND
+	set ZDFP = zln.DFP
+	set ZDSEQ = zln.DSEQ
+	set ZGRP = zln.GRP
+	set ZGTDUE = zln.GTDUE
+	set ZINDEX = zln.INDEX
+	set ZINTSPR = zln.INTSPR
+	set ZIRN = zln.IRN
+	set ZLCHG = zln.LCHG
+	set ZLPDT = zln.LPDT
+	set ZMCHG = zln.MCHG
+	set ZMDT = zln.MDT
+	set ZODT = zln.ODT
+	set ZPMT = zln.PMT
+	set ZPMTPI = zln.PMTPI
+	set ZPPA = zln.PPA
+	set ZPRNRPD = zln.PRNRPD
+	set ZPYTD = zln.PYTD
+	set ZSCHSEQ = zln.SCHSEQ
+	set ZSTAT = zln.STAT
+	set ZSUBT = zln.SUBT
+	set ZTDR = zln.TDR
+	set ZTITLE1 = zln.TITLE1
+	set ZTYPE = zln.TYPE
+	set ZTYPEDES = zln.TYPEDES
+	set ZUNIN = zln.UNIN
+	set ZUNPR = zln.UNPR
+	set ZZACCOID = zln.ZACCOID
+	set ZZAR = zln.ZAR
+	set ZZCURUEI = zln.ZCURUEI
+	set ZZDELPERM = zln.ZDELPERM
+	set ZZDLRCD = zln.ZDLRCD
+	set ZZISIC = zln.ZISIC
+	set ZZMKTCD = zln.ZMKTCD
+	set ZZNPLLDT = zln.ZNPLLDT
+	set ZZPERCONS = zln.ZPERCONS
+	set ZZREQAMT = zln.ZREQAMT
+	set ZZRESCLS = zln.ZRESCLS
+	set ZZREVINT = zln.ZREVINT
+	set ZZSP = zln.ZSP
+	
+	type RecordZTMPEXT1 ztmpext1=Db.getRecord("ZTMPEXT1",":CID",1)
+	type RecordZTMPEXT2 ztmpext2=Db.getRecord("ZTMPEXT2",":CID",1)
+	
+	if zln.stat=0 do {
+		//set ztmpext1
+		do INSTMP1(ztmpext1)
+		
+		//set ztmpext2
+		do INSTMP2(ztmpext2)
+	}
+	
+	if zln.stat=4 do {
+		//set ztmpext2
+		do INSTMP2(ztmpext2)
+	}
+	
+	quit
+	
+private INSTMP1(RecordZTMPEXT1 ztmpext1)
+	set ztmpext1.ACN = ZACN
+	set ztmpext1.AMTREQ = ZAMTREQ
+	set ztmpext1.BAL = ZBAL
+	set ztmpext1.BOO = ZBOO
+	set ztmpext1.CRLMT = ZCRLMT
+	set ztmpext1.DARCLS = ZDARCLS
+	set ztmpext1.DAYSDELQ = ZDAYSDELQ
+	set ztmpext1.DFP = ZDFP
+	set ztmpext1.DSEQ = ZDSEQ
+	set ztmpext1.GRP = ZGRP
+	set ztmpext1.GTDUE = ZGTDUE
+	set ztmpext1.INDEX = ZINDEX
+	set ztmpext1.INTSPR = ZINTSPR
+	set ztmpext1.IRN = ZIRN
+	set ztmpext1.LPDT = ZLPDT
+	set ztmpext1.ODT = ZODT
+	set ztmpext1.PMT = ZPMT
+	set ztmpext1.PMTPI = ZPMTPI
+	set ztmpext1.PPA = ZPPA
+	set ztmpext1.PRNRPD = ZPRNRPD
+	set ztmpext1.SCHSEQ = ZSCHSEQ
+	set ztmpext1.STAT = ZSTAT
+	set ztmpext1.SUBT = ZSUBT
+	set ztmpext1.TYPE = ZTYPE
+	set ztmpext1.TYPEDES = ZTYPEDES
+	set ztmpext1.ZACCOID = ZZACCOID
+	set ztmpext1.ZAR = ZZAR
+	set ztmpext1.ZDELPERM = ZZDELPERM
+	set ztmpext1.ZDLRCD = ZZDLRCD
+	set ztmpext1.ZMKTCD = ZZMKTCD
+	set ztmpext1.ZNPLLDT = ZZNPLLDT
+	set ztmpext1.ZSP = ZZSP
+	
+	do ztmpext1.save()
+	quit
+	
+private INSTMP2(RecordZTMPEXT2 ztmpext2)
+	set ztmpext2.ACN = ZACN
+	set ztmpext2.BAL = ZBAL
+	set ztmpext2.BOO = ZBOO
+	set ztmpext2.CLS = ZCLS
+	set ztmpext2.CRLMT = ZCRLMT
+	set ztmpext2.CUIN = ZCUIN
+	set ztmpext2.CUPR = ZCUPR
+	set ztmpext2.DIST1LD = ZDIST1LD
+	set ztmpext2.DIST1ND = ZDIST1ND
+	set ztmpext2.GRP = ZGRP
+	set ztmpext2.GTDUE = ZGTDUE
+	set ztmpext2.IRN = ZIRN
+	set ztmpext2.LCHG = ZLCHG
+	set ztmpext2.MCHG = ZMCHG
+	set ztmpext2.MDT = ZMDT
+	set ztmpext2.ODT = ZODT
+	set ztmpext2.PMTPI = ZPMTPI
+	set ztmpext2.PRNRPD = ZPRNRPD
+	set ztmpext2.PYTD = ZPYTD
+	set ztmpext2.STAT = ZSTAT
+	set ztmpext2.SUBT = ZSUBT
+	set ztmpext2.TDR = ZTDR
+	set ztmpext2.TITLE1 = ZTITLE1
+	set ztmpext2.TYPE = ZTYPE
+	set ztmpext2.TYPEDES = ZTYPEDES
+	set ztmpext2.UNIN = ZUNIN
+	set ztmpext2.UNPR = ZUNPR
+	set ztmpext2.ZACCOID = ZZACCOID
+	set ztmpext2.ZAR = ZZAR
+	set ztmpext2.ZCURUEI = ZZCURUEI
+	set ztmpext2.ZDLRCD = ZZDLRCD
+	set ztmpext2.ZISIC = ZZISIC
+	set ztmpext2.ZMKTCD = ZZMKTCD
+	set ztmpext2.ZNPLLDT = ZZNPLLDT
+	set ztmpext2.ZPERCONS = ZZPERCONS
+	set ztmpext2.ZREQAMT = ZZREQAMT
+	set ztmpext2.ZRESCLS = ZZRESCLS
+	set ztmpext2.ZREVINT = ZZREVINT
+	
+	do ztmpext2.save()
+	quit
+
+---------- THREXIT ------ Section marker

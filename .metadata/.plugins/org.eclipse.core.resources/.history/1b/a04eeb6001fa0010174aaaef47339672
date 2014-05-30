@@ -1,0 +1,29 @@
+//DO NOT MODIFY  Test Ignore Error|ZMKCATCH|||||||1
+
+
+RET(CIF) 
+	
+	set WHERE = "ACN="_CIFNo
+	type DbSet ds = Db.selectDbSet("CIF",WHERE)
+		
+		while ds.next() do {
+			type RecordCIF cif = ds.getRecord()
+				set output.piece("|",1) = cif.acn
+				set output.piece("|",2) = cif.pers
+				set output.piece("|",3) = cif.ztitle
+				set output.piece("|",4) = cif.fname
+				set output.piece("|",5) = cif.lnm
+				set output.piece("|",6) = cif.mname
+				set output.piece("|",7) = $S(cif.pers=1:cif.fname+cif.mname+cif.lnm,1:cif.nam)
+				set output.piece("|",8) = Db.getOneRow("DESC","ZUTBLTITLE","=:cif.zetitle,1")
+				set output.piece("|",9) = cif.zefname
+				set output.piece("|",10) = cif.zelnm
+				set output.piece("|",11) = cif.zemname
+				set output.piece("|",12) = cif.zenam
+				set output.piece("|",13) = cif.pad1
+				set output.piece("|",14) = cif.pad2
+				set output.piece("|",15) = cif.pad3
+				
+		}
+		
+	quit output

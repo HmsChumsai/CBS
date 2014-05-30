@@ -1,0 +1,1041 @@
+//DO NOT MODIFY  Extact Collateral Contract|ZBCONVCN||||||ZCONTRACT|||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	
+	kill ^TMP("ZCONVCNT")
+	kill ^TMP("ZCONVCOL")
+	kill ^TMP("ZRPT1")
+	kill ^TMP("ZRPT2")	
+	kill ^TMP("ZRPT3")
+	kill ^TMP("ZRPT4")
+	kill ^TMP("ZRPT5")
+	kill ^TMP("ZRPT6")
+	kill ^TMP("ZRPT7")
+	kill ^TMP("ZRPT8")
+	kill ^TMP("ZRPT9")
+	kill ^TMP("ZTMP3")
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	
+	
+		type RecordZCONTRACT zcnt = Db.getRecord("ZCONTRACT","CTRCT=:CTRCT")
+		if '((zcnt.CTRSTAT=1)!(zcnt.CTRSTAT=0)) quit
+	
+		set ZTAB=$C(9)
+		set ZENTER=$C(13)
+		set ZPROBLEM=$C(10)
+		
+		set ZDATA1.piece("|",1)= zcnt.BOO
+		set ZDATA1.piece("|",2) = zcnt.CC
+		set ZDATA1.piece("|",3) = zcnt.CONTRREL
+		set ZDATA1.piece("|",4) = zcnt.CONVDT.toString("YEAR-MM-DD")
+		if zcnt.CRTDATE'=0,zcnt.CRTDATE'="" set ZDATA1.piece("|",5) = zcnt.CRTDATE.toString("YEAR-MM-DD")_"-00.00.00"
+		set ZDATA1.piece("|",6) = zcnt.CRTUSER
+		set ZDATA1.piece("|",7) = zcnt.CTRCT
+		if zcnt.CTRCTDT'=0,zcnt.CTRCTDT'="" set ZDATA1.piece("|",8) = zcnt.CTRCTDT.toString("YEAR-MM-DD")_"-00.00.00"
+		set ZDATA1.piece("|",9) = zcnt.CTRSTAT
+		set ZDATA1.piece("|",10) = zcnt.MCTRCT
+		set ZDATA1.piece("|",11) = zcnt.PLDGAMT
+		set ZDATA1.piece("|",12) = zcnt.PLDGSEQ
+		if zcnt.RELDATE'=0,zcnt.RELDATE'="" set ZDATA1.piece("|",13) = zcnt.RELDATE.toString("YEAR-MM-DD")_"-00.00.00"
+		set ZDATA1.piece("|",14) = zcnt.REMARKS
+		set ZDATA1.piece("|",15) = zcnt.RESPUNIT
+			
+		if ZDATA1[ZENTER  set ZDATA1=$TR(ZDATA1,ZENTER," ")
+		if ZDATA1[ZTAB    set ZDATA1=$TR(ZDATA1,ZTAB," ")
+		if ZDATA1[ZPROBLEM set ZDATA1=$TR(ZDATA1,ZPROBLEM," ")
+		if ZDATA1[$C(34) set ZDATA1=$TR(ZDATA1,$C(34)," ")
+		
+		if zcnt.CTRSTAT=0 do {
+			set ^ZCONV("CONTRACT",zcnt.ctrct)=ZDATA1
+			do ZCTRCT(.zcnt)							
+			type ResultSet rs = Db.select("COLL","zctrctcol","ZCTRCTCOL.CTRCT=:zcnt.ctrct")	
+			while rs.next() do {			
+				set ZRSCOL = rs.getCol(1)	
+				type RecordZCOL zcol = Db.getRecord("ZCOL","COLL=:ZRSCOL")	
+				type ResultSet cid = Db.select("CID","ZCTRCTACN","CTRCT=:zcnt.ctrct")
+				if cid.next() do ZCID(cid.getCol(1))	
+				do ZCOL(.zcol)
+			}
+		}
+		if zcnt.CTRSTAT=1 do {
+			
+			type ResultSet rs = Db.select("COLL","zctrctcol","ZCTRCTCOL.CTRCT=:zcnt.ctrct")			
+			while rs.next() do {			
+				set ZRSCOL = rs.getCol(1)	
+				type RecordZCOL zcol = Db.getRecord("ZCOL","COLL=:ZRSCOL")
+				if (zcol.coltyp=1)!(zcol.coltyp=2)!(zcol.coltyp=8)!(zcol.coltyp=11) do {				
+					set ^ZCONV("CONTRACT",zcnt.ctrct)=ZDATA1
+					do ZCTRCT(.zcnt)
+					type ResultSet cid = Db.select("CID","ZCTRCTACN","CTRCT=:zcnt.ctrct")
+					if cid.next() do ZCID(cid.getCol(1))
+					do ZCOL(.zcol)
+				}
+			}		
+		}
+		
+		
+	
+	quit
+		
+ZCID(ZCID)		
+		type RecordACN acn = Db.getRecord("ACN","CID=:ZCID",1)
+		if acn.getMode()=0 quit
+		set output.piece("|",36)=""
+		set ZCLS = acn.CLS
+		set ZSUBT= acn.ZSUBT
+		set (SUBDESC,GRPDES,PRODDES,STATDESC,BRCDESC,MKTCDES)=""
+		
+		
+		if ZCLS="D" do {
+			type RecordDEP dep = Db.getRecord("DEP","CID=:ZCID")
+			set output.piece("|",1) = dep.cid
+			set output.piece("|",2) = dep.cls
+			set output.piece("|",3) = dep.grp
+			
+			if 'dep.grp.isNull() do {			
+			type RecordSTBLGRP desc = Db.getRecord("STBLGRP","CLS=:dep.cls,GRP=dep.grp",1)
+			if 'desc.getMode()=0 set GRPDES = desc.des			
+			}
+			
+			set output.piece("|",4) = GRPDES
+			set output.piece("|",5) = dep.type
+			
+			if 'dep.type.isNull() do {
+			type RecordPRODCTL desc = Db.getRecord("PRODCTL","TYPE=:dep.type",1)
+			if 'desc.getMode()=0 set PRODDES = desc.des
+			}
+			
+			set output.piece("|",6) = PRODDES
+			set output.piece("|",7) = dep.title1
+			set output.piece("|",8) = dep.acn
+			set output.piece("|",9) = dep.zstatcd
+			
+			if 'dep.zstatcd.isNull() do {
+			type RecordZUTBLSTATD desc = Db.getRecord("ZUTBLSTATD","ZSTATCD=:dep.zstatcd",1)
+			if 'desc.getMode()=0 set STATDESC = desc.des
+			}
+			
+			set output.piece("|",10) = STATDESC
+			set output.piece("|",11) = dep.bal
+			set output.piece("|",12) = dep.balavl
+			set output.piece("|",13) = dep.ZMASTER
+			set output.piece("|",14) = ""
+			set output.piece("|",15) = ""
+			set output.piece("|",16) = ""
+			set output.piece("|",17) = dep.zcltot   
+			if dep.tld'=0,dep.tld'="" set output.piece("|",18) = dep.tld.toString("YEAR-MM-DD")_"-00.00.00"
+			if dep.dtc'=0,dep.dtc'="" set output.piece("|",19) = dep.dtc.toString("YEAR-MM-DD")_"-00.00.00"
+			set output.piece("|",20) = dep.boo
+			
+			if 'dep.boo.isNull() do {
+			type RecordUTBLBRCD desc = Db.getRecord("UTBLBRCD","BRCD=:dep.boo",1)
+			if 'desc.getMode()=0 set BRCDESC = desc.desc		
+			}
+			
+			set output.piece("|",21) = BRCDESC
+			set output.piece("|",22) = dep.NEGACR+dep.NEGACRUN
+			set output.piece("|",23) = dep.ZASINT
+			set output.piece("|",24) = dep.zlgid
+			set output.piece("|",25) = ""
+			set output.piece("|",26) = ""
+			set output.piece("|",27) = ""
+			set output.piece("|",28) = ""
+			set output.piece("|",29) = ""
+			set output.piece("|",30) = dep.darcls
+			set output.piece("|",31) = ""
+			if 'ZSUBT.isNull() do {
+			type RecordUTBLSUBT desc = Db.getRecord("UTBLSUBT","GRP=:dep.grp,KEY=:ZSUBT",1)
+			if 'desc.getMode()=0 set SUBDESC = desc.desc
+			}
+			
+			set output.piece("|",32) = SUBDESC
+			set output.piece("|",33) = ""
+			set output.piece("|",34) = dep.ODLIM
+			set output.piece("|",36) = ""
+			
+			
+			}
+	
+		if (ZCLS="L") do {
+		type RecordLN ln = Db.getRecord("LN","CID=:ZCID")
+			
+			set output.piece("|",1) = ln.cid
+			set output.piece("|",2) = ln.cls
+			set output.piece("|",3) = ln.grp
+			
+			if 'ln.grp.isNull() do {
+			type RecordSTBLGRP desc = Db.getRecord("STBLGRP","CLS=:ln.cls,GRP=:ln.grp",1)
+			if 'desc.getMode()=0 set GRPDES = desc.des
+			}
+			
+			set output.piece("|",4) = GRPDES
+			set output.piece("|",5) = ln.type
+			
+			if 'ln.type.isNull() do {
+			
+			type RecordPRODCTL desc = Db.getRecord("PRODCTL","TYPE=:ln.type",1)
+			if 'desc.getMode()=0 set PRODDES = desc.des
+			
+			}
+			
+			set output.piece("|",6) = PRODDES
+			set output.piece("|",7) = ln.title1
+			set output.piece("|",8) = ln.acn
+			set output.piece("|",9) = ln.stat
+			
+			if 'ln.zstatcd.isNull() do {
+			
+			type RecordZUTBLSTATD desc = Db.getRecord("ZUTBLSTATD","ZSTATCD=:ln.zstatcd",1)
+			if 'desc.getMode()=0 set STATDESC = desc.des
+			
+			}
+			set output.piece("|",10) = STATDESC
+			set output.piece("|",11) = ln.bal
+			set output.piece("|",12) = ln.balavail
+			set output.piece("|",13) = ""
+			set output.piece("|",14) = ln.subt
+			set output.piece("|",15) = ln.zmktcd
+			
+			if 'ln.zmktcd.isNull() do {
+			
+			type RecordZUTBLMKTCD desc = Db.getRecord("ZUTBLMKTCD","GRP=:ln.grp,SUBT=:ln.subt,CODE=:ln.zmktcd",1)
+			if 'desc.getMode()=0 set MKTCDES = desc.DESC
+			
+			}
+			set output.piece("|",16) = MKTCDES
+			set output.piece("|",17) = ln.crlmt
+			if ln.tld'=0,ln.tld'="" set output.piece("|",18) = ln.tld.toString("YEAR-MM-DD")_"-00.00.00"
+			if ln.dtc'=0,ln.dtc'="" set output.piece("|",19) = ln.dtc.toString("YEAR-MM-DD")_"-00.00.00"
+			set output.piece("|",20) = ln.boo
+			
+			if 'ln.boo.isNull() do {
+			type RecordUTBLBRCD desc = Db.getRecord("UTBLBRCD","BRCD=:ln.boo",1)
+			if 'desc.getMode()=0 set BRCDESC = desc.desc
+			
+			}
+			set output.piece("|",21) = BRCDESC
+			
+			if ln.ZDELSTAT=1 		set output.piece("|",22) = ln.acr
+			if ln.ZDELSTAT=2 		set output.piece("|",22) = 0
+			if 'ln.ZDELSTAT=2,ln.ZDELSTAT=1 set output.piece("|",22) = ""
+			
+			if ln.ZDELSTAT=2 		set output.piece("|",23) = ln.acr
+			if 'ln.ZDELSTAT=2 		set output.piece("|",23) = 0
+			
+			
+			set output.piece("|",24) = ln.zlgid
+			set output.piece("|",25) = ln.gtdue
+			set output.piece("|",26) = ln.mcnd
+			set output.piece("|",27) = ln.lchg
+			set output.piece("|",28) = ln.duin
+			set output.piece("|",29) = ln.dupr
+			set output.piece("|",30) = ln.darcls
+			set output.piece("|",31) = ln.rescls
+			if 'ZSUBT.isNull() do {
+			type RecordUTBLSUBT desc = Db.getRecord("UTBLSUBT","GRP=:ln.grp,KEY=:ZSUBT",1)
+			if 'desc.getMode()=0 set SUBDESC = desc.desc
+			}
+			
+			set output.piece("|",32) = SUBDESC
+			if ln.DTNT'=0,ln.DTNT'="" set output.piece("|",33) = ln.DTNT.toString("YEAR-MM-DD")_"-00.00.00"
+			set output.piece("|",34) = ""
+			set output.piece("|",35) = ln.cctlb
+			set output.piece("|",36) = ln.MCHG
+			
+		}
+		set ^ZCONV("CID",ZCID)=output
+		//set zextcms2.DATA = output
+		//do zextcms2.bypassSave()
+			
+	quit
+	
+ZCOL(RecordZCOL zcol)
+	
+				set ZDATA=""
+				set ZDATA.piece("|",1) = zcol.AMPHUR
+				set ZDATA.piece("|",2) = zcol.AO
+				set ZDATA.piece("|",3) = zcol.APDCODE
+				set ZDATA.piece("|",4) = zcol.APPBOO
+				set ZDATA.piece("|",5) = zcol.APPBY
+				set ZDATA.piece("|",6) = zcol.APPDT.toString("YEAR-MM-DD")
+				set ZDATA.piece("|",7) = zcol.APPOFF1
+				set ZDATA.piece("|",8) = zcol.APPOFF2
+				set ZDATA.piece("|",9) = zcol.APPOFF3
+				set ZDATA.piece("|",10) = zcol.APPTID
+				set ZDATA.piece("|",11) = zcol.APPVAL
+				set ZDATA.piece("|",12) = zcol.ASDATE.toString("YEAR-MM-DD")
+				set ZDATA.piece("|",13) = zcol.BKNUMBER
+				set ZDATA.piece("|",14) = zcol.BLASTID
+				set ZDATA.piece("|",15) = zcol.BLDCODE
+				set ZDATA.piece("|",16) = zcol.BLDNAME
+				set ZDATA.piece("|",17) = zcol.BLDNUM
+				set ZDATA.piece("|",18) = zcol.BLDTYPE
+				set ZDATA.piece("|",19) = zcol.BLDVAL
+				set ZDATA.piece("|",20) = zcol.BOO
+				set ZDATA.piece("|",21) = zcol.BOOTFR
+				set ZDATA.piece("|",22) = zcol.BOTCODE
+				set ZDATA.piece("|",23) = zcol.BOTRSKRT
+				set ZDATA.piece("|",24) = zcol.BSOI
+				set ZDATA.piece("|",25) = zcol.BSTRTID
+				set ZDATA.piece("|",26) = zcol.BUILDNO
+				set ZDATA.piece("|",27) = zcol.CACN
+				set ZDATA.piece("|",28) = zcol.CC
+				set ZDATA.piece("|",29) = zcol.CCRDT.toString("YEAR-MM-DD")
+				set ZDATA.piece("|",30) = zcol.CCRNUM
+				set ZDATA.piece("|",31) = zcol.CERNO
+				set ZDATA.piece("|",32) = zcol.CID
+				set ZDATA.piece("|",33) = zcol.CMDCD
+				set ZDATA.piece("|",34) = zcol.COLL
+				set ZDATA.piece("|",35) = zcol.COLSUBT
+				set ZDATA.piece("|",36) = zcol.COLTYP
+				set ZDATA.piece("|",37) = zcol.CONDPAR
+				set ZDATA.piece("|",38) = zcol.CONVDT.toString("YEAR-MM-DD")
+				set ZDATA.piece("|",39) = zcol.CRCD
+				set ZDATA.piece("|",40) = zcol.DATETRF.toString("YEAR-MM-DD")
+				set ZDATA.piece("|",41) = zcol.DESC
+				set ZDATA.piece("|",42) = zcol.DOB.toString("YEAR-MM-DD")
+				set ZDATA.piece("|",43) = zcol.DOCLCT
+				set ZDATA.piece("|",44) = zcol.DOD.toString("YEAR-MM-DD")
+				set ZDATA.piece("|",45) = zcol.ENGCAP
+				set ZDATA.piece("|",46) = zcol.EXTRSKR
+				set ZDATA.piece("|",47) = zcol.FLOOR
+				set ZDATA.piece("|",48) = zcol.GRPNO
+				set ZDATA.piece("|",49)	= zcol.GTEL
+				set ZDATA.piece("|",50) = zcol.INSREQ
+				set ZDATA.piece("|",51) = zcol.KTBRKR
+				set ZDATA.piece("|",52) = zcol.LNDINFO
+				set ZDATA.piece("|",53) = zcol.LNDNO
+				set ZDATA.piece("|",54) = zcol.LNDVAL
+				set ZDATA.piece("|",55) = zcol.LNDVOL1
+				set ZDATA.piece("|",56) = zcol.LNDVOL2
+				set ZDATA.piece("|",57) = zcol.LNDVOL3
+				set ZDATA.piece("|",58) = zcol.LNDVOL4
+				set ZDATA.piece("|",59) = zcol.LOC1
+				set ZDATA.piece("|",60) = zcol.LOC2
+				set ZDATA.piece("|",61) = zcol.LOC3
+				set ZDATA.piece("|",62) = zcol.LQCD
+				set ZDATA.piece("|",63) = zcol.LRTRVDT.toString("YEAR-MM-DD")
+				set ZDATA.piece("|",64) = zcol.MCODE1
+				set ZDATA.piece("|",65) = zcol.MCODE2
+				set ZDATA.piece("|",66) = zcol.NONCRM
+				set ZDATA.piece("|",67) = zcol.OPRIMKEY
+				set ZDATA.piece("|",68) = zcol.OWNLNDVOL1
+				set ZDATA.piece("|",69) = zcol.OWNLNDVOL2
+				set ZDATA.piece("|",70) = zcol.OWNLNDVOL3
+				set ZDATA.piece("|",71) = zcol.OWNLNDVOL4
+				set ZDATA.piece("|",72) = zcol.OWNPORTN
+				set ZDATA.piece("|",73) = zcol.PACN
+				set ZDATA.piece("|",74) = zcol.PAGENO
+				set ZDATA.piece("|",75) = zcol.PARTLFLG
+				set ZDATA.piece("|",76) = zcol.PAYPARTY
+				set ZDATA.piece("|",77) = zcol.PCHPRICE
+				set ZDATA.piece("|",78) = zcol.PCOLVAL
+				set ZDATA.piece("|",79) = zcol.PERSONID
+				set ZDATA.piece("|",80) = zcol.PROVINCE
+				set ZDATA.piece("|",81) = zcol.RAVANG
+				set ZDATA.piece("|",82) = zcol.REASON
+				set ZDATA.piece("|",83) = zcol.REMARKS
+				set ZDATA.piece("|",84) = zcol.RESPUNIT
+				set ZDATA.piece("|",85) = zcol.RIGHBAL
+				set ZDATA.piece("|",86) = zcol.RIGHVAL
+				set ZDATA.piece("|",87) = zcol.RMAREA
+				set ZDATA.piece("|",88) = zcol.RMKPORTN
+				set ZDATA.piece("|",89) = zcol.RMNUMBER
+				set ZDATA.piece("|",90) = zcol.ROAD
+				set ZDATA.piece("|",91) = zcol.RSCD
+				set ZDATA.piece("|",92) = zcol.RULCOST
+				set ZDATA.piece("|",93) = zcol.SEQNO
+				set ZDATA.piece("|",94) = zcol.SHRHLDRG
+				set ZDATA.piece("|",95) = zcol.SHRTNAME
+				set ZDATA.piece("|",96) = zcol.STCKNO
+				set ZDATA.piece("|",97) = zcol.STOREY
+				set ZDATA.piece("|",98) = zcol.SUBBOT
+				set ZDATA.piece("|",99) = zcol.SYMBOL
+				set ZDATA.piece("|",100) = zcol.TAMBOL
+				set ZDATA.piece("|",101) = zcol.TOTPORTN
+				set ZDATA.piece("|",102) = zcol.UNITCD
+				set ZDATA.piece("|",103) = zcol.USEDSTDT.toString("YEAR-MM-DD")
+				set ZDATA.piece("|",104) = zcol.USEFULIF
+				set ZDATA.piece("|",105) = zcol.ZATEEXP.toString("YEAR-MM-DD")
+				set ZDATA.piece("|",106) = zcol.ZATEISSUEDT.toString("YEAR-MM-DD")
+				set ZDATA.piece("|",107) = zcol.ZATEISSUER
+				set ZDATA.piece("|",108) = zcol.ZATENUM
+				set ZDATA.piece("|",109) = zcol.ZCERTBAL
+				set ZDATA.piece("|",110) = zcol.ZCERTCID
+				set ZDATA.piece("|",111) = zcol.ZCERTGRP
+				set ZDATA.piece("|",112) = zcol.ZCERTID
+				set ZDATA.piece("|",113) = zcol.ZCERTLOTH
+				set ZDATA.piece("|",114) = zcol.ZCERTLOTL
+				set ZDATA.piece("|",115) = zcol.ZCERTPERIOD
+				set ZDATA.piece("|",116) = zcol.ZCERTUNIT
+				set ZDATA.piece("|",117) = zcol.ZLGISSUEDT.toString("YEAR-MM-DD")
+				set ZDATA.piece("|",118) = zcol.ZLGNUM
+				set ZDATA.piece("|",119) = zcol.ZRADUR
+				set ZDATA.piece("|",120) = zcol.ZRAEXP.toString("YEAR-MM-DD")
+				set ZDATA.piece("|",121) = zcol.ZRAISSUER
+				set ZDATA.piece("|",122) = zcol.ZRANUM
+				set ZDATA.piece("|",123) = zcol.ZRATYPE
+				set ZDATA.piece("|",124) = zcol.BONDTYPE
+				set ZDATA.piece("|",125) = zcol.BONDCODE
+				set ZDATA.piece("|",126) = zcol.BONDNAME
+				set ZDATA.piece("|",127) = zcol.ISSYEAR
+				set ZDATA.piece("|",128) = zcol.BSEQ
+				set ZDATA.piece("|",129) = zcol.BOWNNAME
+				set ZDATA.piece("|",130) = zcol.BEXPDATE.toString("YEAR-MM-DD")
+				set ZDATA.piece("|",131) = zcol.BINTRATE
+				set ZDATA.piece("|",132) = zcol.BUPRICE
+				set ZDATA.piece("|",133) = zcol.MKDATE.toString("YEAR-MM-DD")
+				set ZDATA.piece("|",134) = zcol.MKPRICE
+				set ZDATA.piece("|",135) = zcol.TOTBNVAL
+				set ZDATA.piece("|",136) = zcol.LISTED
+				set ZDATA.piece("|",137) = zcol.SENIORITY
+				set ZDATA.piece("|",138) = zcol.APPAMT
+				set ZDATA.piece("|",139) = zcol.SHRTNAME
+				set ZDATA.piece("|",140) = zcol.STCKTYP
+				set ZDATA.piece("|",141) = zcol.STCKNAME
+				set ZDATA.piece("|",142) = zcol.ISSNAME
+				set ZDATA.piece("|",143) = zcol.TAXID
+				set ZDATA.piece("|",144) = zcol.ISSDATE.toString("YEAR-MM-DD")
+				set ZDATA.piece("|",145) = zcol.NOSHARE
+				set ZDATA.piece("|",146) = zcol.PARPRC
+				set ZDATA.piece("|",147) = zcol.PARD.toString("YEAR-MM-DD")
+				set ZDATA.piece("|",148) = zcol.BKPRICE
+				set ZDATA.piece("|",149) = zcol.BKDATE.toString("YEAR-MM-DD")
+				set ZDATA.piece("|",150) = zcol.ISSRSKRT
+				set ZDATA.piece("|",151) = zcol.STCKTYP2
+				set ZDATA.piece("|",152) = zcol.RSKWOCL
+				set ZDATA.piece("|",153) = zcol.STCKSHR
+				
+				
+				if ZDATA[ZENTER  set ZDATA=$TR(ZDATA,ZENTER," ")
+				if ZDATA[ZTAB    set ZDATA=$TR(ZDATA,ZTAB," ")
+				if ZDATA[ZPROBLEM set ZDATA=$TR(ZDATA,ZPROBLEM," ")
+				if ZDATA[$C(34) set ZDATA=$TR(ZDATA,$C(34)," ")
+				
+				
+				set ^ZCONV("COLL",zcol.COLL)=ZDATA
+				set ZAMT = zcol.APPVAL
+				set ZBOTCD = zcol.BOTCODE
+				set ZSUBBOTCD		= zcol.SUBBOT
+				set ZBOO		= zcol.BOO
+				set ZCOLTYP		= zcol.COLTYP
+				set ZCOLSUBT		= zcol.COLSUBT
+				set APPRAISEDBY 	= zcol.APPBY
+				set APPRAISEDDT 	= zcol.APPDT.toString("YEAR-MM-DD")
+				set APPRAISALVAL 	= zcol.APPVAL
+				set (ZDETAIL,ZDATA2)	= ""
+				set ZCOLL		= zcol.COLL		
+				set ZRPT5="ZRPT5"
+				set ZRPT1="ZRPT1"
+				set (ZBRNAME,ZCOLTYPDESC,ZSUBBOTDES,ZCOLSUBDESC)="N/A"
+				
+					
+				
+			
+				if Db.isDefined("UTBLBRCD","BRCD=:ZBOO") do {
+					type RecordUTBLBRCD zbr = Db.getRecord("UTBLBRCD","BRCD=:ZBOO")
+					set ZBRNAME = zbr.desc
+				}
+				if Db.isDefined("ZUTBLCOLTYP","COLCD=:ZCOLTYP") do {
+					type RecordZUTBLCOLTYP coldesc = Db.getRecord("ZUTBLCOLTYP","COLCD=:ZCOLTYP")  
+					set ZCOLTYPDESC=coldesc.desc
+				}
+				if Db.isDefined("ZUTBLCOLSUBT","COLCD=:ZCOLTYP,COLSUBT=:ZCOLSUBT") do {
+					type RecordZUTBLCOLSUBT colsubdesc = Db.getRecord("ZUTBLCOLSUBT","COLCD=:ZCOLTYP,COLSUBT=:ZCOLSUBT")
+					set ZCOLSUBDESC = colsubdesc.desc
+				}
+				
+				type ResultSet botdesc = Db.select("DESC","ZUTBLSUBBOT","BOTCODE=:ZBOTCD AND SUBBOT=:ZSUBBOTCD")
+				if 'botdesc.isEmpty(),botdesc.next() set ZSUBBOTDES=botdesc.getCol(1)
+				
+				if ZSUBBOTCD="" set ZSUBBOTCD="N/A"
+				if ZBOTCD=""    set ZBOTCD="N/A"
+				if ZBOO="" 	set ZBOO="N/A"
+				if ZCOLTYP=""	set ZCOLTYP="N/A"
+				if ZCOLSUBT=""	set ZCOLSUBT="N/A"
+				
+				type ResultSet rscol = Db.select("ACN,COLL,PAROWNFLG","ZCOLOWNLINK","COLL=:ZCOLL")
+				while rscol.next() do {
+					
+					set ZACN=rscol.getCol(1)
+					type RecordTMPRPT5 rpt5 = Db.getRecord("TMPRPT5","PID=:ZRPT5,ZBOO,ZCOLTYP,ZCOLSUBT,ZCOLL,ZACN",1)
+					type RecordCIF cif = Db.getRecord("CIF","ACN=:rscol.getCol(1)") 
+					
+					set ZTMP5DATA.piece("|",1) = ZBRNAME
+					set ZTMP5DATA.piece("|",2) = ZCOLTYPDESC
+					set ZTMP5DATA.piece("|",3) = ZCOLSUBDESC
+					set ZTMP5DATA.piece("|",4) = ZBOTCD
+					set ZTMP5DATA.piece("|",5) = ZSUBBOTCD
+					set ZTMP5DATA.piece("|",6) = rscol.getCol(2)	
+					set ZTMP5DATA.piece("|",7) = ZACN
+					set ZTMP5DATA.piece("|",8) = cif.fname_" "_cif.lnm
+					
+					set rpt5.DATA = ZTMP5DATA
+					do rpt5.save()
+					
+					//Tmp for ZCOLOWNLINK Extraction					
+					if $O(^ZCONV("ZCOLOWNLINK",""),-1)="" set ZPOINT=0
+					else set ZPOINT=$O(^ZCONV("ZCOLOWNLINK",""),-1)
+					set ^ZCONV("ZCOLOWNLINK",ZPOINT+1)= rscol.getCol(1)_"|"_rscol.getCol(2)_"|"_rscol.getCol(3)
+					//do io2.write(ZDATA2)
+				}
+							
+				type RecordTMPRPT5 rpt1 = Db.getRecord("TMPRPT5","PID=:ZRPT1,ZBOO,ZCOLTYP,ZCOLSUBT,ZBOTCD,ZSUBBOTCD",1)
+				set ZTMP2DATA.piece("|",1) = ZBRNAME
+				set ZTMP2DATA.piece("|",2) = ZCOLTYPDESC
+				set ZTMP2DATA.piece("|",3) = ZCOLSUBDESC
+				set ZTMP2DATA.piece("|",4) = ZSUBBOTDES
+				set ZTMP2DATA.piece("|",5) = rpt1.DATA.piece("|",5)+1
+				set ZTMP2DATA.piece("|",6) = rpt1.DATA.piece("|",6)+ZAMT
+				set rpt1.DATA		   = ZTMP2DATA		
+				do rpt1.save()
+				
+				set ^ZCONV("COL",ZCOLL)=ZDATA			
+				//do io.write(ZDATA)				
+				
+				
+					
+				if ZCOLTYP=1 do { 
+					
+					set ZDETAIL.piece("|",1) = zcol.LRTRVDT  
+					set ZDETAIL.piece("|",2) = zcol.GRPNO 
+					set ZDETAIL.piece("|",3) = zcol.AMPHUR 
+					set ZDETAIL.piece("|",4) = zcol.BKNUMBER 
+					set ZDETAIL.piece("|",5) = zcol.PARTLFLG  
+					set ZDETAIL.piece("|",6) = zcol.LNDNO
+					set ZDETAIL.piece("|",7) = zcol.LNDVOL1
+					set ZDETAIL.piece("|",8) = zcol.LNDVOL2 
+					set ZDETAIL.piece("|",9) = zcol.LNDVOL3
+					set ZDETAIL.piece("|",10) = zcol.LNDVOL4   
+					set ZDETAIL.piece("|",11) = zcol.LOC1
+					set ZDETAIL.piece("|",12) = zcol.LOC2       
+					set ZDETAIL.piece("|",13) = zcol.LOC3
+					set ZDETAIL.piece("|",14) = zcol.OWNPORTN   
+					set ZDETAIL.piece("|",15) = zcol.OWNLNDVOL1 
+					set ZDETAIL.piece("|",16) = zcol.OWNLNDVOL2 
+					set ZDETAIL.piece("|",17) = zcol.OWNLNDVOL3 
+					set ZDETAIL.piece("|",18) = zcol.OWNLNDVOL4 
+					set ZDETAIL.piece("|",19) = zcol.PAGENO  
+					set ZDETAIL.piece("|",20) = zcol.CONDPAR  
+					set ZDETAIL.piece("|",21) = zcol.RMKPORTN   
+					set ZDETAIL.piece("|",22) = zcol.PROVINCE
+					set ZDETAIL.piece("|",23) = zcol.RAVANG
+					set ZDETAIL.piece("|",24) = zcol.SEQNO   
+					set ZDETAIL.piece("|",25) = zcol.TAMBOL 
+					set ZDETAIL.piece("|",26) = zcol.TOTPORTN
+					set ZDETAIL.piece("|",27) = zcol.LNDINFO
+					set ZDETAIL.piece("|",28) = zcol.PROVINCE
+					set ZDETAIL.piece("|",29) = zcol.ROAD
+					set ZDETAIL.piece("|",30) = zcol.BSOI
+					set ZDETAIL.piece("|",31) = zcol.TAMBOL  
+					set ZDETAIL.piece("|",32) = zcol.BLDCODE 
+					set ZDETAIL.piece("|",33) = zcol.BLDNAME  
+					set ZDETAIL.piece("|",34) = zcol.BLDNUM 
+					set ZDETAIL.piece("|",35) = zcol.BUILDNO  
+					set ZDETAIL.piece("|",36) = zcol.RMNUMBER
+					set ZDETAIL.piece("|",37) = zcol.STOREY
+					set ZDETAIL.piece("|",38) = zcol.RMAREA
+					set ZDETAIL.piece("|",39) = APPRAISEDBY
+					set ZDETAIL.piece("|",40) = APPRAISEDDT 
+					set ZDETAIL.piece("|",41) = APPRAISALVAL
+				
+				}
+				
+				
+				if (ZCOLTYP=2) do { quit
+					
+					set ZDETAIL.piece("|",1) = zcol.LNDINFO
+					set ZDETAIL.piece("|",2) = zcol.PROVINCE
+					set ZDETAIL.piece("|",3) = zcol.ROAD
+					set ZDETAIL.piece("|",4) = zcol.BSOI
+					set ZDETAIL.piece("|",5) = zcol.TAMBOL 
+					set ZDETAIL.piece("|",6) = zcol.BLDCODE
+					set ZDETAIL.piece("|",7) = zcol.BLDNAME
+					set ZDETAIL.piece("|",8) = zcol.BLDNUM 
+					set ZDETAIL.piece("|",9) = zcol.BUILDNO
+					set ZDETAIL.piece("|",10) = zcol.RMNUMBER 
+					set ZDETAIL.piece("|",11) = zcol.STOREY 
+					set ZDETAIL.piece("|",12) = zcol.RMAREA
+					set ZDETAIL.piece("|",13) = APPRAISEDBY
+					set ZDETAIL.piece("|",14) = APPRAISEDDT 
+					set ZDETAIL.piece("|",15) = APPRAISALVAL
+				
+				
+				}
+				
+				
+				if (ZCOLTYP=3) do {
+					
+					set ZDETAIL.piece("|",1) = zcol.AMPHUR
+					set ZDETAIL.piece("|",2) = zcol.ENGCAP
+					set ZDETAIL.piece("|",3) = zcol.MCODE1
+					set ZDETAIL.piece("|",4) = zcol.MCODE2
+					set ZDETAIL.piece("|",5) = zcol.UNITCD
+					set ZDETAIL.piece("|",6) = zcol.USEDSTDT
+					set ZDETAIL.piece("|",7) = zcol.PROVINCE.toString("DD/MM/YEAR")
+					set ZDETAIL.piece("|",8) = zcol.ROAD 
+					set ZDETAIL.piece("|",9) = zcol.BSOI
+					set ZDETAIL.piece("|",10) = zcol.TAMBOL
+					set ZDETAIL.piece("|",11) = APPRAISEDBY
+					set ZDETAIL.piece("|",12) = APPRAISEDDT 
+					set ZDETAIL.piece("|",13) = APPRAISALVAL
+			
+					
+				}
+				
+				if ZCOLTYP=4 do {
+					
+					set ZDETAIL.piece("|",1)=zcol.CID
+					set ZDETAIL.piece("|",2) = APPRAISEDBY
+					set ZDETAIL.piece("|",3) = APPRAISEDDT 
+					set ZDETAIL.piece("|",4) = APPRAISALVAL 					
+		
+				}
+				
+				if (ZCOLTYP=5) do {
+			
+					set ZDETAIL.piece("|",1) = zcol.BLASTID
+					set ZDETAIL.piece("|",2) = zcol.BSTRTID
+					set ZDETAIL.piece("|",3) = zcol.SHRHLDRG
+					set ZDETAIL.piece("|",4) = APPRAISEDBY
+					set ZDETAIL.piece("|",5) = APPRAISEDDT 
+					set ZDETAIL.piece("|",6) = APPRAISALVAL
+										
+				}
+				
+				if (ZCOLTYP=6) do {
+			
+					set ZDETAIL.piece("|",1) = zcol.BLASTID
+					set ZDETAIL.piece("|",2) = zcol.BSTRTID
+					set ZDETAIL.piece("|",3) = zcol.SHRHLDRG
+					set ZDETAIL.piece("|",4) = APPRAISEDBY
+					set ZDETAIL.piece("|",5) = APPRAISEDDT 
+					set ZDETAIL.piece("|",6) = APPRAISALVAL
+					
+				}
+				
+				if ZCOLTYP=7 do {
+			
+					set ZDETAIL.piece("|",1) = zcol.GTEL
+					set ZDETAIL.piece("|",2) = zcol.CACN
+					set ZDETAIL.piece("|",3) = zcol.PACN
+					set ZDETAIL.piece("|",4) = APPRAISEDBY
+					set ZDETAIL.piece("|",5) = APPRAISEDDT 
+					set ZDETAIL.piece("|",6) = APPRAISALVAL
+					
+				}
+				
+				if (ZCOLTYP=8) do {
+					
+					set ZDETAIL.piece("|",1) = zcol.LNDINFO
+					set ZDETAIL.piece("|",2) = zcol.PROVINCE
+					set ZDETAIL.piece("|",3) = zcol.ROAD
+					set ZDETAIL.piece("|",4) = zcol.BSOI
+					set ZDETAIL.piece("|",5) = zcol.TAMBOL 
+					set ZDETAIL.piece("|",6) = zcol.BLDCODE
+					set ZDETAIL.piece("|",7) = zcol.BLDNAME
+					set ZDETAIL.piece("|",8) = zcol.BLDNUM 
+					set ZDETAIL.piece("|",9) = zcol.BUILDNO
+					set ZDETAIL.piece("|",10) = zcol.RMNUMBER 
+					set ZDETAIL.piece("|",11) = zcol.STOREY 
+					set ZDETAIL.piece("|",12) = zcol.RMAREA 
+					set ZDETAIL.piece("|",13) = APPRAISEDBY
+					set ZDETAIL.piece("|",14) = APPRAISEDDT 
+					set ZDETAIL.piece("|",15) = APPRAISALVAL
+					
+				}
+				
+				if (ZCOLTYP=9) do {
+					
+					set ZDETAIL.piece("|",1) = zcol.AMPHUR	
+					set ZDETAIL.piece("|",2) = zcol.PROVINCE
+					set ZDETAIL.piece("|",3) = zcol.ROAD
+					set ZDETAIL.piece("|",4) = zcol.BSOI
+					set ZDETAIL.piece("|",5) = zcol.TAMBOL 
+					set ZDETAIL.piece("|",6) = zcol.RIGHBAL
+					set ZDETAIL.piece("|",7) = zcol.ZLGNUM
+					set ZDETAIL.piece("|",8) = zcol.ZATEISSUER 
+					set ZDETAIL.piece("|",9) = zcol.ZLGISSUEDT
+					set ZDETAIL.piece("|",10) = zcol.ZATEEXP 
+					set ZDETAIL.piece("|",11) = zcol.ZATEISSUEDT 
+					set ZDETAIL.piece("|",12) = zcol.ZATENUM
+					set ZDETAIL.piece("|",13) = zcol.ZRAEXP
+					set ZDETAIL.piece("|",14) = zcol.ZRAISSUER
+					set ZDETAIL.piece("|",15) = zcol.ZRANUM
+					set ZDETAIL.piece("|",16) = zcol.ZRATYPE
+					set ZDETAIL.piece("|",17) = zcol.ASDATE
+					set ZDETAIL.piece("|",18) = zcol.CCRDT
+					set ZDETAIL.piece("|",19) = zcol.CCRNUM
+					set ZDETAIL.piece("|",20) = zcol.PAYPARTY
+					set ZDETAIL.piece("|",21) = zcol.RIGHVAL
+					set ZDETAIL.piece("|",22) = zcol.BOOTFR
+					set ZDETAIL.piece("|",23) = zcol.DATETRF
+					set ZDETAIL.piece("|",24) = APPRAISEDBY
+					set ZDETAIL.piece("|",25) = APPRAISEDDT 
+					set ZDETAIL.piece("|",26) = APPRAISALVAL
+					
+				}
+				
+				if (ZCOLTYP=10) do {
+					
+					set ZDETAIL.piece("|",1) = zcol.AMPHUR
+					set ZDETAIL.piece("|",2) = zcol.ENGCAP
+					set ZDETAIL.piece("|",3) = zcol.MCODE1
+					set ZDETAIL.piece("|",4) = zcol.MCODE2
+					set ZDETAIL.piece("|",5) = zcol.UNITCD
+					set ZDETAIL.piece("|",6) = zcol.USEDSTDT
+					set ZDETAIL.piece("|",7) = zcol.PROVINCE.toString("DD/MM/YEAR")
+					set ZDETAIL.piece("|",8) = zcol.ROAD 
+					set ZDETAIL.piece("|",9) = zcol.BSOI
+					set ZDETAIL.piece("|",10) = zcol.TAMBOL 
+					set ZDETAIL.piece("|",11) = APPRAISEDBY
+					set ZDETAIL.piece("|",12) = APPRAISEDDT 
+					set ZDETAIL.piece("|",13) = APPRAISALVAL
+					
+				}
+				
+				
+				if (ZCOLTYP=11) do {
+					
+					set ZDETAIL.piece("|",1) = zcol.AMPHUR	
+					set ZDETAIL.piece("|",2) = zcol.PROVINCE
+					set ZDETAIL.piece("|",3) = zcol.ROAD
+					set ZDETAIL.piece("|",4) = zcol.BSOI
+					set ZDETAIL.piece("|",5) = zcol.TAMBOL 
+					set ZDETAIL.piece("|",6) = zcol.RIGHBAL
+					set ZDETAIL.piece("|",7) = zcol.ZLGNUM
+					set ZDETAIL.piece("|",8) = zcol.ZATEISSUER 
+					set ZDETAIL.piece("|",9) = zcol.ZLGISSUEDT
+					set ZDETAIL.piece("|",10) = zcol.ZATEEXP 
+					set ZDETAIL.piece("|",11) = zcol.ZATEISSUEDT 
+					set ZDETAIL.piece("|",12) = zcol.ZATENUM
+					set ZDETAIL.piece("|",13) = zcol.ZRAEXP
+					set ZDETAIL.piece("|",14) = zcol.ZRAISSUER
+					set ZDETAIL.piece("|",15) = zcol.ZRANUM
+					set ZDETAIL.piece("|",16) = zcol.ZRATYPE
+					set ZDETAIL.piece("|",17) = zcol.ASDATE
+					set ZDETAIL.piece("|",18) = zcol.CCRDT
+					set ZDETAIL.piece("|",19) = zcol.CCRNUM
+					set ZDETAIL.piece("|",20) = zcol.PAYPARTY
+					set ZDETAIL.piece("|",21) = zcol.RIGHVAL
+					set ZDETAIL.piece("|",22) = zcol.BOOTFR
+					set ZDETAIL.piece("|",23) = zcol.DATETRF
+					set ZDETAIL.piece("|",24) = APPRAISEDBY
+					set ZDETAIL.piece("|",25) = APPRAISEDDT 
+					set ZDETAIL.piece("|",26) = APPRAISALVAL
+					
+				}
+					
+				if (ZCOLTYP=12) do {
+					
+					set ZDETAIL.piece("|",1) = zcol.AMPHUR	
+					set ZDETAIL.piece("|",2) = zcol.PROVINCE
+					set ZDETAIL.piece("|",3) = zcol.ROAD
+					set ZDETAIL.piece("|",4) = zcol.BSOI
+					set ZDETAIL.piece("|",5) = zcol.TAMBOL 
+					set ZDETAIL.piece("|",6) = zcol.RIGHBAL
+					set ZDETAIL.piece("|",7) = zcol.ZLGNUM
+					set ZDETAIL.piece("|",8) = zcol.ZATEISSUER 
+					set ZDETAIL.piece("|",9) = zcol.ZLGISSUEDT
+					set ZDETAIL.piece("|",10) = zcol.ZATEEXP 
+					set ZDETAIL.piece("|",11) = zcol.ZATEISSUEDT 
+					set ZDETAIL.piece("|",12) = zcol.ZATENUM
+					set ZDETAIL.piece("|",13) = zcol.ZRAEXP
+					set ZDETAIL.piece("|",14) = zcol.ZRAISSUER
+					set ZDETAIL.piece("|",15) = zcol.ZRANUM
+					set ZDETAIL.piece("|",16) = zcol.ZRATYPE
+					set ZDETAIL.piece("|",17) = zcol.ASDATE
+					set ZDETAIL.piece("|",18) = zcol.CCRDT
+					set ZDETAIL.piece("|",19) = zcol.CCRNUM
+					set ZDETAIL.piece("|",20) = zcol.PAYPARTY
+					set ZDETAIL.piece("|",21) = zcol.RIGHVAL
+					set ZDETAIL.piece("|",22) = zcol.BOOTFR
+					set ZDETAIL.piece("|",23) = zcol.DATETRF
+					set ZDETAIL.piece("|",24) = APPRAISEDBY
+					set ZDETAIL.piece("|",25) = APPRAISEDDT 
+					set ZDETAIL.piece("|",26) = APPRAISALVAL
+										
+				}
+				
+				if (ZCOLTYP=13) do {
+					
+					set ZDETAIL.piece("|",1) = zcol.AMPHUR	
+					set ZDETAIL.piece("|",2) = zcol.PROVINCE
+					set ZDETAIL.piece("|",3) = zcol.ROAD
+					set ZDETAIL.piece("|",4) = zcol.BSOI
+					set ZDETAIL.piece("|",5) = zcol.TAMBOL 
+					set ZDETAIL.piece("|",6) = zcol.RIGHBAL
+					set ZDETAIL.piece("|",7) = zcol.ZLGNUM
+					set ZDETAIL.piece("|",8) = zcol.ZATEISSUER 
+					set ZDETAIL.piece("|",9) = zcol.ZLGISSUEDT
+					set ZDETAIL.piece("|",10) = zcol.ZATEEXP 
+					set ZDETAIL.piece("|",11) = zcol.ZATEISSUEDT 
+					set ZDETAIL.piece("|",12) = zcol.ZATENUM
+					set ZDETAIL.piece("|",13) = zcol.ZRAEXP
+					set ZDETAIL.piece("|",14) = zcol.ZRAISSUER
+					set ZDETAIL.piece("|",15) = zcol.ZRANUM
+					set ZDETAIL.piece("|",16) = zcol.ZRATYPE
+					set ZDETAIL.piece("|",17) = zcol.ASDATE
+					set ZDETAIL.piece("|",18) = zcol.CCRDT
+					set ZDETAIL.piece("|",19) = zcol.CCRNUM
+					set ZDETAIL.piece("|",20) = zcol.PAYPARTY
+					set ZDETAIL.piece("|",21) = zcol.RIGHVAL
+					set ZDETAIL.piece("|",22) = zcol.BOOTFR
+					set ZDETAIL.piece("|",23) = zcol.DATETRF
+					set ZDETAIL.piece("|",24) = APPRAISEDBY
+					set ZDETAIL.piece("|",25) = APPRAISEDDT 
+					set ZDETAIL.piece("|",26) = APPRAISALVAL
+					
+					
+				}
+				
+				if ZCOLTYP=14 do {
+			
+					set ZDETAIL.piece("|",1) = zcol.CID
+					set ZDETAIL.piece("|",2) = zcol.ZCERTID
+					set ZDETAIL.piece("|",3) = zcol.ZCERTCID
+					set ZDETAIL.piece("|",4) = zcol.ZCERTBAL
+					set ZDETAIL.piece("|",5) = zcol.ZCERTGRP
+					set ZDETAIL.piece("|",6) = zcol.ZCERTLOTH
+					set ZDETAIL.piece("|",7) = zcol.ZCERTLOTL
+					set ZDETAIL.piece("|",8) = zcol.ZCERTPERIOD
+					set ZDETAIL.piece("|",9) = zcol.ZCERTUNIT
+					set ZDETAIL.piece("|",10) = APPRAISEDBY
+					set ZDETAIL.piece("|",11) = APPRAISEDDT 
+					set ZDETAIL.piece("|",12) = APPRAISALVAL
+			
+				}
+				if ZCOLTYP=99 do {
+			
+					set ZDETAIL.piece("|",1) = zcol.DESC
+					set ZDETAIL.piece("|",2) = APPRAISEDBY
+					set ZDETAIL.piece("|",3) = APPRAISEDDT 
+					set ZDETAIL.piece("|",4) = APPRAISALVAL
+				
+				}
+	
+				if ZDETAIL[ZENTER  set ZDETAIL=$TR(ZDATA,ZENTER," ")
+				if ZDETAIL[ZTAB    set ZDETAIL=$TR(ZDETAIL,ZTAB," ")
+				if ZDETAIL[ZPROBLEM set ZDETAIL=$TR(ZDETAIL,ZPROBLEM," ")
+				if ZDETAIL[$C(34) set ZDETAIL=$TR(ZDETAIL,$C(34)," ")
+				
+				set ^TMP("ZRPT4",ZBOO,ZCOLTYP,zcol.coll) = ZBOO_"|"_ZBRNAME_"|"_ZCOLTYP_"|"_ZCOLTYPDESC_"|"_ZCOLSUBT_"|"_ZCOLSUBDESC_"|"_zcol.BOTCODE_"|"_zcol.coll_"|"_ZDETAIL
+				
+			
+	quit
+
+ZCTRCT(RecordZCONTRACT zcnt)
+		
+		set (ZDATA1,ZDATA2,ZDATA3,ZDATA4,ZCID,ZACN,rpt2DATA,rpt3DATA,rpt6DATA,rpt7DATA,rpt8DATA,rpt9DATA,ZCTRCT,ZBOO,ZTYP,ZRELDATE)=""	
+		
+		set ZCTRCT 	= zcnt.CTRCT	
+		set ZBOO 	= zcnt.BOO
+         	set ZTYP 	= zcnt.CONTRREL
+         	if zcnt.CTRCTDT'=0,zcnt.CTRCTDT'="" set ZCTRCTDT = zcnt.CTRCTDT.toString("YEAR-MM-DD")_"-00.00.00"
+         	set ZSTAT 	= zcnt.CTRSTAT
+         	set ZMCTRCT	= zcnt.MCTRCT
+         	set ZAMT	= zcnt.PLDGAMT
+         	if zcnt.RELDATE'=0,zcnt.RELDATE'="" set ZRELDATE = zcnt.RELDATE.toString("YEAR-MM-DD")_"-00.00.00"
+         	
+         
+		
+		set (ZBRNAME,ZCTRTYPDES,ZSTATDESC)="N/A"
+		
+		
+		if Db.isDefined("UTBLBRCD","BRCD=:ZBOO") do {
+			type RecordUTBLBRCD zbr = Db.getRecord("UTBLBRCD","BRCD=:ZBOO")
+			set ZBRNAME = zbr.desc
+		}
+		if Db.isDefined("ZUTBLCNTSTAT","CNTSTAT=:ZSTAT") do {
+			type RecordZUTBLCNTSTAT CNTSTAT = Db.getRecord("ZUTBLCNTSTAT","CNTSTAT=:ZSTAT")  
+			set ZSTATDESC=CNTSTAT.desc
+		}
+		if Db.isDefined("ZUTBLCONTREL","CONTRREL=:ZTYP") do {
+			type RecordZUTBLCONTREL CONTRREL = Db.getRecord("ZUTBLCONTREL","CONTRREL=:ZTYP")
+			set ZCTRTYPDES = CONTRREL.desc
+		}
+		
+		
+         	type ResultSet rscol = Db.select("COLL","ZCTRCTCOL","ZCTRCTCOL.CTRCT=:ZCTRCT")					
+		while rscol.next() do {			
+			set (ZCOLTYPDESC,ZCOLSUBDESC,ZSUBBOTCD,ZBOTCD)="N/A"
+			set ZRSCOL = rscol.getCol(1)	
+			type RecordZCOL zcol = Db.getRecord("ZCOL","COLL=:ZRSCOL")
+		        set ZCOLTYP	= zcol.COLTYP
+		        set ZCOLSUBT	= zcol.COLSUBT
+			set ZSUBBOTCD	= zcol.SUBBOT        
+			set ZBOTCD	= zcol.BOTCODE
+			
+			
+			if Db.isDefined("ZUTBLCOLTYP","COLCD=:ZCOLTYP") do {
+				type RecordZUTBLCOLTYP coldesc = Db.getRecord("ZUTBLCOLTYP","COLCD=:ZCOLTYP")  
+				set ZCOLTYPDESC=coldesc.desc
+			}
+			if Db.isDefined("ZUTBLCOLSUBT","COLCD=:ZCOLTYP,COLSUBT=:ZCOLSUBT") do {
+				type RecordZUTBLCOLSUBT colsubdesc = Db.getRecord("ZUTBLCOLSUBT","COLCD=:ZCOLTYP,COLSUBT=:ZCOLSUBT")
+				set ZCOLSUBDESC = colsubdesc.desc
+			}
+		       
+		        type RecordTMPRPT5 tmp3 = Db.getRecord("TMPRPT5","PID='ZTMP3',ZBOO,ZTYP,ZSTAT,ZCOLTYP,ZCOLSUBT",1)								
+			
+			set tmp3DATA.piece("|",1)  = ZCOLTYPDESC
+			set tmp3DATA.piece("|",2)  = ZCOLSUBDESC
+			set tmp3DATA.piece("|",3)  = tmp3.DATA+1
+			set tmp3.DATA = tmp3DATA
+			do tmp3.bypassSave()
+			
+			type RecordTMPRPT5 rpt9 = Db.getRecord("TMPRPT5","PID='ZRPT9',ZBOO,ZTYP,ZSTAT,ZCTRCT,ZRSCOL",1)
+			set rpt9DATA.piece("|",1)	= ZBRNAME
+			set rpt9DATA.piece("|",2)	= ZCTRTYPDES
+			set rpt9DATA.piece("|",3)	= ZSTATDESC
+			set rpt9DATA.piece("|",4)	= ZCOLTYP
+			set rpt9DATA.piece("|",5)	= ZCOLTYPDESC
+			set rpt9DATA.piece("|",6)	= ZCOLSUBT
+			set rpt9DATA.piece("|",7)	= ZCOLSUBDESC
+			set rpt9DATA.piece("|",8)	= ZBOTCD
+			set rpt9DATA.piece("|",9)	= ZSUBBOTCD
+			set rpt9DATA.piece("|",10)	= ZRSCOL
+			set rpt9.DATA = rpt9DATA
+			do rpt9.bypassSave()
+		}
+					
+		
+		type ResultSet data2 = Db.select("CID","ZCTRCTACN","CTRCT=:ZCTRCT")
+		while data2.next() do {
+			
+			set ZCID = data2.getCol(1)
+			//set ZDATA2=ZCID_"|"_ZCTRCT
+			if $O(^ZCONV("ZCTRCTACN",""),-1)="" set ZPOINTER2=0
+			else set ZPOINTER2=$O(^ZCONV("ZCTRCTACN",""),-1)
+			set ^ZCONV("ZCTRCTACN",ZPOINTER2+1)=ZCID_"|"_ZCTRCT
+			//do io2.write(ZDATA2)
+			
+			type RecordACN acn = Db.getRecord("ACN","CID=:ZCID")       	
+	         	set ZPRODTYP	= acn.type
+	         	set ZPRODDES	= "N/A"
+	         	if Db.isDefined("PRODCTL","TYPE=:ZPRODTYP") do {
+			type RecordPRODCTL prod = Db.getRecord("PRODCTL","TYPE=:ZPRODTYP")
+			set ZPRODDES = prod.des
+			}
+	         	type RecordTMPRPT6 rpt8 = Db.getRecord("TMPRPT6","PID='ZRPT8',ZBOO,ZTYP,ZSTAT,ZCTRCT,ZPRODTYP,ZCID",1)        	         	    	
+         		set rpt8DATA.piece("|",1)	= ZBRNAME
+			set rpt8DATA.piece("|",2)	= ZCTRTYPDES
+			set rpt8DATA.piece("|",3)	= ZSTATDESC
+         		set rpt8DATA.piece("|",4)	= ZPRODDES
+         		set rpt8DATA.piece("|",5)	= acn.title1
+        
+         		set rpt8.DATA = rpt8DATA
+
+         		do rpt8.bypassSave()
+			
+			type RecordTMPRPT4 rpt3 = Db.getRecord("TMPRPT4","PID='ZRPT3',ZBOO,ZTYP,ZSTAT,ZPRODTYP",1)								
+			set rpt3DATA.piece("|",1)	= rpt3.DATA+1
+			set rpt3DATA.piece("|",2)	= ZBRNAME
+			set rpt3DATA.piece("|",3)	= ZCTRTYPDES
+			set rpt3DATA.piece("|",4)	= ZSTATDESC
+			set rpt3DATA.piece("|",5)	= ZPRODDES
+			set rpt3.DATA = rpt3DATA
+			do rpt3.bypassSave()
+			
+			
+	    		
+	         	
+		}
+		
+		
+			
+		type ResultSet data3 = Db.select("ACN","ZCTRCTCIF","CTRCT=:ZCTRCT")
+		while data3.next() do {
+			set ZACN = data3.getCol(1)
+			//set ZDATA3 = ZACN_"|"_ZCTRCT			
+			if $O(^ZCONV("ZCTRCTCIF",""),-1)="" set ZPOINTER3=0
+			else set ZPOINTER3=$O(^ZCONV("ZCTRCTCIF",""),-1)
+			set ^ZCONV("ZCTRCTCIF",ZPOINTER3+1)=ZACN_"|"_ZCTRCT
+			//do io3.write(ZDATA3)
+			
+		
+			type RecordTMPRPT5 rpt7 = Db.getRecord("TMPRPT5","PID='ZRPT7',ZBOO,ZTYP,ZSTAT,ZCTRCT,ZACN",1) 
+			
+			type RecordCIF cif = Db.getRecord("CIF","ACN=:ZACN")
+			set rpt7DATA.piece("|",1) = ZBRNAME
+			set rpt7DATA.piece("|",2) = ZCTRTYPDES
+			set rpt7DATA.piece("|",3) = ZSTATDESC
+			set rpt7DATA.piece("|",4) = cif.fname_" "_cif.lnm
+			set rpt7.DATA = rpt7DATA
+			
+			do rpt7.bypassSave()
+		}
+		
+		
+		
+		type ResultSet data4 = Db.select("CTRCT,COLL,CCSTAT,PLDGVAL,RELDATE,PLDGAMT,CRTDATE,CRTUSER","ZCTRCTCOL","CTRCT=:ZCTRCT")
+		while data4.next() do {			
+			
+			new ZDATA4		
+			type Date ZRELDATE = data4.getCol(5)
+			type Date ZCRTDATE = data4.getCol(7)
+			if 'data4.getCol(5).isNull(),data4.getCol(5)'=0 set ZRELDATE = ZRELDATE.toString("YEAR-MM-DD")
+			else set ZRELDATE=""
+			if 'data4.getCol(7).isNull(),data4.getCol(7)'=0 set ZCRTDATE = ZCRTDATE.toString("YEAR-MM-DD")
+			else set ZCRTDATE=""
+			
+			
+			set ZDATA4.piece("|",8) = ""
+			set ZDATA4.piece("|",1) = data4.getCol(1)
+			set ZDATA4.piece("|",2) = data4.getCol(2)
+			set ZDATA4.piece("|",3) = data4.getCol(3)
+			set ZDATA4.piece("|",4) = data4.getCol(4)
+			set ZDATA4.piece("|",5) = ZRELDATE
+			set ZDATA4.piece("|",6) = data4.getCol(6)
+			set ZDATA4.piece("|",7) = ZCRTDATE
+			set ZDATA4.piece("|",8) = data4.getCol(8)
+			
+			if $O(^ZCONV("ZCTRCTCOL",""),-1)="" set ZPOINTER4=0
+			else set ZPOINTER4=$O(^ZCONV("ZCTRCTCOL",""),-1)
+			set ^ZCONV("ZCTRCTCOL",ZPOINTER4+1)=ZDATA4
+			
+			//do io4.write(ZDATA4)	
+		}
+		
+			
+	         type RecordTMPRPT3 rptext = Db.getRecord("TMPRPT3","PID='ZRPT2',ZBOO,ZTYP,ZSTAT",1)
+	         
+	         set ZTMPDATA.piece("|",1) = rptext.DATA.piece("|",1)+1
+		 set ZTMPDATA.piece("|",2) = rptext.DATA.piece("|",2)+ZAMT
+		 set ZTMPDATA.piece("|",3) = ZBRNAME
+		 set ZTMPDATA.piece("|",4) = ZCTRTYPDES
+		 set ZTMPDATA.piece("|",5) = ZSTATDESC
+	         set rptext.DATA	   = ZTMPDATA
+	         	
+	         do rptext.bypassSave()
+	         	
+	         type RecordTMPRPT4 rpt6 = Db.getRecord("TMPRPT4","PID='ZRPT6',ZBOO,ZTYP,ZSTAT,ZCTRCT",1)        	         	    	
+	         set rpt6DATA.piece("|",1)	= ZBRNAME
+		 set rpt6DATA.piece("|",2)	= ZCTRTYPDES
+		 set rpt6DATA.piece("|",3)      = ZSTATDESC
+	         set rpt6DATA.piece("|",4)	= ZCTRCTDT
+	         set rpt6DATA.piece("|",5)	= ZAMT
+	         set rpt6DATA.piece("|",6)	= ZMCTRCT
+	         set rpt6DATA.piece("|",7)	= ZRELDATE
+	         set rpt6.DATA = rpt6DATA
+	         do rpt6.bypassSave()
+		
+	quit  	
+		 //do io1.write(ZTMP)
+	
+---------- THREXIT ------ Section marker

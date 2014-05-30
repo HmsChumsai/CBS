@@ -1,0 +1,72 @@
+//DO NOT MODIFY  Before Insert Trigger|1|0|0|0|0|0||||
+
+	/*
+	Revision History----------------------------------------------------
+	
+	12/01/2011 - Natnapaporn P. (SR 01112258)
+		     Add new condition if PCM=14,15 must be input p&i payment amount.
+		     
+	10/08/2009 - Panicha R.
+	      	   - Check ln.index+ln.intspr not > ln.intmx before insert Effective Date.
+
+	*/
+	if efd.table="LN" do {
+		new EFDCID,INDEX,INTSPR,INTMX,START,END,TMPEND
+		set (EFDCID,INDEX,INTSPR,INTMX,START,END,TMPEND)=0		
+
+		set EFDCID=efd.cid
+
+		if 'Db.isDefined("LN","CID=:EFDCID") set ER=1 do Runtime.setErrMSG("LN",1259,"EFDCID") quit
+		type RecordLN ln=Db.getRecord("LN","CID=:EFDCID")
+		
+		// Start - Natnapaporn P. (SR 01112258) - 12/01/2011
+		// Add new condition if PCM=14,15 must be input p&i payment amount.
+		
+		type Number STR,END,ZPMTPI
+		set STR=$F(efd.column,"PMTPI=")
+		if STR=0 quit		
+		set END=$F(efd.column,",",STR-1)
+		if END=0 set ZPMTPI = +($E(efd.column,STR,$L(efd.column)))
+		else  set ZPMTPI=$E(efd.column,STR,END-2)
+		
+		type Number ZPCM
+		set ZPCM = ","_ln.pcm_","
+		if (",14,15,"'[ZPCM) quit
+		if +ZPMTPI=0 do Runtime.setErrXBAD("EFD","ZPMTPI0") if ER quit
+		
+		// End - Natnapaporn P. (SR 01112258) - 12/01/2011
+		
+		// find INDEX from efd.column
+		set STARTIN=$F(efd.column,"INDEX='")
+		if STARTIN=0 set INDEX=ln.index		
+		else  do {
+			set ENDIN=$F(efd.column,"'",STARTIN+1)
+			set INDEX=$E(efd.column,STARTIN,ENDIN-2)
+		}
+		
+		// find INTSPR from efd.column
+		set START=$F(efd.column,"INTSPR='")
+		if START=0 set INTSPR=ln.intspr
+		else  do {
+			set END=$F(efd.column,"'",START+1)
+			set INTSPR=$E(efd.column,START,END-2)
+		}
+		
+		if (STARTIN=0),(START=0) quit
+	
+		set INTMX=ln.intmx
+
+		set (ZQUIT,ZNEWRATE,SUMINT)=0
+
+		type ResultSet index1=Db.select("RATE","INDEX1","INDEX=:INDEX","EFD DESC")
+		if 'index1.isEmpty() while index1.next() do { quit:ZQUIT
+			set ZNEWRATE=index1.getCol(1)
+			set ZQUIT=1
+		}
+		
+		set SUMINT=ZNEWRATE+INTSPR	
+		if SUMINT>INTMX do Runtime.setErrXBAD("EFD","ZINTOV") quit:ER
+		
+	}
+	
+	quit

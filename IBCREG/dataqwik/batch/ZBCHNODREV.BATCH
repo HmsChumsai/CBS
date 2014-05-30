@@ -1,0 +1,60 @@
+//DO NOT MODIFY  Batch For ZNODREV Report|ZBCHNODR||||||DEP|||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	set TJD=%SystemDate
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	
+	set ZCID=CID
+	do NOD(ZCID)
+	quit
+		
+NOD(ZCID)
+
+	type RecordDEP dep = Db.getRecord("DEP","CID=:ZCID")
+	
+	if dep.balavl<>0 quit
+	if dep.zstatcd=4 quit
+	if dep.zcheckod=0 quit
+	
+	set zbrcd = dep.boo
+	set zcid  = ZCID
+	
+	type ResultSet zod 	= Db.select("CLAMT,EXPDT,STDT,SEQ","ZODTIER","CID=:ZCID")
+	while zod.next() do {	
+		
+		set zseq  = zod.getCol("SEQ")	
+	
+	type RecordZNODREV nod 	= Class.new("RecordZNODREV")	
+		
+		set nod.brcd	= dep.boo
+		set nod.cid	= dep.cid
+		set nod.seq	= zseq
+		set nod.clamt	= zod.getCol("CLAMT")
+		set nod.expdt	= zod.getCol("EXPDT")
+		set nod.stdt	= zod.getCol("STDT")
+		
+		
+	
+		do nod.bypassSave()
+		
+		}
+	
+	
+	quit
+	
+---------- THREXIT ------ Section marker

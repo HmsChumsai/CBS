@@ -1,0 +1,43 @@
+//DO NOT MODIFY  Procedure's Q for test|ZIKQ|||||||1
+	/*
+	 ORIG: 1 - 17/10/2013
+	 DESC: 
+	
+	 ---- Comments --------------------------------------------------------
+		Nattapon Tu. (Q) [27/11/2013]
+		- Procedure for testing anything	
+	 ---- Revision History ------------------------------------------------
+		ZCUSTTYP 1 is Individual customer
+			 2 is Organization customer
+			
+		ERRCD Descritpion
+		1 error same Rquid
+		2 error not have UID in Table SCAU
+		3 error Trancode not match in KBMF
+		4 error not found ACN 
+		5 error not found CID
+		6 error create flag not match KBMF
+		7 error not found relationship in table relcif
+		8 error relationship role is primary (Delete secondary)
+		
+	 ****** Consider using setAuditFlag for all objects in this procedure
+	   example :do dep.setAuditFlag(1)
+	
+	*/
+
+GETCIS(DATE)
+	do SYSVAR^SCADRV0()
+	
+	set RETURN=0
+	
+	set A=$$DOW^SCADAT(DATE)
+	set B=$$DAY^SCADAT(DATE)
+	
+	if A'="Friday" quit RETURN
+	if (B'<15) & (B'>21) set RETURN=1
+	
+	write A,!
+	write B,!
+	
+	
+	quit RETURN	

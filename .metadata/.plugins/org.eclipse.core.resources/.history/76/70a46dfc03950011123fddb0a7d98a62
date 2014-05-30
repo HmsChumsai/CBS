@@ -1,0 +1,138 @@
+//DO NOT MODIFY  Extract Collateral-Related CIF|ZBEXTCMS||||||CIF|||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+/*
+ORIG: Ravipong Chumsai Na Ayuthaya - 15/12/2011
+DESC: Batch for CMS Convertion-Extraction
+	
+*/
+---------- OPEN    ------ Section marker
+	kill ^TMP("ZEXTCMS")
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	
+	do RUN(ACN)
+	quit
+	
+RUN(ACN)
+	new ZCHK,EXIT,ZBREAK
+	set (ZCHK,EXIT)=0
+	set ZACN=ACN
+	set ZBREAK=0
+	set ZTAB=$C(9)
+	set ZENTER=$C(13)
+	set ZPROBLEM=$C(10)
+	
+	
+	do { 
+		//Rule 5: ZOCL.PACN=CIF.ACN (CIF of Collateral Type:Individual)
+		type ResultSet chk5 = Db.select("PACN","ZCOL","PACN=:ZACN")
+		if chk5.next() set ZCHK=1 quit
+		
+		//Rule 2 and 6: ZCOLOWNLINK.ACN where ZCOLOWNLINK.coll=ZCOL.COLL (ZCOL.coltyp=12)(CIF of Collateral Owner)
+		
+		type ResultSet chk26 = Db.select("COLL","ZCOLOWNLINK","ZCOLOWNLINK.ACN=:ZACN")
+		while 'ZBREAK,chk26.next() do {		
+			set ZEXTCOLL= chk26.getCol(1)
+			type ResultSet rscol = Db.select("COLL","ZCOL","COLL=:ZEXTCOLL")
+			if 'rscol.isEmpty() do {
+				set ZCHK=1
+				set ZBREAK=1
+				}
+			}		
+		if ZCHK=1 quit
+		//Rule 4:DEP.ACN where ZCOL.cid=DEP.CID(CIF whom is owner of Deposit Account-Collateral )
+		
+		type Resultset rs = Db.select("CID","DEP","ACN=:ZCN")
+		while rs.next(),'ZBREAK do {
+			set ZCID = rs.getCol(1)
+			type ResultSet rscol = Db.select("COLL","ZCOL","CID=:ZCID")
+			if 'rscol.isEmpty() do {
+				set ZCHK=1
+				set ZBREAK=1
+			}
+		}
+		if ZCHK=1 quit
+	
+	}
+	//Keep CIF and its detail into tmp table for proceed later
+	if ZCHK=1 do {
+	type RecordCIF cif = Db.getRecord("CIF","ACN=:ZACN")
+		set output.piece("|",1) = cif.acn
+		set output.piece("|",2) = cif.ZTITLE
+		set output.piece("|",3) = cif.FNAME
+		set output.piece("|",4) = cif.LNM
+		set output.piece("|",5) = cif.MNAME
+		set output.piece("|",6) = cif.ZCIZID
+
+		set output.piece("|",7) = cif.TAXID
+		set output.piece("|",8) = cif.PAD1
+		set output.piece("|",9) = cif.PAD2
+		set output.piece("|",10) = cif.PAD3
+		set output.piece("|",11) = cif.ZPSDISCD
+		set output.piece("|",12) = cif.PCITY
+		set output.piece("|",13) = cif.pstate
+		set output.piece("|",14) = cif.pcntry
+		set output.piece("|",15) = cif.pzip
+
+		set output.piece("|",16) = cif.HPH
+		set output.piece("|",17) = cif.APH
+		set output.piece("|",18) = cif.BPH
+		set output.piece("|",19) = cif.BPHEXT
+		set output.piece("|",20) = cif.ZJIN
+		set output.piece("|",21) = cif.mad1
+		set output.piece("|",22) = cif.mad2
+		set output.piece("|",23) = cif.mad3
+
+		set output.piece("|",24) = cif.ZMSDISCD
+		set output.piece("|",25) = cif.mcity
+		set output.piece("|",26) = cif.mstate
+		set output.piece("|",27) = cif.mcntry
+		set output.piece("|",28) = cif.mzip
+		set output.piece("|",29) = cif.zoad1
+		set output.piece("|",30) = cif.zoad2
+		set output.piece("|",31) = cif.zoad3
+
+		set output.piece("|",32) = cif.ZOSDISCD
+		set output.piece("|",33) = cif.zocity
+		set output.piece("|",34) = cif.zostate
+		set output.piece("|",35) = cif.zocntry
+		set output.piece("|",36) = cif.zozip
+		set output.piece("|",37) = cif.mar
+		set output.piece("|",38) = cif.sex
+		set output.piece("|",39) = cif.dob.toString("YEAR-MM-DD")
+		set output.piece("|",40) = cif.FAXNUM
+		set output.piece("|",41) = cif.EMAIL
+		set output.piece("|",42) = cif.ZKTBCCODE
+		set output.piece("|",43) = cif.PERS
+		set output.piece("|",44) = cif.PASNUM
+			
+	type RecordTMPRPT1 zextcms =Class.new("RecordTMPRPT1")
+	
+			if output[ZENTER  set output=$TR(output,ZENTER," ")
+			if output[ZTAB    set output=$TR(output,ZTAB," ")
+			if output[ZPROBLEM set output=$TR(output,ZPROBLEM," ")
+			if output[$C(34) set output=$TR(output,$C(34)," ")
+			
+	set zextcms.PID 	= "ZEXTCMS"
+	set zextcms.KEY1 	= ZACN
+	set zextcms.DATA	= output
+	do zextcms.bypassSave()
+	
+	}
+	
+	quit
+---------- THREXIT ------ Section marker

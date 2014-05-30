@@ -1,0 +1,483 @@
+//DO NOT MODIFY  Utility for Salak Report|ZPSCUTIL|||||||1
+
+	/*
+ZPSCDEPOSIT()
+
+	type ResultSet rsTtx=Db.select("BRCD,UID,TSEQ,ITC6,ITC12,ETC","TTX","TJD=:ZXTJD AND (ETC='PDCA' OR ETC='PDTR' OR ETC='PDSS' OR ETC='PSDCK' OR ETC='PSDCKP' OR ETC='PDCAS' OR ETC='PDTRS' OR ETC='PSDCKS' OR ETC='PSDCKPS' OR ETC='PDTRI')")
+ 	if rsTtx.isEmpty() Q
+	while rsTtx.next() do {
+		type Number zCount,SUMUNIT,SUMBAL
+                set (zCount,SUMUNIT,SUMBAL)=0
+        	if (rsTtx.getCol("ITC6")=1)!(rsTtx.getCol("ITC12")=1) Q
+        	type ResultSet rsCount = Db.select("CCID","ZPSCTTX","TJD=:ZXTJD AND BRCD=:ZBRCD AND UID=:ZUID AND TSEQ=:ZTSEQ")
+        	while rsCount.next() do {
+        		set zCount=zCount+1
+        		set CCID=rsCount.getCol(1)
+        	}
+        	if zCount=1 do { 
+	        	I 'Db.isDefined("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3),CCID") Q
+	        	type RecordZPSCTTX psc=Db.getRecord("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3),CCID")
+	        	I 'Db.isDefined("ZCERT","psc.cid,psc.ccid") Q
+	        	type RecordZCERT zcert=Db.getRecord("ZCERT","psc.cid,psc.ccid")
+	        	I 'Db.isDefined("DEP","CID=:zcert.cid") quit
+	        	type RecordDEP dep=Db.getRecord("DEP","CID=:zcert.cid")
+	        	I (ZXVBRCD'="ALL")&(ZXVBRCD'=dep.boo) quit
+	        	S ZSEQ=Db.nextVal("TMPRPT93","TJD=:ZXTJD,BRCD=:dep.boo")
+	        	type RecordTMPRPT93 tmp=Db.getRecord("TMPRPT93","ZXTJD,dep.boo,ZSEQ",1)
+	        	S tmp.ztype=zcert.type
+	        	S tmp.period=zcert.period
+	        	S ZETC=rsTtx.getCol("ETC")
+	        	I (ZETC="PDCA")!(ZETC="PDTR")!(ZETC="PDSS")!(ZETC="PSDCK")!(ZETC="PSDCKP") S tmp.channel="ONLINE"
+	        	E  I (ZETC="PDCAS")!(ZETC="PDTRS")!(ZETC="PSDCKS")!(ZETC="PSDCKPS") S tmp.channel="SPECIAL"
+	        	E  I ZETC="PDTRI" S tmp.channel="HO"
+	        	S tmp.cid=zcert.cid
+	        	I (ZETC="PSDCKS")!(ZETC="PSDCKPS")!(ZETC="PSDCK")!(ZETC="PSDCKP") S tmp.status="CHEQUE"
+	        	E  S status=""
+	        	S tmp.grp=zcert.grp
+	        	S tmp.lotl=zcert.lotl.zero(7)
+	        	S tmp.loth=zcert.loth.zero(7)
+	        	S tmp.unit=zcert.unit
+	        	S tmp.amt=zcert.bal
+	        	D tmp.save()
+        	}
+        	else D {
+        		set EXIT=0
+                	type ResultSet rs=Db.select("CCID","ZPSCTTX","TJD=:ZXTJD AND BRCD=:rsTtx.getCol(1) AND UID=:rsTtx.getCol(2) AND TSEQ=:rsTtx.getCol(3)")
+                	if rs.isEmpty() Q
+                	while rs.next() do {
+                		set ZCCID=rs.getCol(1)        		
+        			I 'Db.isDefined("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3),ZCCID") set EXIT=1 Q
+	        		type RecordZPSCTTX psc=Db.getRecord("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3),ZCCID")
+	        		I 'Db.isDefined("ZCERT","psc.cid,psc.ccid") set EXIT=1 Q
+	        		type RecordZCERT zcert=Db.getRecord("ZCERT","psc.cid,psc.ccid")
+	        		if 'Db.isDefined("DEP","CID=:zcert.cid") set EXIT=1 Q
+	        		type RecordDEP dep=Db.getRecord("DEP","CID=:zcert.cid")
+	        		I (ZXVBRCD'="ALL")&(ZXVBRCD'=dep.boo) set EXIT=1 Q
+				set ZCID=zcert.cid
+				set ZGRP=$$GETGRP^ZPSCUTIL(zcert.grp)
+				set ztype=zcert.type
+				set zperoid=zcert.period
+				set zgrp="*"
+				set lotl=zcert.lotl.zero(7)
+				set loth=zcert.loth.zero(7)
+				set ZBOO=dep.boo
+				set SUMUNIT=SUMUNIT+zcert.unit
+				set SUMBAL=SUMBAL+zcert.bal
+                	}
+            		if EXIT Q
+                	S ZSEQ=Db.nextVal("TMPRPT93","TJD=:ZXTJD,BRCD=:ZBOO")
+	        	type RecordTMPRPT93 tmp=Db.getRecord("TMPRPT93","ZXTJD,ZBOO,ZSEQ",1)
+	        	S tmp.ztype=ztype
+	        	S tmp.period=zperoid
+	        	S ZETC=rsTtx.getCol("ETC")
+	        	I (ZETC="PDCA")!(ZETC="PDTR")!(ZETC="PDSS")!(ZETC="PSDCK")!(ZETC="PSDCKP") S tmp.channel="ONLINE"
+	        	E  I (ZETC="PDCAS")!(ZETC="PDTRS")!(ZETC="PSDCKS")!(ZETC="PSDCKPS") S tmp.channel="SPECIAL"
+	        	E  I ZETC="PDTRI" S tmp.channel="HO"
+	        	S tmp.cid=ZCID
+	        	I (ZETC="PSDCKS")!(ZETC="PSDCKPS")!(ZETC="PSDCK")!(ZETC="PSDCKP") S tmp.status="CHEQUE"
+	        	E  S status=""
+	        	S tmp.grp=zgrp
+	        	S tmp.lotl=lotl
+	        	S tmp.loth=loth
+	        	S tmp.unit=SUMUNIT
+	        	S tmp.amt=SUMBAL
+	        	D tmp.save()
+        	}
+	        	
+	}
+        
+	quit
+	
+        
+ZPSCDEPHO()
+
+	type ResultSet rsTtx=Db.select("BRCD,UID,TSEQ,ITC6,ITC12,ETC","TTX","TJD=:ZXTJD AND (ETC='PDCA' OR ETC='PDTR' OR ETC='PDSS' OR ETC='PSDCK' OR ETC='PSDCKP' OR ETC='PDCAS' OR ETC='PDTRS' OR ETC='PSDCKS' OR ETC='PSDCKPS' OR ETC='PDTRI')")
+        if rsTtx.isEmpty() quit
+        while rsTtx.next() D {
+        	type Number zCount,SUMUNIT,SUMBAL
+                set (zCount,SUMUNIT,SUMBAL)=0
+        	type Number CCID
+		if (rsTtx.getCol("ITC6")=1)!(rsTtx.getCol("ITC12")=1) quit
+		type ResultSet rsCount=Db.select("CCID","ZPSCTTX","TJD=:ZXTJD AND BRCD=:rsTtx.getCol(1) AND UID=:rsTtx.getCol(2) AND TSEQ=:rsTtx.getCol(3)")
+                while rsCount.next() do {
+                	set zCount=zCount+1
+                	set CCID=rsCount.getCol(1)
+                }
+                if zCount=1 do {
+	                if 'Db.isDefined("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3),CCID") Q
+	                type RecordZPSCTTX psc=Db.getRecord("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3),CCID")
+	                I 'Db.isDefined("ZCERT","psc.cid,psc.ccid") Q
+	                type RecordZCERT zcert=Db.getRecord("ZCERT","psc.cid,psc.ccid")
+	                if 'Db.isDefined("DEP","CID=:zcert.cid") quit
+	                type RecordDEP dep=Db.getRecord("DEP","CID=:zcert.cid")
+	                S ZGRP=$$GETGRP(zcert.grp)
+	                type RecordTMPRPT96 tmp=Db.getRecord("TMPRPT96","zcert.type,zcert.period,ZGRP,zcert.lotl.zero(7)",1)
+	                S ZETC=rsTtx.getCol("ETC")
+	                I (ZETC="PDCA")!(ZETC="PDTR")!(ZETC="PDSS")!(ZETC="PSDCK")!(ZETC="PSDCKP") S tmp.channel="ONLINE"
+	                E  I (ZETC="PDCAS")!(ZETC="PDTRS")!(ZETC="PSDCKS")!(ZETC="PSDCKPS") S tmp.channel="SPECIAL"
+	                E  I ZETC="PDTRI" S tmp.channel="HO"
+			S tmp.cid=zcert.cid
+	                I (ZETC="PSDCKS")!(ZETC="PSDCKPS")!(ZETC="PSDCK")!(ZETC="PSDCKP") S tmp.stat="CHEQUE"
+	                E  S stat=""
+	                S tmp.loth=zcert.loth.zero(7)
+	                S tmp.unit=zcert.unit
+	                S tmp.bal=zcert.bal
+	                S tmp.brcd=dep.boo
+	                D tmp.save()
+                }
+ 
+                E do {
+                	type ResultSet rs=Db.select("CCID","ZPSCTTX","TJD=:ZXTJD AND BRCD=:rsTtx.getCol(1) AND UID=:rsTtx.getCol(2) AND TSEQ=:rsTtx.getCol(3)")
+                	while rs.next() do {
+                		//set CCID=rsCount.getCol(1)
+				if 'Db.isDefined("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3),rs.getCol(1)") quit       
+				type RecordZPSCTTX psc=Db.getRecord("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3),rs.getCol(1)")
+			 	if 'Db.isDefined("ZCERT","psc.cid,psc.ccid") quit
+				type RecordZCERT zcert=Db.getRecord("ZCERT","psc.cid,psc.ccid")
+				if 'Db.isDefined("DEP","CID=:zcert.cid") quit
+				type RecordDEP dep=Db.getRecord("DEP","CID=:zcert.cid")
+				set ZCCID=psc.ccid
+				set ZCID=zcert.cid
+				set ZGRP=$$GETGRP(zcert.grp)
+				set ztype=zcert.type
+				set zperoid=zcert.period
+				set zgrp="*"
+				set lotl=zcert.lotl.zero(7)
+				set loth=zcert.loth.zero(7)
+				set zbrcd=dep.boo
+				set SUMUNIT=SUMUNIT+zcert.unit
+				set SUMBAL=SUMBAL+zcert.bal
+                	}	
+	    	
+			    	type RecordZCERT zcert=Db.getRecord("ZCERT","ZCID,ZCCID")
+			        type RecordTMPRPT96 tmp=Db.getRecord("TMPRPT96","zcert.type,zcert.period,zgrp,lotl",1)
+				set ZETC=rsTtx.getCol("ETC")
+				if (ZETC="PDCA")!(ZETC="PDTR")!(ZETC="PDSS")!(ZETC="PSDCK")!(ZETC="PSDCKP") set tmp.channel="ONLINE"
+				else if (ZETC="PDCAS")!(ZETC="PDTRS")!(ZETC="PSDCKS")!(ZETC="PSDCKPS") set tmp.channel="SPECIAL"
+				else if ZETC="PDTRI" set tmp.channel="HO"
+				set tmp.cid=ZCID
+			 	if (ZETC="PSDCKS")!(ZETC="PSDCKPS")!(ZETC="PSDCK")!(ZETC="PSDCKP") set tmp.stat="CHEQUE"
+				else set stat=""
+				set tmp.loth=loth
+				set tmp.unit=SUMUNIT
+				set tmp.bal=SUMBAL
+				set tmp.brcd=zbrcd
+				do tmp.save()
+         
+         	}
+        }
+        
+	quit
+ZPSCDDEP()
+	type ResultSet rsTtx=Db.select("BRCD,UID,TSEQ,ITC6,ITC12,ETC","TTX","TJD=:ZXTJD AND (ETC='PDCA' OR ETC='PDTR' OR ETC='PDSS' OR ETC='PSDCK' OR ETC='PSDCKP' OR ETC='PDCAS' OR ETC='PDTRS' OR ETC='PSDCKS' OR ETC='PSDCKPS' OR ETC='PDTRI')")
+        if rsTtx.isEmpty() quit
+        while rsTtx.next() D {
+        	type Number CCID
+                type Number zCount,SUMUNIT,SUMBAL
+                set (zCount,SUMUNIT,SUMBAL)=0
+		if (rsTtx.getCol("ITC6")=1)!(rsTtx.getCol("ITC12")=1) quit
+		type ResultSet rsCount=Db.select("CCID","ZPSCTTX","TJD=:ZXTJD AND BRCD=:rsTtx.getCol(1) AND UID=:rsTtx.getCol(2) AND TSEQ=:rsTtx.getCol(3)")
+                while rsCount.next() do {
+                	set zCount=zCount+1
+                	set CCID=rsCount.getCol(1)
+                }
+                if zCount=1 do {
+	                if 'Db.isDefined("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3),CCID") Q
+	                type RecordZPSCTTX psc=Db.getRecord("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3),CCID")
+	                I 'Db.isDefined("ZCERT","psc.cid,psc.ccid") Q
+	                type RecordZCERT zcert=Db.getRecord("ZCERT","psc.cid,psc.ccid")
+	                if 'Db.isDefined("DEP","CID=:zcert.cid") quit
+	                 type RecordDEP dep=Db.getRecord("DEP","CID=:zcert.cid")
+	                //I (ZXVBRCD'="ALL")&(ZXVBRCD'=dep.boo) quit
+	                I dep.boo'=rsTtx.getCol("BRCD") quit
+	                S ZSEQ=Db.nextVal("TMPRPT93","TJD=:ZXTJD,BRCD=:dep.boo")
+	                type RecordTMPRPT93 tmp=Db.getRecord("TMPRPT93","ZXTJD,dep.boo,ZSEQ",1)
+	                S tmp.brcd2=rsTtx.getCol("BRCD")
+	                S tmp.ztype=zcert.type
+	                S tmp.period=zcert.period
+	                S ZETC=rsTtx.getCol("ETC")
+			I (ZETC="PDCA")!(ZETC="PDTR")!(ZETC="PDSS")!(ZETC="PSDCK")!(ZETC="PSDCKP") S tmp.channel="ONLINE"
+			E  I (ZETC="PDCAS")!(ZETC="PDTRS")!(ZETC="PSDCKS")!(ZETC="PSDCKPS") S tmp.channel="SPECIAL"
+	                E  I ZETC="PDTRI" S tmp.channel="HO"
+	                S tmp.cid=zcert.cid
+	       		I (ZETC="PSDCKS")!(ZETC="PSDCKPS")!(ZETC="PSDCK")!(ZETC="PSDCKP") S tmp.status="CHEQUE"
+	       		E  S status=""		
+	                S tmp.grp=zcert.grp
+	                S tmp.lotl=zcert.lotl.zero(7)
+	                S tmp.loth=zcert.loth.zero(7)
+	                S tmp.unit=zcert.unit
+	                S tmp.amt=zcert.bal
+	                D tmp.save()
+	        }
+	        else do {
+	        	type ResultSet rs=Db.select("CCID","ZPSCTTX","TJD=:ZXTJD AND BRCD=:rsTtx.getCol(1) AND UID=:rsTtx.getCol(2) AND TSEQ=:rsTtx.getCol(3)")
+                	if rs.isEmpty() quit
+                	while rs.next() do {
+                		set CCID=rs.getCol(1)
+		                if 'Db.isDefined("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3),CCID") Q
+		                type RecordZPSCTTX psc=Db.getRecord("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3),CCID")
+		                I 'Db.isDefined("ZCERT","psc.cid,psc.ccid") Q
+		                type RecordZCERT zcert=Db.getRecord("ZCERT","psc.cid,psc.ccid")
+		                if 'Db.isDefined("DEP","CID=:zcert.cid") quit	            
+		                type RecordDEP dep=Db.getRecord("DEP","CID=:zcert.cid")
+		                //I (ZXVBRCD'="ALL")&(ZXVBRCD'=dep.boo) quit
+		                I dep.boo'=rsTtx.getCol("BRCD") quit
+		                set ZBOO=dep.boo
+		                set ZCID=zcert.cid
+	                	set ztype=zcert.type
+	                	set zperiod=zcert.period
+	                	set lotl=zcert.lotl.zero(7)
+	                	set loth=zcert.loth.zero(7)
+	                	set SUMUNIT=SUMUNIT+zcert.unit
+	                	set SUMBAL=SUMBAL+zcert.bal
+                	}
+		        S ZSEQ=Db.nextVal("TMPRPT93","TJD=:ZXTJD,BRCD=:ZBOO")
+		        type RecordTMPRPT93 tmp=Db.getRecord("TMPRPT93","ZXTJD,ZBOO,ZSEQ",1)
+		        S tmp.brcd2=rsTtx.getCol("BRCD")
+		        S tmp.ztype=ztype
+		        S tmp.period=zperiod
+		        S ZETC=rsTtx.getCol("ETC")
+			I (ZETC="PDCA")!(ZETC="PDTR")!(ZETC="PDSS")!(ZETC="PSDCK")!(ZETC="PSDCKP") S tmp.channel="ONLINE"
+			E  I (ZETC="PDCAS")!(ZETC="PDTRS")!(ZETC="PSDCKS")!(ZETC="PSDCKPS") S tmp.channel="SPECIAL"
+		        E  I ZETC="PDTRI" S tmp.channel="HO"
+		        S tmp.cid=ZCID
+		       	I (ZETC="PSDCKS")!(ZETC="PSDCKPS")!(ZETC="PSDCK")!(ZETC="PSDCKP") S tmp.status="CHEQUE"
+		       	E  S status=""		
+		        S tmp.grp="*"
+		        S tmp.lotl=lotl
+		        S tmp.loth=loth
+		        S tmp.unit=SUMUNIT
+		        S tmp.amt=SUMBAL
+		        D tmp.save()
+	        
+	        }
+        }
+        
+	quit
+		
+ZPSCTDEP()
+	
+	type ResultSet rsTtx=Db.select("BRCD,UID,TSEQ,ITC6,ITC12,ETC","TTX","TJD=:ZXTJD AND (ETC='PDCA' OR ETC='PDTR' OR ETC='PDSS' OR ETC='PSDCK' OR ETC='PSDCKP' OR ETC='PDCAS' OR ETC='PDTRS' OR ETC='PSDCKS' OR ETC='PSDCKPS' OR ETC='PDTRI')")
+        if rsTtx.isEmpty() quit
+	while rsTtx.next() D {
+		type Number CCID
+                type Number zCount,SUMUNIT,SUMBAL
+                set (zCount,SUMUNIT,SUMBAL)=0
+        	if (rsTtx.getCol("ITC6")=1)!(rsTtx.getCol("ITC12")=1) quit
+        	type ResultSet rsCount=Db.select("CCID","ZPSCTTX","TJD=:ZXTJD AND BRCD=:rsTtx.getCol(1) AND UID=:rsTtx.getCol(2) AND TSEQ=:rsTtx.getCol(3)")
+                while rsCount.next() do {
+			set zCount=zCount+1
+                	set CCID=rsCount.getCol(1)
+                }
+		if zCount=1 do {
+			if 'Db.isDefined("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3),CCID") Q
+			type RecordZPSCTTX psc=Db.getRecord("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3),CCID")
+                        I 'Db.isDefined("ZCERT","psc.cid,psc.ccid") Q
+                        type RecordZCERT zcert=Db.getRecord("ZCERT","psc.cid,psc.ccid")
+                        if 'Db.isDefined("DEP","CID=:zcert.cid") quit
+                        type RecordDEP dep=Db.getRecord("DEP","CID=:zcert.cid")
+                        //I (ZXVBRCD'="ALL")&(ZXVBRCD'=dep.boo) quit
+                        I dep.boo=rsTtx.getCol("BRCD") quit
+                        S ZSEQ=Db.nextVal("TMPRPT93","TJD=:ZXTJD,BRCD=:rsTtx.getCol(1)")
+                        type RecordTMPRPT93 tmp=Db.getRecord("TMPRPT93","ZXTJD,rsTtx.getCol(1),ZSEQ",1)
+                        S tmp.brcd2=dep.boo
+                        S tmp.ztype=zcert.type
+                        S tmp.period=zcert.period
+                        S ZETC=rsTtx.getCol("ETC")
+                        I (ZETC="PDCA")!(ZETC="PDTR")!(ZETC="PDSS")!(ZETC="PSDCK")!(ZETC="PSDCKP") S tmp.channel="ONLINE"
+                        E  I (ZETC="PDCAS")!(ZETC="PDTRS")!(ZETC="PSDCKS")!(ZETC="PSDCKPS") S tmp.channel="SPECIAL"
+                        E  I ZETC="PDTRI" S tmp.channel="HO"
+                        S tmp.cid=zcert.cid
+                        I (ZETC="PSDCKS")!(ZETC="PSDCKPS")!(ZETC="PSDCK")!(ZETC="PSDCKP") S tmp.status="CHEQUE"
+                        E  S status=""
+                        S tmp.grp=zcert.grp
+                        S tmp.lotl=zcert.lotl.zero(7)
+                        S tmp.loth=zcert.loth.zero(7)
+                        S tmp.unit=zcert.unit
+                        S tmp.amt=zcert.bal
+                        D tmp.save()
+              }
+		else do {
+			type ResultSet rs=Db.select("CCID","ZPSCTTX","TJD=:ZXTJD AND BRCD=:rsTtx.getCol(1) AND UID=:rsTtx.getCol(2) AND TSEQ=:rsTtx.getCol(3)")
+                	while rs.next() do {
+                		set CCID=rs.getCol(1)
+                		if 'Db.isDefined("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3),CCID") Q
+				type RecordZPSCTTX psc=Db.getRecord("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3),CCID")
+	                        I 'Db.isDefined("ZCERT","psc.cid,psc.ccid") Q
+	                        type RecordZCERT zcert=Db.getRecord("ZCERT","psc.cid,psc.ccid")
+	                        if 'Db.isDefined("DEP","CID=:zcert.cid") quit
+	                        type RecordDEP dep=Db.getRecord("DEP","CID=:zcert.cid")
+	                        //I (ZXVBRCD'="ALL")&(ZXVBRCD'=dep.boo) quit
+	                        I dep.boo=rsTtx.getCol("BRCD") quit
+		                set ZBOO=dep.boo
+		                set ZCID=zcert.cid
+	                	set ztype=zcert.type
+	                	set zperiod=zcert.period
+	                	set lotl=zcert.lotl.zero(7)
+	                	set loth=zcert.loth.zero(7)
+	                	set SUMUNIT=SUMUNIT+zcert.unit
+	                	set SUMBAL=SUMBAL+zcert.bal	                       	                                       	
+                	}
+                	S ZSEQ=Db.nextVal("TMPRPT93","TJD=:ZXTJD,BRCD=:rsTtx.getCol(1)")
+                        type RecordTMPRPT93 tmp=Db.getRecord("TMPRPT93","ZXTJD,rsTtx.getCol(1),ZSEQ",1)
+                        S tmp.brcd2=ZBOO
+                        S tmp.ztype=ztype
+                        S tmp.period=zperiod
+                        S ZETC=rsTtx.getCol("ETC")
+                        I (ZETC="PDCA")!(ZETC="PDTR")!(ZETC="PDSS")!(ZETC="PSDCK")!(ZETC="PSDCKP") S tmp.channel="ONLINE"
+                        E  I (ZETC="PDCAS")!(ZETC="PDTRS")!(ZETC="PSDCKS")!(ZETC="PSDCKPS") S tmp.channel="SPECIAL"
+                        E  I ZETC="PDTRI" S tmp.channel="HO"
+                        S tmp.cid=ZCID
+                        I (ZETC="PSDCKS")!(ZETC="PSDCKPS")!(ZETC="PSDCK")!(ZETC="PSDCKP") S tmp.status="CHEQUE"
+                        E  S status=""
+                        S tmp.grp="*"
+                        S tmp.lotl=lotl
+                        S tmp.loth=loth
+                        S tmp.unit=SUMUNIT
+                        S tmp.amt=SUMBAL
+                        D tmp.save()
+              }
+        }
+	quit
+ZPSCFDEP
+			  S (ZONLINE,ZSP,ZINTER,ZHO,ZTOTAL)=0
+                          S (ZRONLINE,ZRSP,ZRINTERNET,ZRHO,ZAONLINE,ZASP,ZAINTERNET,ZAHO)=0
+                          S (ZBUONLINE,ZBUSP,ZBUINTERNET,ZBUHO)=0
+                          S (ZBRONLINE,ZBRSP,ZBRINTERNET,ZBRHO,ZBAONLINE,ZBASP,ZBAINTERNET,ZBAHO)=0
+                          do Db.delete("TMPRPT93")
+                          type public Number ZXTJD,ZXVBRCD
+                          S ZSEQ=1
+                          S (ZONLINE,ZSP,ZINTER,ZHO,ZTOTAL)=0
+                          type ResultSet rsTtx=Db.select("BRCD,UID,TSEQ,ITC6,ITC12,ETC","TTX","TJD=:ZXTJD AND (ETC='PDCA' OR ETC='PD
+TR' OR ETC='PDSS' OR ETC='PSDCK' OR ETC='PSDCKP' OR ETC='PDCAS' OR ETC='PDTRS' OR ETC='PSDCKS' OR ETC='PSDCKPS' OR ETC='PDTRI')")
+                          if rsTtx.isEmpty() quit
+                          while rsTtx.next() D {
+                                if (rsTtx.getCol("ITC6")=1)!(rsTtx.getCol("ITC12")=1) quit
+                                if 'Db.isDefined("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3)") Q
+                                type RecordZPSCTTX psc=Db.getRecord("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3)
+")
+                                I 'Db.isDefined("ZCERT","psc.cid,psc.ccid") Q
+                                type RecordZCERT zcert=Db.getRecord("ZCERT","psc.cid,psc.ccid")
+                                if 'Db.isDefined("DEP","CID=:zcert.cid") quit
+                                 type RecordDEP dep=Db.getRecord("DEP","CID=:zcert.cid")
+                                //I (ZXVBRCD'="ALL")&(ZXVBRCD'=dep.boo) quit
+                                I dep.boo=rsTtx.getCol("BRCD") quit
+                                S ZSEQ=Db.nextVal("TMPRPT93","TJD=:ZXTJD,BRCD=:dep.boo")
+                                type RecordTMPRPT93 tmp=Db.getRecord("TMPRPT93","ZXTJD,dep.boo,ZSEQ",1)
+                                S tmp.brcd2=rsTtx.getCol("BRCD")
+                                S tmp.ztype=zcert.type
+                                S tmp.period=zcert.period
+                                S ZETC=rsTtx.getCol("ETC")I (ZETC="PDCA")!(ZETC="PDTR")!(ZETC="PDSS")!(ZETC="PSDCK")!(ZETC="PSDCKP") S tmp.channel="ONLINE"
+                                E  I (ZETC="PDCAS")!(ZETC="PDTRS")!(ZETC="PSDCKS")!(ZETC="PSDCKPS") S tmp.channel="SPECIAL"
+                                E  I ZETC="PDTRI" S tmp.channel="HO"
+                                S tmp.cid=zcert.cid
+                                I (ZETC="PSDCKS")!(ZETC="PSDCKPS")!(ZETC="PSDCK")!(ZETC="PSDCKP") S tmp.status="CHEQUE"
+                                E  S status=""
+                                S tmp.grp=zcert.grp
+                                S tmp.lotl=zcert.lotl.zero(7)
+                                S tmp.loth=zcert.loth.zero(7)
+                                S tmp.unit=zcert.unit
+                                S tmp.amt=zcert.bal
+                                D tmp.save()
+                          }
+ZPSCFDEP()
+
+	type ResultSet rsTtx=Db.select("BRCD,UID,TSEQ,ITC6,ITC12,ETC","TTX","TJD=:ZXTJD AND (ETC='PDCA' OR ETC='PDTR' OR ETC='PDSS' OR ETC='PSDCK' OR ETC='PSDCKP' OR ETC='PDCAS' OR ETC='PDTRS' OR ETC='PSDCKS' OR ETC='PSDCKPS' OR ETC='PDTRI')")
+        if rsTtx.isEmpty() quit
+	while rsTtx.next() D {
+		type Number CCID
+                type Number zCount,SUMUNIT,SUMBAL
+                set (zCount,SUMUNIT,SUMBAL)=0
+                type ResultSet rsCount = Db.select("CCID","ZPSCTTX","TJD=:ZXTJD AND BRCD=:rsTtx.getCol(1) AND UID=:rsTtx.getCol(2) AND TSEQ=:rsTtx.getCol(3)")
+                while rsCount.next() do {
+			set zCount=zCount+1
+                	set CCID=rsCount.getCol(1)
+                }
+                if zCount=1 do {
+	        	if (rsTtx.getCol("ITC6")=1)!(rsTtx.getCol("ITC12")=1) quit
+	                if 'Db.isDefined("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3),CCID") Q
+	                type RecordZPSCTTX psc=Db.getRecord("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3),CCID")
+	                I 'Db.isDefined("ZCERT","psc.cid,psc.ccid") Q
+	                type RecordZCERT zcert=Db.getRecord("ZCERT","psc.cid,psc.ccid")
+	                if 'Db.isDefined("DEP","CID=:zcert.cid") quit
+	                type RecordDEP dep=Db.getRecord("DEP","CID=:zcert.cid")
+	                //I (ZXVBRCD'="ALL")&(ZXVBRCD'=dep.boo) quit
+	                I dep.boo=rsTtx.getCol("BRCD") quit
+	                S ZSEQ=Db.nextVal("TMPRPT93","TJD=:ZXTJD,BRCD=:dep.boo")
+	                type RecordTMPRPT93 tmp=Db.getRecord("TMPRPT93","ZXTJD,dep.boo,ZSEQ",1)
+	                S tmp.brcd2=rsTtx.getCol("BRCD")
+	                S tmp.ztype=zcert.type
+	                S tmp.period=zcert.period
+	                S ZETC=rsTtx.getCol("ETC")
+			I (ZETC="PDCA")!(ZETC="PDTR")!(ZETC="PDSS")!(ZETC="PSDCK")!(ZETC="PSDCKP") S tmp.channel="ONLINE"
+	                E  I (ZETC="PDCAS")!(ZETC="PDTRS")!(ZETC="PSDCKS")!(ZETC="PSDCKPS") S tmp.channel="SPECIAL"
+	                E  I ZETC="PDTRI" S tmp.channel="HO"
+	                S tmp.cid=zcert.cid
+	                I (ZETC="PSDCKS")!(ZETC="PSDCKPS")!(ZETC="PSDCK")!(ZETC="PSDCKP") S tmp.status="CHEQUE"
+	                E  S status=""
+	                S tmp.grp=zcert.grp
+	                S tmp.lotl=zcert.lotl.zero(7)
+	                S tmp.loth=zcert.loth.zero(7)
+	                S tmp.unit=zcert.unit
+	                S tmp.amt=zcert.bal
+	                D tmp.save()
+                }
+                set EXIT=0
+                else do { 
+                	
+                	type ResultSet rs=Db.select("CCID","ZPSCTTX","TJD=:ZXTJD AND BRCD=:rsTtx.getCol(1) AND UID=:rsTtx.getCol(2) AND TSEQ=:rsTtx.getCol(3)")
+                	if rs.isEmpty() quit
+                	while rs.next() do {
+                		set CCID=rs.getCol(1)
+                		if (rsTtx.getCol("ITC6")=1)!(rsTtx.getCol("ITC12")=1) set EXIT=1 quit
+	                	if 'Db.isDefined("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3),CCID") set EXIT=1 quit
+	                	type RecordZPSCTTX psc=Db.getRecord("ZPSCTTX","ZXTJD,rsTtx.getCol(1),rsTtx.getCol(2),rsTtx.getCol(3),CCID")
+	                	I 'Db.isDefined("ZCERT","psc.cid,psc.ccid") set EXIT=1 quit
+	                	type RecordZCERT zcert=Db.getRecord("ZCERT","psc.cid,psc.ccid")
+	                	if 'Db.isDefined("DEP","CID=:zcert.cid") set EXIT=1 quit
+	                	type RecordDEP dep=Db.getRecord("DEP","CID=:zcert.cid")
+	                	//I (ZXVBRCD'="ALL")&(ZXVBRCD'=dep.boo) set EXIT=1 quit
+	                	I dep.boo=rsTtx.getCol("BRCD") set EXIT=1 quit
+                		set ZBOO=dep.boo
+		                set ZCID=zcert.cid
+	                	set ztype=zcert.type
+	                	set zperiod=zcert.period
+	                	set lotl=zcert.lotl.zero(7)
+	                	set loth=zcert.loth.zero(7)
+	                	set SUMUNIT=SUMUNIT+zcert.unit
+	                	set SUMBAL=SUMBAL+zcert.bal
+                	}
+                	if EXIT quit
+                	S ZSEQ=Db.nextVal("TMPRPT93","TJD=:ZXTJD,BRCD=:ZBOO")
+	                type RecordTMPRPT93 tmp=Db.getRecord("TMPRPT93","ZXTJD,ZBOO,ZSEQ",1)
+	                S tmp.brcd2=rsTtx.getCol("BRCD")
+	                S tmp.ztype=ztype
+	                S tmp.period=zperiod
+	                S ZETC=rsTtx.getCol("ETC")
+			I (ZETC="PDCA")!(ZETC="PDTR")!(ZETC="PDSS")!(ZETC="PSDCK")!(ZETC="PSDCKP") S tmp.channel="ONLINE"
+	                E  I (ZETC="PDCAS")!(ZETC="PDTRS")!(ZETC="PSDCKS")!(ZETC="PSDCKPS") S tmp.channel="SPECIAL"
+	                E  I ZETC="PDTRI" S tmp.channel="HO"
+	                S tmp.cid=ZCID
+	                I (ZETC="PSDCKS")!(ZETC="PSDCKPS")!(ZETC="PSDCK")!(ZETC="PSDCKP") S tmp.status="CHEQUE"
+	                E  S status=""
+	                S tmp.grp="*"
+	                S tmp.lotl=lotl
+	                S tmp.loth=loth
+	                S tmp.unit=SUMUNIT
+	                S tmp.amt=SUMBAL
+	                D tmp.save()
+                	
+        	}
+        }                                
+	quit	
+
+        */
+        
+GETGRP(ZGRP)
+
+	new ZSEQ
+	type ResultSet rs=Db.select("SEQ","ZUTBLGRPMAP","GRP=:ZGRP")
+	if rs.next() set ZSEQ=rs.getCol(1)
+	
+	quit ZSEQ
+	

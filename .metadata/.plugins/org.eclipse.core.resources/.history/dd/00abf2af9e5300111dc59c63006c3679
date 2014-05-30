@@ -1,0 +1,29 @@
+//DO NOT MODIFY  STBLCNTRY Extration|ZEXTCNTR|||||||1
+		/*
+ORIG: Ravipong Chumsai Na Ayuthaya  - 07/02/2012
+DESC: Extract data from Table - UTBLCCNTR
+	*/
+	
+	do SYSVAR^SCADRV0()
+	
+	new io1,output
+	set TJD=TJD.toString("DD/MM/YEAR")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"UTBLCCNTR_"_TJD_".TXT"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "COUNT_CODE"_"|"_"DESCRIPTION"_"|"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLBRCD")
+	while ds.next() do {
+		set i=i+1
+		set output=""
+		set output.piece("|",1) = ds.getRecord().CNTRY
+		set output.piece("|",2) = ds.getRecord().DESC_"|"
+		do io1.write(output)
+		}
+	do io1.write(i_"|")	
+		
+		
+	quit

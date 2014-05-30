@@ -1,0 +1,75 @@
+//DO NOT MODIFY  UPDATE LN.FPA,LN.FIA |ZFIXLNCV|||||||1
+	/*
+	 ORIG: 1 - 31/08/2010
+	 DESC: 
+	
+	 ---- Comments --------------------------------------------------------
+	
+	 ---- Revision History ------------------------------------------------
+	
+	 ****** Consider using setAuditFlag for all objects in this procedure
+	   example :do dep.setAuditFlag(1)
+	
+	*/
+	
+	
+	quit
+
+FIX(String FName)
+
+	do SYSVAR^SCADRV0()
+	set %UserID = 1
+	set TLO = "BATCH"
+
+	type IO io = Class.new("IO")
+	type Number CNT
+	//set io.directory = "/home/istgsb03/ZFIXLNCV.TXT"
+	set io.fileName = FName
+	set io.openParams = "READ"
+
+	catch iox {
+
+      		// if device has been opened, close it
+      		if io.device'="" do io.close()
+	}
+
+	do io.open()
+	set CNT=0
+
+	for  set REC = io.read() do {
+		do PROC(.REC)
+	}
+
+	quit
+
+PROC(String REC)
+
+	type String STR,RES()
+	type Number CONVACN,CID,ITC,TAMT,FPA,FIA
+	new ZTMP
+	
+	//type Date BOM1,BOM2,BOM3,BOM4,BOM5,JD	
+
+	set ZTMP=$P(REC,"|",3)
+	set CID = +ZTMP
+	
+	set ZTMP=$P(REC,"|",9)
+	set FIA = +ZTMP
+	
+	set ZTMP=$P(REC,"|",10)
+	set FPA = +ZTMP
+	
+	//write "CID-"_CID_"-FPA-"_FPA_"-FIA-"_FIA,!
+
+	if CID = "" write "[ERROR] Accout is null : "_CID,! quit
+	if 'Db.isDefined("LN",":CID") write "[ERROR] No Account found : "_CID,! quit
+
+	type RecordLN ln = Db.getRecord("LN",":CID")
+
+	set ln.fia = FIA
+	set ln.fpa= FPA
+
+	do ln.save()
+	
+	quit
+	

@@ -1,0 +1,166 @@
+//DO NOT MODIFY  Test batch Q|ZBCHIKQ||||||DTJFM|TJD=:ZDATE||100|32000|ZDATE|0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	//set ZDATE=%SystemDate-1
+	kill ^TMP("ZQ")
+	set %TAB("ZDATE")="/DES=DATE Date/LEN=10/TYP=D"
+	set %READ="@@%FN,,ZDATE/REQ"
+	 	
+	do ^UTLREAD if VFMQ="Q" set %BatchExit=1 quit
+
+	//kill ^ZTLRJGL(ZDATE)
+---------- SCHINIT ------ Section marker
+
+	//type public String ZDAY
+	//set ZDAY=$$DAT^%ZM(DATE,"YEARMMDD")
+	
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	//write !,ZDAY
+	//write !,CID
+	/*write file CID 
+	set Z="ZIKQACN"
+	type public String ZCID
+	type IO io = Class.new("IO")	
+	set io.fileName="ZQII.txt"
+	set io.directory=$$TRNLNM^%ZFUNC("SCAU_SPOOL")
+	set io.openParams="NEWV/WRITE"
+	set io.recordSize=1024
+	do io.open()
+	type ResultSet tmp=Db.select("PID","TMPRPT0")
+	while tmp.next() do {
+		set ZCID=tmp.getCol("PID")
+		do io.write(ZCID)
+	}	
+	set IOTYP="RMS"	
+	do io.close()
+	
+	quit*/
+	set Z="ZQ"
+	type public String ZFILE
+	type IO io = Class.new("IO")	
+	set io.fileName="ZQII2.txt"
+	set io.directory=$$TRNLNM^%ZFUNC("SCAU_SPOOL")
+	set io.openParams="NEWV/WRITE"
+	set io.recordSize=1024
+	do io.open()
+	
+	set Z1="NEW"
+	type ResultSet tmp=Db.select("DATA,PID","TMPRPT3","PID=:Z AND KEY1=:Z1")
+	while tmp.next() do {
+		set ZFILE=tmp.getCol("DATA")
+		set ZW="New Account: "_ZFILE
+		do io.write(ZW)
+	}
+	set Z2="NON"
+	type ResultSet tmp=Db.select("DATA,PID","TMPRPT3","PID=:Z AND KEY1=:Z2 ")
+	while tmp.next() do {
+		set ZFILE=tmp.getCol("DATA")
+		set ZW="Non-Financial: "_ZFILE
+		do io.write(ZW)
+	}
+	set Z3="NEW"
+	type ResultSet tmp=Db.select("DATA,PID","TMPRPT3","PID=:Z AND KEY1=:Z3")
+	while tmp.next() do {
+		set ZFILE=tmp.getCol("DATA")
+		set ZW="New Account & Non-Financial: "_ZFILE
+		do io.write(ZW)
+	}	
+
+	set IOTYP="RMS"	
+	do io.close()
+	
+	
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	//type public String ZCID
+	// TJD,DATETIME,CID,TSEQ
+	//set ^ZIKQ2(TJD,CID)=DATE_"_"_CID
+	
+	//TJD,DATETIME,CID,TSEQ
+	//type RecordDMJ dmj=Db.getRecord("DMJ","TJD,DATETIME,CID,TSEQ")
+	//set ^ZIKQ2(dmj.tjd,dmj.cid)=dmj.cid
+	//Get CID from ACN 4 line
+	/*type RecordTMPRPT0 ztmp=Class.new("RecordTMPRPT0")
+	type RecordACN zacn=Db.getRecord("ACN","CID")
+	set ztmp.pid=zacn.cid
+	do ztmp.bypassSave()*/
+	
+	/*set i=1
+	set SEQ="1"
+	type ResultSet rs=Db.select("CID,TCMT,TSEQ","DTJFM","TJD=:TJD AND TSEQ=:SEQ")
+	while rs.next() do {
+		if (rs.getCol("TCMT")="SET UP NEW ACCOUNT") do {
+			set ZCIDFM=rs.getCol("CID")
+		
+			if Db.isDefined("DTJNA","TJD=:TJD,CLS,GRP,TYP,CID=:ZCIDFM") do {
+				type RecordTMPRPT2 ztmp=Class.new("RecordTMPRPT2")
+				type RecordDTJNA zdtjna=Db.getRecord("DTJNA","TJD=:TJD,CLS,GRP,TYP,CID=:ZCIDFM")
+				set ztmp.pid="ZQ"
+				set ztmp.key1=zdtjna.tjd
+				set ztmp.key2=i
+				set ztmp.DATA=zdtjna.cid_":"_zdtjna.acn
+				set i=i+1
+				do ztmp.bypassSave()
+			}
+		}	
+	}
+	quit */
+	//set i=1
+	type RecordTMPRPT4 ztmp=Class.new("RecordTMPRPT4")
+	type RecordDTJFM zdtjfm=Db.getRecord("DTJFM","TJD=:TJD,CLS,GRP,TYP,CID,TSEQ")
+	//if zdtjfm.tcmt="SET UP NEW ACCOUNT" do {
+	if Db.isDefined("DTJNA","TJD=:TJD,CLS,GRP,TYP,CID=:zdtjfm.cid") do {
+		type RecordDTJNA zdtjna=Db.getRecord("DTJNA","TJD=:TJD,CLS,GRP,TYP,CID=:zdtjfm.cid")
+		set ztmp.pid="ZQ"
+		set ztmp.key1="NEW"
+		set ztmp.key2=zdtjna.tjd
+		set ztmp.key3=zdtjna.CLS
+		set ztmp.key4=zdtjna.cid
+		set ztmp.DATA=zdtjfm.cid_":"_zdtjna.acn
+		do ztmp.bypassSave()
+	}
+	//}	
+	//if zdtjfm.tcmt'="SET UP NEW ACCOUNT" do {	
+	/*if Db.isDefined("DTJNA","TJD=:TJD,CLS,GRP,TYP,CID=:zdtjfm.cid") do {
+		type RecordDTJNA zdtjna=Db.getRecord("DTJNA","TJD=:TJD,CLS,GRP,TYP,CID=:zdtjfm.cid")
+		set ztmp.pid="ZQ"
+		set ztmp.key1="BOTH"
+		set ztmp.key2=zdtjna.tjd
+		set ztmp.key3=zdtjna.CLS
+		set ztmp.key4=zdtjna.cid
+		set ztmp.DATA=zdtjfm.cid_":"_zdtjna.acn
+		do ztmp.bypassSave()
+	}*/
+	else  'Db.isDefined("DTJNA","TJD=:TJD,CLS,GRP,TYP,CID=:zdtjfm.cid") do {
+		set ztmp.pid="ZQ"
+		set ztmp.key1="NON"
+		set ztmp.key1=zdtjfm.tjd
+		set ztmp.key2=zdtjfm.cls
+		set ztmp.key3=zdtjfm.cid
+		set ztmp.DATA=zdtjfm.cid
+		do ztmp.bypassSave()
+	}
+	
+	
+	quit 
+	
+	
+	
+		
+	
+		
+	
+	
+		
+---------- THREXIT ------ Section marker

@@ -1,0 +1,146 @@
+//DO NOT MODIFY  Batch Filter for ACN,CIF extraction|ZBCMSCIF||||||ZCONVRPT|PID='ACN'||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	kill ^ZCMS("ACN")
+	do SYSVAR^SCADRV0()
+	
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	do GENCIF^ZCMSREPL
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	if PID="ACN" do PROC(SEQ)
+	
+	quit
+		
+	
+PROC(ACN)
+
+	type Date ZTJD
+	type String ZSEQ
+	set ZSEQ=$O(^CIFH(ACN,""),-1)
+	if ZSEQ.isNull() quit
+	set ZTJD=^CIFH(ACN,ZSEQ).piece("|",1)
+	if ZTJD=(%SystemDate) do {
+		do ZCIF(ACN)	
+	}
+	
+	
+	quit
+	
+ZCIF(ZACN)
+			if 'Db.isDefined("CIF","ACN=:ZACN") quit
+			
+			type RecordCIF cif  = Db.getRecord("CIF","ACN =:ZACN")
+			set output.piece("|",1)  = cif.acn
+			set output.piece("|",2)  = cif.ZTITLE
+			set output.piece("|",3)  = cif.FNAME
+			set output.piece("|",4)  = cif.LNM
+			set output.piece("|",5)  = cif.MNAME
+			set output.piece("|",6)  = cif.ZCIZID
+	
+			set output.piece("|",7)  = cif.TAXID
+			set output.piece("|",8)  = cif.PAD1
+			set output.piece("|",9)  = cif.PAD2
+			set output.piece("|",10)  = cif.PAD3
+			set output.piece("|",11)  = cif.ZPSDISCD
+			set output.piece("|",12)  = cif.PCITY
+			set output.piece("|",13)  = cif.pstate
+			set output.piece("|",14)  = cif.pcntry
+			set output.piece("|",15)  = cif.pzip
+	
+			set output.piece("|",16)  = cif.HPH
+			set output.piece("|",17)  = cif.APH
+			set output.piece("|",18)  = cif.BPH
+			set output.piece("|",19)  = cif.BPHEXT
+			set output.piece("|",20)  = cif.ZJIN
+			set output.piece("|",21)  = cif.mad1
+			set output.piece("|",22)  = cif.mad2
+			set output.piece("|",23)  = cif.mad3
+	
+			set output.piece("|",24)  = cif.ZMSDISCD
+			set output.piece("|",25)  = cif.mcity
+			set output.piece("|",26)  = cif.mstate
+			set output.piece("|",27)  = cif.mcntry
+			set output.piece("|",28)  = cif.mzip
+			set output.piece("|",29)  = cif.zoad1
+			set output.piece("|",30)  = cif.zoad2
+			set output.piece("|",31)  = cif.zoad3
+	
+			set output.piece("|",32)  = cif.ZOSDISCD
+			set output.piece("|",33)  = cif.zocity
+			set output.piece("|",34)  = cif.zostate
+			set output.piece("|",35)  = cif.zocntry
+			set output.piece("|",36)  = cif.zozip
+			set output.piece("|",37)  = cif.mar
+			set output.piece("|",38)  = cif.sex
+			set output.piece("|",39)  = cif.dob.toString("DD/MM/YEAR")
+			set output.piece("|",40)  = cif.FAXNUM
+			set output.piece("|",41)  = cif.EMAIL
+			set output.piece("|",42)  = cif.ZKTBCCODE
+			set output.piece("|",43)  = $$GET("DESC,ZUTBLKTBCUST,KTBCCODE,"_cif.ZKTBCCODE)
+			set output.piece("|",44)  = cif.PERS
+			if (cif.PASNUM="") set output.piece("|",45)=" "
+			else set output.piece("|",45)  = cif.PASNUM
+		
+			set ^ZCMS("ACN",ACN)=output_" "
+	
+	quit
+	
+GET(INPUT)
+	//Ravipong Chumsai 
+	// 10/10/11
+	//This Linetag functions similiar to Db.select command but different aims to check the input parms and incapable to select more than 1 field
+	//The form of the input is in comma-separated  format where the first 2 parameters are "SELECT,FROM" Statement
+	//And follow by 2(n) consecutive WHERE statement ,for example This input string "CID,ACN,BAL,100,CLS,LN,"
+	//Will be translated to SELECT CID FROM ACN WHERE BAL ='100' AND CLS ='LN'
+	
+	set ret =""
+	new ER
+	set ER =0
+	set INPUT  = INPUT.translate("""","")
+	set s =$P(INPUT,",",1)
+	set f =$P(INPUT,",",2)
+	type Number k
+	set k =2
+	new exit
+	set exit =0
+	
+	type String where =""
+	type Number Count  = INPUT.length(",")  
+	
+	while (k<Count) do { quit:exit
+		
+	if $P(INPUT,",",k+2) ="" set ER =1, exit =1 quit
+	
+		if 'where.isNull() do {
+	
+		set where  = where_" AND "_$P(INPUT,",",1+k)_" ='"_$P(INPUT,",",k+2)_"'"
+	
+		}
+		else set where =$P(INPUT,",",1+k)_" ='"_$P(INPUT,",",k+2)_"'"
+		set k =k+2
+		if k =Count set exit =1
+		}
+	if ER quit ret
+	
+	type String exe()
+	type ResultSet x  = Db.select(s,f,where)
+	if x.next() set ret  = x.getCol(1)
+	
+	quit ret
+	
+---------- THREXIT ------ Section marker

@@ -1,0 +1,2275 @@
+//DO NOT MODIFY  Sample Test|ZBOYTEST|||||||1
+	/*
+	 ORIG: 9999999999 - 07/01/2008
+	 DESC: 
+	
+	 ---- Comments --------------------------------------------------------
+	
+	 ---- Revision History ------------------------------------------------
+	
+	 ****** Consider using setAuditFlag for all objects in this procedure
+	   example :do dep.setAuditFlag(1)
+	
+	*/
+
+	// INSERT DATA
+
+	quit
+
+RUN
+
+	type String %TAB,%READ,VFMQ
+
+	do SYSVAR^SCADRV0()
+
+	set ZMENU=""
+	set ZOPT1="Date format"
+	set ZOPT2="Dr./Cr."
+	set ZOPT3="Get SCAU by Br. code"
+	set ZOPT4="Cut strings"
+	set ZOPT5="Check transaction dup"
+	set ZOPT6="Get tax chq by TSEQ"
+	set ZOPT7="Get tax chq from hist"
+	set ZOPT8="Find unbal by tran from hist"
+	set ZOPT9="Report GFMIS_CC"
+	set ZOPT10="[Chq Diff] Dep & zars"
+	set ZOPT11="[Chq Diff] Status 'S'"
+	set ZOPT12="[Chq Diff] From hist"
+	set ZOPT13="Calculate accure from hist"
+	set ZOPT14="Allocate Cheque (delete)"
+	set ZOPT15="Allocate Cheque (update)"
+
+	set %TAB("ZOPT1")="/DES=(01)/LEN=30/TYP=T/PROT"
+	set %TAB("ZOPT2")="/DES=(02)/LEN=30/TYP=T/PROT"
+	set %TAB("ZOPT3")="/DES=(03)/LEN=30/TYP=T/PROT"
+	set %TAB("ZOPT4")="/DES=(04)/LEN=30/TYP=T/PROT"
+	set %TAB("ZOPT5")="/DES=(05)/LEN=30/TYP=T/PROT"
+	set %TAB("ZOPT6")="/DES=(06)/LEN=30/TYP=T/PROT"
+	set %TAB("ZOPT7")="/DES=(07)/LEN=30/TYP=T/PROT"
+	set %TAB("ZOPT8")="/DES=(08)/LEN=30/TYP=T/PROT"
+	set %TAB("ZOPT9")="/DES=(09)/LEN=30/TYP=T/PROT"
+	set %TAB("ZOPT10")="/DES=(10)/LEN=30/TYP=T/PROT"
+	set %TAB("ZOPT11")="/DES=(11)/LEN=30/TYP=T/PROT"
+	set %TAB("ZOPT12")="/DES=(12)/LEN=30/TYP=T/PROT"
+	set %TAB("ZOPT13")="/DES=(13)/LEN=30/TYP=T/PROT"
+	set %TAB("ZOPT14")="/DES=(14)/LEN=30/TYP=T/PROT"
+	set %TAB("ZOPT15")="/DES=(15)/LEN=30/TYP=T/PROT"
+	set %TAB("ZMENU")="/DES=Function No./LEN=2/TYP=N"
+	set %READ="@@%FN/REV/CEN,,,ZOPT1,ZOPT2,ZOPT3,ZOPT4,ZOPT5,ZOPT6,ZOPT7,ZOPT8,ZOPT9,ZOPT10,ZOPT11,ZOPT12,ZOPT13,ZOPT14,ZOPT15,ZMENU"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	if ZMENU=1 do ZDATE(%CurrentDate) write $$MSG^%TRMVT("","",1)
+	if ZMENU=2 do DRCR write $$MSG^%TRMVT("","",1)
+	if ZMENU=3 do ZGETSCAU write $$MSG^%TRMVT("","",1)
+	if ZMENU=4 do ZCUTSTR write $$MSG^%TRMVT("","",1)
+	if ZMENU=5 do ZCKDUP write $$MSG^%TRMVT("","",1)
+	if ZMENU=6 do ZCKTAXCHQ write $$MSG^%TRMVT("","",1)
+	if ZMENU=7 do ZCKTSEQ write $$MSG^%TRMVT("","",1)
+	if ZMENU=8 do ZDUBAL write $$MSG^%TRMVT("","",1)
+	if ZMENU=9 do ZGFCC write $$MSG^%TRMVT("","",1)
+	if ZMENU=10 do ZCHQDIFF write $$MSG^%TRMVT("","",1)
+	if ZMENU=11 do ZCHQSTOP write $$MSG^%TRMVT("","",1)
+	if ZMENU=12 do ZCHQHIST write $$MSG^%TRMVT("","",1)
+	if ZMENU=13 do ZACCRUE write $$MSG^%TRMVT("","",1)
+	if ZMENU=14 do ZCKADD1 write $$MSG^%TRMVT("","",1)
+	if ZMENU=15 do ZCKADD2 write $$MSG^%TRMVT("","",1)
+	if (ZMENU="")!(ZMENU<1)!(ZMENU>15) write $$MSG^%TRMVT("Function Not Found.","",1)
+
+	do RUN
+
+	quit
+
+
+ZDATE(JDATE)
+
+	if JDATE.isNull() set JDATE=%CurrentDate // today
+	set ZDATE="02/04/2010" // dd/mm/yy
+
+	set %TAB("JDATE")="/DES=JDATE/LEN=10/TYP=N/REQ"
+	set %TAB("ZDATE")="/DES=ZDATE/LEN=10/TYP=D/REQ"
+	set %READ="@@%FN/REV/CEN,,,JDATE,ZDATE"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	write "J "_JDATE,!
+	write "Z "_ZDATE,!
+	write !
+
+	write "J "_$$BD^UNBD(JDATE),! // business date true,false
+	write !
+
+	write "J+1 "_$$NBD^UNBD(JDATE+1,1,0),! // no business date
+	write "J "_$$NBD^UNBD(JDATE,1,0),! // no business date
+	write !
+
+	write "J "_$$PRBD^UNBD(JDATE,1),! // prev business date
+	write !
+
+	set CONVDATE=$$DAT^%ZM(JDATE,"DD/MM/YEAR") // convert to date format dd/mm/yyyy
+	set CONV2TJD=$$^SCAJD(ZDATE,"DD/MM/YEAR") // convert to TJD
+
+	write "J "_$$^SCAJD(CONVDATE,"DD/MM/YEAR"),! // convert to TJD
+	write "Z "_$$^SCAJD(ZDATE,"DD/MM/YEAR"),! // convert to TJD
+	write !
+
+	write "J "_$$DAT^%ZM(JDATE,"DD/MM/YEAR"),! // convert to date format dd/mm/yyyy
+	write "Z "_$$DAT^%ZM(CONV2TJD,"DD/MM/YEAR"),! // convert to date format dd/mm/yyyy
+	write !
+
+	write "J "_$$BOMJD^SCADAT(JDATE,1),! // begin of month
+	write "Z "_$$DAT^%ZM($$BOMJD^SCADAT(CONV2TJD,1),"DD/MM/YEAR"),! // begin of month
+	write !
+
+	write "J "_$$EOMJD^SCADAT(JDATE,1),! // end of month
+	write "Z "_$$DAT^%ZM($$EOMJD^SCADAT(CONV2TJD,1),"DD/MM/YEAR"),! // end of month
+	write !
+	
+	write "TIME "_$$TIM^%ZM(11111) // Time format 03:05 AM
+	write !
+
+	quit
+
+
+DRCR //batch
+
+	type String %TAB,%READ,VFMQ
+
+	set %TAB("DRCID")="/DES=Debit Account/LEN=12/TYP=N" // Input Debit Account
+	set %TAB("CRCID")="/DES=Credit Account/LEN=12/TYP=N" // Input Credit Account
+	set %TAB("ZAMT")="/DES=Amount/LEN=20/TYP=N" // Input Transaction Amount
+	set %READ="@@%FN/REV/CEN,,,ZAMT/REQ,DRCID/REQ,CRCID/REQ"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	set %UserID=98004
+	set %UserClass="BATCH"
+	set TLO="BATCH"
+
+	do SYSVAR^SCADRV0()
+
+	set ZINTRF="ZJSK"
+	set ZKEY="DRCR"
+
+	do SOURCE^BCHSOURC(ZINTRF,ZKEY,.%UserID,.XBRCD,.%UserClass,.TSDRCID,.TSCRCID,.ODP)
+
+	type public Number ER = ER.get()
+	type public String RM
+	type RecordTTX ttx()
+
+	set ER=0	
+
+	set DRETC="SW"	//Debit TRC
+	//set DRCID=19		//Debit Account
+	set CRETC="SD"		//Credit TRC
+	//set CRCID=200867	//Credit Account
+
+	//set ZAMT=100		//Amount
+	set ZEFD=%SystemDate	//Effective Date
+	set ZTSO=""
+	set ZTCMT="Test"
+
+	type RecordDEP zdep1 = Db.getRecord("DEP","CID=:DRCID")
+	set ZCC1=zdep1.cc
+
+	type RecordDEP zdep2 = Db.getRecord("DEP","CID=:CRCID")
+	set ZCC2=zdep2.cc
+
+	do TTXFMT(.ttx,DRCID,DRETC,ZAMT,ZEFD,ZTSO,ZTCMT,ZCC1,1)	
+
+	do TTXFMT(.ttx,CRCID,CRETC,ZAMT,ZEFD,ZTSO,ZTCMT,ZCC2,2)
+
+	set ZERR = $$TTXPST(.ttx, XBRCD)	
+
+	write $$MSG^%TRMVT("ZERR:"_ZERR,"",1)
+
+	quit
+
+
+TTXFMT(RecordTTX ttx(), Number CID,String ETC, Number AMT, Date EFD,String TSO, String TCMT, String CC,Number seq)
+	/*
+	 Create a transaction record
+
+	 ARGUMENTS:
+		CID	- Account number
+		ETC	- PROFILE transaction code
+		AMT	- Transaction amount
+		EFD	- Effective date
+		TSO	- Transaction source of funds
+		TCMT	- Transaction comment
+		CC	- Cost Center	** any call without cc set, cc will be default to dep.cc
+	*/
+
+	type public Number ER
+	type public String RM
+	
+	type Number I = 0
+	type RecordTRN trn
+	
+	// Retrieve transaction code information
+	set trn=Db.getRecord("TRN","ETC=:ETC",1)
+	if 'trn.getMode() set ER=1,RM=$$^MSG(1498,ETC) quit
+	
+	if CC.get().isNull(),(Db.isDefined("DEP","CID=:CID")) do {
+		type RecordDEP zxdep=Db.getRecord("DEP","CID=:CID")
+		set CC=zxdep.cc
+	}
+
+	set ttx(seq) = Class.new("RecordTTX")
+	set ttx(seq).cid = CID
+	set ttx(seq).itc = trn.itc
+	set ttx(seq).etc = ETC
+	set ttx(seq).tamt = AMT
+	set ttx(seq).efd = EFD
+	set ttx(seq).tso = TSO
+	set ttx(seq).tcmt = TCMT
+	set ttx(seq).cc = CC.get()
+	quit	
+
+
+TTXPST(RecordTTX ttx(), Number BRCD)
+	
+	
+	//set par("IPMODE")=4
+	//set par("OPTION")=2
+	//set par("UPDTTX")=1
+	//set par("KEEPOVR")=1
+
+	type Number i, PTRC
+	type String status, OVR(), RJ(), SPV(), TRNINPUT()
+	
+	set TRNINPUT("updTTX") = 1
+	do TRNSET^TRNDRV(.ttx(), %SystemDate, BRCD, 2, .PTRC, .RJ(), .SPV(), .OVR(),,REJMET.get(),.TRNINPUT())
+	
+	//do ts.postTSet(%SystemDate,XBRCD,.par,.TR)
+	
+	set status = "0|0"	// default success
+	for i = 1:1 quit:'RJ(i).exists()  set status.piece("|",i) = 1
+
+	quit status_","_PTRC.get()
+
+
+ZCKTAXCHQ
+
+	set SPLDIR="/tmp/"
+	set ZFILE="zcktaxchq_1.txt"
+	set TDRV=$$FILE^%TRNLNM(ZFILE,SPLDIR)
+	set ZSAVE="/tmp/zcktaxchq_2.txt"
+
+	type String %TAB,%READ,VFMQ
+	set ZSEQ=11415055
+
+	set %TAB("TDRV")="/DES=File Name/LEN=60/TYP=T/PROT"
+	set %TAB("ZSEQ")="/DES=Transaction Sequence/LEN=15/TYP=N"
+	set %READ="@@%FN/REV/CEN,,,TDRV/REQ,ZSEQ/REQ"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	set Z=$$FILE^%ZOPEN(TDRV,"READ",5)
+	if Z.piece("|",1)=0 do { quit
+		write $$MSG^%TRMVT("Error:"_Z.piece("|",2),"",1)
+	}
+
+	type IO io=Class.new("IO")
+	set io.fileName=TDRV
+	set io.openParams="READ"
+	set io.timeout=5
+	set io.recordSize=400
+	do io.open()
+
+	type IO ioout=Class.new("IO")
+	set ioout.fileName=ZSAVE
+	set ioout.openParams="NEWV/WRITE"
+	set ioout.recordSize=400
+	do ioout.open()
+
+	set ZTAB=$C(9)
+
+	for  set REC=io.read(.ETYP) quit:+ETYP'=0  do {
+		set TREC=$$RTB^%ZFUNC(REC)
+
+		if TREC=""!(TREC=$C(26))!(TREC=$C(13)) quit
+
+		set ZCHKNO=+$$TRIM^%ZS($E(REC,3,9))
+		set ZDATA=ZCHKNO
+
+		type ResultSet rs=Db.select("TSEQ,TJD,BRCD,ETC,TAMT,TSO","HIST","CID=1846000092 AND ZCKSTM=:ZCHKNO AND TSEQ>:ZSEQ","TSEQ DESC")
+		if 'rs.isEmpty(),rs.next() {
+			set ZDATA=ZDATA_ZTAB_rs.getCol(1)
+			set ZDATA=ZDATA_ZTAB_$$DAT^%ZM(rs.getCol(2),"DD/MM/YEAR")
+			set ZDATA=ZDATA_ZTAB_rs.getCol(3)
+			set ZDATA=ZDATA_ZTAB_rs.getCol(4)
+			set ZDATA=ZDATA_ZTAB_rs.getCol(5)
+			set ZDATA=ZDATA_ZTAB_rs.getCol(6)
+
+			//if ZSEQ>rs.getCol(1) set ZSEQ=rs.getCol(1)
+		}
+
+		do ioout.write(ZDATA)
+	}
+
+	do ioout.close()
+	do io.close()
+
+	quit
+
+
+ZCKTSEQ
+
+	set SPLDIR="/tmp/"
+	set ZFILE="zcktaxchq_1.txt"
+	set TDRV=$$FILE^%TRNLNM(ZFILE,SPLDIR)
+	set ZSAVE="/tmp/zcktaxchq_2.txt"
+
+	type String %TAB,%READ,VFMQ
+
+	set %TAB("TDRV")="/DES=File Name/LEN=60/TYP=T/PROT"
+	set %READ="@@%FN/REV/CEN,,,TDRV/REQ"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	set Z=$$FILE^%ZOPEN(TDRV,"READ",5)
+	if Z.piece("|",1)=0 do { quit
+		write $$MSG^%TRMVT("Error:"_Z.piece("|",2),"",1)
+	}
+
+	type IO io=Class.new("IO")
+	set io.fileName=TDRV
+	set io.openParams="READ"
+	set io.timeout=5
+	set io.recordSize=400
+	do io.open()
+
+	type IO ioout=Class.new("IO")
+	set ioout.fileName=ZSAVE
+	set ioout.openParams="NEWV/WRITE"
+	set ioout.recordSize=400
+	do ioout.open()
+
+	set ZTAB=$C(9)
+
+	for  set REC=io.read(.ETYP) quit:+ETYP'=0  do {
+		set TREC=$$RTB^%ZFUNC(REC)
+
+		if TREC=""!(TREC=$C(26))!(TREC=$C(13)) quit
+
+		set ZTSEQ=+$$TRIM^%ZS($E(REC,1,15))
+		set ZDATA=ZTSEQ
+
+		type ResultSet rs=Db.select("ZCKSTM,TAMT,TCMT,BRCD,ETC,TJD,TSO","HIST","CID=1846000092 AND TSEQ=:ZTSEQ")
+		if 'rs.isEmpty(),rs.next() {
+			set ZDATA=ZDATA_ZTAB_rs.getCol(1)
+			set ZDATA=ZDATA_ZTAB_rs.getCol(2)
+			set ZDATA=ZDATA_ZTAB_rs.getCol(3)
+			set ZDATA=ZDATA_ZTAB_rs.getCol(4)
+			set ZDATA=ZDATA_ZTAB_rs.getCol(5)
+			set ZDATA=ZDATA_ZTAB_$$DAT^%ZM(rs.getCol(6),"DD/MM/YEAR")
+			set ZDATA=ZDATA_ZTAB_rs.getCol(7)
+		}
+
+		do ioout.write(ZDATA)
+	}
+
+	do ioout.close()
+	do io.close()
+
+	quit
+
+
+ZCUTSTR
+
+	set SPLDIR="/tmp/"
+	set ZFILE="zcutstr_1.txt"
+	set TDRV=$$FILE^%TRNLNM(ZFILE,SPLDIR)
+	set ZSAVE="/tmp/zcutstr_2.txt"
+
+	type String %TAB,%READ,VFMQ
+
+	set %TAB("TDRV")="/DES=File Name/LEN=60/TYP=T/PROT"
+	set %READ="@@%FN/REV/CEN,,,TDRV/REQ"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	set Z=$$FILE^%ZOPEN(TDRV,"READ",5)
+	if Z.piece("|",1)=0 do { quit
+		write $$MSG^%TRMVT("Error:"_Z.piece("|",2),"",1)
+	}
+
+	type IO io=Class.new("IO")
+	set io.fileName=TDRV
+	set io.openParams="READ"
+	set io.timeout=5
+	set io.recordSize=400
+	do io.open()
+
+	type IO ioout=Class.new("IO")
+	set ioout.fileName=ZSAVE
+	set ioout.openParams="NEWV/WRITE"
+	set ioout.recordSize=400
+	do ioout.open()
+
+	set ZTMP=0
+	set ZSUM=0
+
+	for  set REC=io.read(.ETYP) quit:+ETYP'=0  do {
+
+		set TREC=$$RTB^%ZFUNC(REC)
+		if TREC=""!(TREC=$C(26))!(TREC=$C(13)) quit
+
+		set ZBOO=$P(REC,"|",1)
+		set ZAMT=$P(REC,"|",2)
+
+		if ZTMP'=ZBOO do {
+			do ioout.write(ZTMP_$C(9)_ZSUM)
+			set ZTMP=ZBOO
+			set ZSUM=ZAMT
+		}
+		else  do {
+			set ZSUM=ZSUM+ZAMT
+		}
+	}
+
+	do io.close()
+
+	quit
+
+
+ZGETSCAU
+
+	type String %TAB,%READ,VFMQ
+
+	set ZBRCD=153
+	set ZCNT=0
+
+	set %TAB("ZBRCD")="/DES=Branch No./LEN=4/TYP=N/REQ"
+	set %READ="@@%FN/REV/CEN,,,ZBRCD"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	type ResultSet rs=Db.select("UID","SCAU","BRCD=:ZBRCD")
+	if rs.isEmpty() quit
+
+	while rs.next() do {
+		set ZCNT=ZCNT+1
+		set ZUID=rs.getCol(1)
+
+		#ACCEPT Date=08/19/10; Pgm=Unknown; CR=unknown; Group=Global
+		set ^ZSCAU(ZUID)=^SCAU(1,ZUID)
+	}
+
+	write $$MSG^%TRMVT("Total Record(s): "_ZCNT,"",1)
+
+	quit
+
+
+ZCKDUP
+
+	type Date ZTJD
+	type String %TAB,%READ,VFMQ
+
+	set ZTJD=%SystemDate // System date
+
+	set %TAB("ZTJD")="/DES=DATE/LEN=10/TYP=D/REQ"
+	set %TAB("ZBRCD")="/DES=BRCD/LEN=6/TYP=N/REQ"
+	set %TAB("ZUID")="/DES=UID/LEN=20/TYP=T/REQ"
+	set %READ="@@%FN/REV/CEN,,,ZTJD,ZBRCD,ZUID"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" set %BatchExit=1 quit
+
+	type IO ioout=Class.new("IO")
+	set ioout.fileName="/tmp/zckdup.txt"
+	set ioout.openParams="NEWV/WRITE"
+	set ioout.recordSize=400
+	do ioout.open()
+
+	type ResultSet rs1=Db.select("CID,TSEQ","TTX","TJD=:ZTJD AND BRCD=:ZBRCD AND UID=:ZUID")
+	if 'rs1.isEmpty() do {
+
+		set ZTAB=$C(9)
+
+		while rs1.next() do {
+			set ZCNT=0
+			set ZCID=rs1.getCol(1)
+			set ZTRC=rs1.getCol(2)
+
+			type ResultSet rs2=Db.select("ETC,TAMT","HIST","TJD=:ZTJD AND TRC=:ZTRC AND CID=:ZCID")
+			if 'rs2.isEmpty() do {
+
+				while rs2.next() do {
+					set ZETC=rs2.getCol(1)
+					set ZAMT=rs2.getCol(2)
+					set ZCNT=ZCNT+1
+				}
+
+				if ZCNT > 1 do {
+					set ZDATA=ZCID_ZTAB_ZETC_ZTAB_ZTRC_ZTAB_ZAMT_ZTAB_ZCNT
+					do ioout.write(ZDATA)
+				}
+			}
+			else  do {
+
+				if 'Db.isDefined("EXC","TJD=:ZTJD,TSEQ=:ZTRC,BRCD=:ZBRCD,UID=:ZUID") do {
+					set ZDATA=ZCID_ZTAB_ZETC_ZTAB_ZTRC_ZTAB_ZCNT_ZTAB_"ERR"
+				}
+				else  do {
+					type RecordEXC zexc=Db.getRecord("EXC","TJD=:ZTJD,TSEQ=:ZTRC,BRCD=:ZBRCD,UID=:ZUID")
+					set ZETC=zexc.etc
+					set ZAMT=zexc.tamt
+					set ZDATA=ZCID_ZTAB_ZETC_ZTAB_ZTRC_ZTAB_ZAMT_ZTAB_"EXC"
+				}
+
+				do ioout.write(ZDATA)
+			}
+		}
+	}
+
+	do ioout.close()
+
+	quit
+
+
+ZCOUNT
+
+	set SPLDIR1="/tmp/"
+
+	set ZFILE1="zcount_1.txt"
+	set TDRV1=$$FILE^%TRNLNM(ZFILE1,SPLDIR1)
+
+	set ZFILE2="zcount_2.txt"
+	set TDRV2=$$FILE^%TRNLNM(ZFILE2,SPLDIR1)
+
+	set ZSAVE="/tmp/zcount_3.txt"
+
+	type String %TAB,%READ,VFMQ
+
+	set %TAB("TDRV1")="/DES=Index File/LEN=60/TYP=T/REQ"
+	set %TAB("TDRV2")="/DES=Target File/LEN=60/TYP=T/REQ"
+	set %TAB("ZSAVE")="/DES=Output File/LEN=60/TYP=T/REQ"
+	set %READ="@@%FN/REV/CEN,,,TDRV1,TDRV2,ZSAVE"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	set Z1=$$FILE^%ZOPEN(TDRV1,"READ",5)
+
+	if Z1.piece("|",1)=0 do { quit
+		write $$MSG^%TRMVT("Error:"_Z1.piece("|",2),"",1)
+	}
+
+	type IO io1=Class.new("IO")
+	set io1.fileName=TDRV1
+	set io1.openParams="READ"
+	set io1.timeout=5
+	set io1.recordSize=400
+	do io1.open()
+
+	type IO ioout=Class.new("IO")
+	set ioout.fileName=ZSAVE
+	set ioout.openParams="NEWV/WRITE"
+	set ioout.recordSize=400
+	do ioout.open()
+
+	set ZTMP=0
+	set ZSUM=0
+
+	for  set REC1=io1.read(.ETYP1) quit:+ETYP1'=0  do {
+
+		set TREC1=$$RTB^%ZFUNC(REC1)
+		if TREC1=""!(TREC1=$C(26))!(TREC1=$C(13)) quit
+
+		set ZCK=+$$TRIM^%ZS($E(REC1,1,15))
+		set ZCNT=0
+
+		type IO io2=Class.new("IO")
+		set io2.fileName=TDRV2
+		set io2.openParams="READ"
+		set io2.timeout=5
+		set io2.recordSize=400
+		do io2.open()
+
+		for  set REC2=io2.read(.ETYP2) quit:+ETYP2'=0  do {
+
+			set TREC2=$$RTB^%ZFUNC(REC2)
+			if TREC2=""!(TREC2=$C(26))!(TREC2=$C(13)) quit
+
+			set ZCMP=+$$TRIM^%ZS($E(REC2,1,15)) //+REC2.piece("|",1)
+			if ZCMP=ZCK set ZCNT=ZCNT+1
+		}
+
+		do ioout.write(ZCK_$C(9)_ZCNT)
+		do io2.close()
+
+	}
+
+	do ioout.close()
+	do io1.close()
+
+	quit
+
+
+ZOPENBR
+
+	set SPLDIR="/tmp/"
+	set ZFILE="zopenbr.txt"
+	set TDRV=$$FILE^%TRNLNM(ZFILE,SPLDIR)
+
+	type String %TAB,%READ,VFMQ
+
+	set %TAB("TDRV")="/DES=File Name/LEN=60/TYP=T/PROT"
+	set %READ="@@%FN/REV/CEN,,,TDRV/REQ"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	set Z=$$FILE^%ZOPEN(TDRV,"READ",5)
+	if Z.piece("|",1)=0 do { quit
+		write $$MSG^%TRMVT("Error:"_Z.piece("|",2),"",1)
+	}
+
+	type IO io=Class.new("IO")
+	set io.fileName=TDRV
+	set io.openParams="READ"
+	set io.timeout=5
+	set io.recordSize=400
+	do io.open()
+
+	for  set REC=io.read(.ETYP) quit:+ETYP'=0  do { quit:VFMQ="Q"
+
+		set TREC=$$RTB^%ZFUNC(REC)
+		if TREC=""!(TREC=$C(26))!(TREC=$C(13)) quit
+
+		set ZBRCD=$P(REC,"|",1)
+		set ZDIST=$P(REC,"|",2)
+		set ZSDIST=$P(REC,"|",3)
+
+		set %TAB("ZBRCD")="/DES=BRCD/LEN=4/TYP=T/PROT"
+		set %TAB("ZDIST")="/DES=DIST/LEN=4/TYP=T/PROT"
+		set %TAB("ZSDIST")="/DES=SUB DIST/LEN=4/TYP=T/PROT"
+		set %READ="@@%FN/REV/CEN,,,ZBRCD,ZDIST,ZSDIST"
+
+		do ^UTLREAD
+
+		//if VFMQ="Q" quit
+	}
+
+	do io.close()
+
+	quit
+
+
+ZWHTAX
+
+	type DbSet ds=Db.selectDbSet("ZWHTAX50")
+	if ds.isEmpty() quit
+
+	while ds.next() do {
+		type RecordZWHTAX50 zwhtax50=ds.getRecord("ZWHTAX50")
+		set ZWHNO=zwhtax50.whno
+
+		type RecordZWHTAX52 zwhtax52=Db.getRecord("ZWHTAX52","WHNO=:ZWHNO",1)
+		if 'zwhtax52.getMode() do zwhtax52.save()
+	}
+
+	quit
+
+
+ZPRODTYPE
+
+	type DbSet ds=Db.selectDbSet("UTBLPRODAUTH","TYPE=100")
+	if ds.isEmpty() quit
+
+	while ds.next() do {
+		type RecordUTBLPRODAUTH zprodauth1=ds.getRecord("UTBLPRODAUTH")
+		set ZBRCD=zprodauth1.brcd
+		set ZTYPE=1202
+
+		type RecordUTBLPRODAUTH zprodauth2=Db.getRecord("UTBLPRODAUTH","BRCD=:ZBRCD,TYPE=:ZTYPE",1)
+		if zprodauth2.getMode() quit
+		do zprodauth2.save() // Add new record for type 1202
+	}
+
+	quit
+
+
+ZDEPBAL(ZCID)
+
+	type DbSet rs=Db.selectDbSet("HIST","CID=:ZCID AND ENDBAL IS NOT NULL","TSEQ DESC")
+	if rs.isEmpty() quit ZCID
+	if rs.next() do {
+		type RecordHIST zhist=rs.getRecord("HIST")
+		set ZENDBAL=+zhist.endbal
+	}
+
+	type RecordDEP zdep=Db.getRecord("DEP","CID=:ZCID",1)
+	if 'zdep.getMode() quit ZCID
+	set ZBAL=zdep.bal
+
+	//if ZENDBAL'=ZBAL write $$MSG^%TRMVT("Error:"_ZCID_" ENDBAL:"_ZENDBAL_" BAL:"_ZBAL,"",1)
+
+	quit ZCID_"|"_ZENDBAL_"|"_ZBAL
+
+
+ZUNBAL(ZTJD,ZCID)
+
+	type String %TAB,%READ,VFMQ
+
+	set ZTMPBAL=0
+	set ZSEQ=0
+
+	set %TAB("ZTJD")="/DES=Find Date/LEN=10/TYP=D/REQ"
+	set %TAB("ZCID")="/DES=Account/LEN=12/TYP=T/REQ"
+	set %READ="@@%FN/REV/CEN,,,ZTJD,ZCID"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	type DbSet rs=Db.selectDbSet("HIST","CID=:ZCID AND TJD=:ZTJD","TSEQ ASC")
+	if rs.isEmpty() quit
+	if rs.next() do {
+		type RecordHIST zhist=rs.getRecord("HIST")
+		set ZSEQ=zhist.tseq
+	}
+
+	type DbSet rs=Db.selectDbSet("HIST","CID=:ZCID AND TSEQ<:ZSEQ AND ENDBAL IS NOT NULL","TSEQ DESC")
+	if rs.isEmpty() quit
+	if rs.next() do {
+		type RecordHIST zhist=rs.getRecord("HIST")
+		set ZTMPBAL=+zhist.endbal
+		set ZSEQ=zhist.tseq
+	}
+
+	type DbSet ds=Db.selectDbSet("HIST","CID=:ZCID AND TJD=:ZTJD","TSEQ ASC")
+	if ds.isEmpty() quit
+	while ds.next() do {
+
+		type RecordHIST zhist=ds.getRecord("HIST")
+		set ZENDBAL=+zhist.endbal
+		set ZAMT=+zhist.tamt
+		set ZITC=zhist.itc1
+
+		if ZITC=0 set ZSUM=ZTMPBAL-ZAMT
+		if ZITC=1 set ZSUM=ZTMPBAL+ZAMT
+		if ZITC.isNull() quit
+
+		if ZSUM'=ZENDBAL do {
+
+			set ZWRITE=ZTJD_"|"_zhist.tseq_"|"_zhist.etc_"|"_ZCID_"|"_ZITC
+			set ZWRITE=ZWRITE_"|"_ZAMT_"|"_ZENDBAL // _"|"_ZSEQ_"|"_ZTMPBAL
+
+			type IO io=Class.new("IO")
+			set io.fileName="/tmp/zunbal_"_ZCID_"_"_ZTJD_".txt"
+			set io.openParams="NEWV/WRITE"
+			set io.recordSize=400
+			do io.open()
+			do io.write(ZWRITE)
+			do io.close()
+
+			quit
+		}
+
+		set ZTMPBAL=ZENDBAL
+	}
+
+	quit
+
+
+ZFUBAL // call ZUNBAL for find unbal by text file
+
+	set SPLDIR="/tmp/"
+	set ZFILE="zunbal.txt"
+	set TDRV=$$FILE^%TRNLNM(ZFILE,SPLDIR)
+	//set ZTJD=%SystemDate
+
+	type String %TAB,%READ,VFMQ
+
+	set %TAB("TDRV")="/DES=File Name/LEN=60/TYP=T/REQ/PROT"
+	set %TAB("ZTJD")="/DES=Find Date/LEN=10/TYP=D/REQ"
+	set %READ="@@%FN/REV/CEN,,,TDRV,ZTJD"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	set Z=$$FILE^%ZOPEN(TDRV,"READ",5)
+	if Z.piece("|",1)=0 do { quit
+		write $$MSG^%TRMVT("Error:"_Z.piece("|",2),"",1)
+	}
+
+	type IO io=Class.new("IO")
+	set io.fileName=TDRV
+	set io.openParams="READ"
+	set io.timeout=5
+	set io.recordSize=400
+	do io.open()
+
+	for  set REC=io.read(.ETYP) quit:+ETYP'=0  do {
+		set TREC=$$RTB^%ZFUNC(REC)
+		if TREC=""!(TREC=$C(26))!(TREC=$C(13)) quit
+		set ZCID=+$$TRIM^%ZS($E(REC,1,12))
+		do ZUNBAL(ZTJD,ZCID)
+	}
+
+	do io.close()
+
+	quit
+
+
+ZDUBAL // call ZUNBAL for find unbal by CID
+
+	type String %TAB,%READ,VFMQ
+
+	if ZTJD.isNull() set ZTJD=%SystemDate
+
+	set %TAB("ZTJD")="/DES=Find Date/LEN=10/TYP=D/REQ"
+	set %TAB("ZCID")="/DES=Account/LEN=12/TYP=T/REQ"
+	set %READ="@@%FN/REV/CEN,,,ZTJD,ZCID"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	set ZFD=$$^SCAJD(ZTJD,"DD/MM/YEAR")
+	set ZND=%SystemDate
+
+	if ZND-ZFD'>0 quit
+
+	for i=ZFD:1:ZND do {
+		set ZTJD=i
+		do ZUNBAL(ZTJD,ZCID)
+	}
+
+	quit
+
+
+ZSUBAL // call ZDEPBAL for find unbal by transaction
+
+	type DbSet db=Db.selectDbSet("DEP","TYPE=2001 AND CC=200029 AND ZSTAT<>4")
+	if db.isEmpty() quit
+
+	type IO io=Class.new("IO")
+	set io.fileName="/tmp/zunbal_dep.txt"
+	set io.openParams="NEWV/WRITE"
+	set io.recordSize=400
+	do io.open()
+
+	while db.next() do {
+		type RecordDEP zdep=db.getRecord("DEP")
+		set ZCID=zdep.cid
+		set ZMSG=$$ZDEPBAL(ZCID)
+		do io.write(ZMSG)
+	}
+
+	do io.close()
+
+	quit
+
+
+ZTTXCID
+
+	set SPLDIR="/tmp/"
+	set ZFILE="zttx_1.txt"
+	set TDRV=$$FILE^%TRNLNM(ZFILE,SPLDIR)
+	set ZTJD="T"
+
+	type String %TAB,%READ,VFMQ
+
+	set %TAB("TDRV")="/DES=File Name/LEN=60/TYP=T"
+	set %TAB("ZTJD")="/DES=Find Date/LEN=10/TYP=D"
+	set %READ="@@%FN/REV/CEN,,,TDRV/REQ,ZTJD/REQ"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	set Z=$$FILE^%ZOPEN(TDRV,"READ",5)
+	if Z.piece("|",1)=0 do { quit
+		write $$MSG^%TRMVT("Error:"_Z.piece("|",2),"",1)
+	}
+
+	type IO io=Class.new("IO")
+	set io.fileName=TDRV
+	set io.openParams="READ"
+	set io.timeout=5
+	set io.recordSize=400
+	do io.open()
+
+	type IO ioout=Class.new("IO")
+	set ioout.fileName="/tmp/zttx_2.txt"
+	set ioout.openParams="NEWV/WRITE"
+	set ioout.recordSize=400
+	do ioout.open()
+
+	for  set REC=io.read(.ETYP) quit:+ETYP'=0  do {
+
+		set TREC=$$RTB^%ZFUNC(REC)
+		if TREC=""!(TREC=$C(26))!(TREC=$C(13)) quit
+
+		set ZBRCD=+REC.piece("|",1)
+		set ZUID=+REC.piece("|",2)
+		set ZSEQ=REC.piece("|",3)
+		set ZSEQ=ZSEQ.extract(1,ZSEQ.length()-1)_"1"
+
+		type RecordTTX zttx=Db.getRecord("TTX","TJD=:ZTJD,BRCD=:ZBRCD,UID=:ZUID,TSEQ=:ZSEQ",1)
+		if 'zttx.getMode() quit
+
+		set ZCID=zttx.cid
+
+		type RecordDEP zdep=Db.getRecord("DEP","CID=:ZCID",1)
+		if 'zdep.getMode() set ZTITLE=""
+
+		set ZTITLE=zdep.title1
+
+		do ioout.write(ZTJD_$C(9)_ZBRCD_$C(9)_ZUID_$C(9)_ZSEQ_$C(9)_ZCID_$C(9)_ZTITLE)
+	}
+
+	do ioout.close()
+	do io.close()
+
+	quit
+
+
+ZGFCC
+
+	//set ZTJD=$$DAT^%ZM(%SystemDate,"DDMMYEAR")
+	set ZSAVE="GFMISCC2NCR.TXT" // "GFMIS_CC"_ZTJD_".01"
+
+	type IO ioout=Class.new("IO")
+	set ioout.fileName="/tmp/"_ZSAVE
+	set ioout.openParams="NEWV/WRITE"
+	set ioout.recordSize=400
+	do ioout.open()
+
+	type DbSet db1=Db.selectDbSet("ZUTBLGFCC","COCD IS NOT NULL")
+	if db1.isEmpty() quit
+
+	while db1.next() do {
+
+		type RecordZUTBLGFCC zgfcc=db1.getRecord("ZUTBLGFCC")
+		set ZCC=zgfcc.cc
+		set ZCOCD=zgfcc.cocd
+
+		type RecordZUTBLTLRPMT zrpmt=Db.getRecord("ZUTBLTLRPMT","COCD=:ZCOCD",1)
+		if 'zrpmt.getMode() quit
+		set ZCID=zrpmt.cid
+		set ZNAME=zrpmt.name
+
+		type RecordDEP zdep=Db.getRecord("DEP","CID=:ZCID",1)
+		if 'zdep.getMode() quit
+
+		set ZBOO=zdep.boo
+		set ZTITLE=zdep.title1
+
+		set ZDATA=ZCC.zero(10)_ZCOCD.blank(6)_ZNAME.blank(60)_ZCID.zero(10)_ZBOO.zero(6)_ZTITLE.blank(100)
+
+		do ioout.write(ZDATA)
+	}
+
+	do ioout.close()
+
+	quit
+
+
+ZCHQDIFF
+
+	set SPLDIR="/tmp/"
+	set ZFILE="zchqdiff_1.txt"
+	set TDRV=$$FILE^%TRNLNM(ZFILE,SPLDIR)
+
+	type String %TAB,%READ,VFMQ
+
+	set %TAB("TDRV")="/DES=Source File/LEN=60/TYP=T"
+	set %TAB("ZTYP")="/DES=Option (1)CC (2)GC (3)DD/LEN=1/TYP=N"
+	set %READ="@@%FN/REV/CEN,,,TDRV/REQ,ZTYP/REQ"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	if (ZTYP<1)!(ZTYP>3) write $$MSG^%TRMVT("Error Option "_ZTYP,"",1) quit
+	if ZTYP=1 set ZTYPE=2
+	if ZTYP=2 set ZTYPE=3
+	if ZTYP=3 set ZTYPE=4
+
+	set Z=$$FILE^%ZOPEN(TDRV,"READ",5)
+	if Z.piece("|",1)=0 do { quit
+		write $$MSG^%TRMVT("Error:"_Z.piece("|",2),"",1)
+	}
+
+	type IO io=Class.new("IO")
+	set io.fileName=TDRV
+	set io.openParams="READ"
+	set io.timeout=5
+	set io.recordSize=400
+	do io.open()
+
+	type IO ioout=Class.new("IO")
+	set ioout.fileName="/tmp/zchqdiff_2.txt"
+	set ioout.openParams="NEWV/WRITE"
+	set ioout.recordSize=400
+	do ioout.open()
+
+	for  set REC=io.read(.ETYP) quit:+ETYP'=0  do {
+
+		set TREC=$$RTB^%ZFUNC(REC)
+		if TREC=""!(TREC=$C(26))!(TREC=$C(13)) quit
+
+		set ZBRCD=+$$TRIM^%ZS(REC.extract(3,6))
+		set ZAMT=0
+		set ZBAL=0
+		set ZCID1=+(ZBRCD_"790000"_ZTYPE)
+		set ZCID2=+(ZBRCD_"79000"_ZTYPE_ZTYPE)
+
+		type DbSet db=Db.selectDbSet("ZARS","ZSTAT IN ('O','U','M') AND (CID=:ZCID1 OR CID=:ZCID2)")
+		if db.isEmpty() do ioout.write(ZBRCD_$C(9)_ZCID1_$C(9)_ZCID2_$C(9)_"ZARS") quit
+
+		while db.next() do {
+
+			type RecordZARS zzars=db.getRecord("ZARS")
+			set ZCID=+zzars.cid
+			set ZCKNO=+zzars.ckno
+
+			type RecordARS zars=Db.getRecord("ARS","CID=:ZCID,CKNO=:ZCKNO",1)
+			if 'zars.getMode() do ioout.write(ZBRCD_$C(9)_ZCID1_$C(9)_ZCID2_$C(9)_"ARS") quit
+			set ZAMT=ZAMT+zars.iamt
+		}
+
+		type DbSet db=Db.selectDbSet("DEP","CID=:ZCID1 OR CID=:ZCID2")
+		if db.isEmpty() quit
+
+		while db.next() do {
+
+			type RecordDEP zdep=db.getRecord("DEP")
+			set ZBAL=ZBAL+zdep.bal
+		}
+
+		set ZDIFF=ZBAL-ZAMT
+
+		do ioout.write(ZBRCD_$C(9)_ZCID1_$C(9)_ZCID2_$C(9)_ZBAL_$C(9)_ZAMT_$C(9)_ZDIFF)
+	}
+
+	do ioout.close()
+	do io.close()
+
+	quit
+
+
+ZCHQSTOP
+
+	type String %TAB,%READ,VFMQ
+
+	set %TAB("ZBRCD")="/DES=Branch Code/LEN=4/TYP=N"
+	set %TAB("ZTYP")="/DES=Option (1)CC (2)GC (3)DD/LEN=1/TYP=N"
+	set %READ="@@%FN/REV/CEN,,,ZBRCD/REQ,ZTYP/REQ"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	if (ZTYP<1)!(ZTYP>3) write $$MSG^%TRMVT("Error Option "_ZTYP,"",1) quit
+	if ZTYP=1 set ZTYPE=2
+	if ZTYP=2 set ZTYPE=3
+	if ZTYP=3 set ZTYPE=4
+
+	set ZAMT=0
+	set ZCID1=+(ZBRCD_"790000"_ZTYPE)
+	set ZCID2=+(ZBRCD_"79000"_ZTYPE_ZTYPE)
+
+	type DbSet db=Db.selectDbSet("ZARS","ZSTAT='S' AND (CID=:ZCID1 OR CID=:ZCID2)")
+	if db.isEmpty() quit
+
+	while db.next() do {
+
+		type RecordZARS zzars=db.getRecord("ZARS")
+		set ZCID=+zzars.cid
+		set ZCKNO=+zzars.ckno
+
+		type RecordARS zars=Db.getRecord("ARS","CID=:ZCID,CKNO=:ZCKNO",1)
+		if 'zars.getMode() quit
+		set ZAMT=ZAMT+zars.iamt
+	}
+
+	write ZBRCD_" : "_ZAMT,!
+
+	quit
+
+
+ZCHQHIST
+
+	type String %TAB,%READ,VFMQ
+
+	set %TAB("ZBRCD")="/DES=Branch Code/LEN=4/TYP=N"
+	set %TAB("ZCKNO")="/DES=Chq No./LEN=8/TYP=T"
+	set %TAB("ZTYP")="/DES=Option (1)CC (2)GC (3)DD/LEN=1/TYP=N"
+	set %READ="@@%FN/REV/CEN,,,ZBRCD/REQ,ZCKNO/REQ,ZTYP/REQ"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	if (ZTYP<1)!(ZTYP>3) write $$MSG^%TRMVT("Error Option "_ZTYP,"",1) quit
+	if ZTYP=1 set ZTYPE=2
+	if ZTYP=2 set ZTYPE=3
+	if ZTYP=3 set ZTYPE=4
+
+	set ZCID1=+(ZBRCD_"790000"_ZTYPE)
+	set ZCID2=+(ZBRCD_"79000"_ZTYPE_ZTYPE)
+	set ZSQL="CID IN ("_ZCID1_","_ZCID2_") AND (TSO LIKE 'ZCK%"_ZCKNO_"%' OR TSO LIKE 'CK%"_ZCKNO_"%')"
+
+	type DbSet db=Db.selectDbSet("HIST",ZSQL)
+	if db.isEmpty() write "No Hist "_ZSQL quit
+
+	while db.next() do {
+
+		type RecordHIST zhist=db.getRecord("HIST")
+		set ZTJD=$$DAT^%ZM(zhist.tjd,"DD/MM/YEAR")
+		set ZETC=zhist.etc
+		set ZITC=zhist.itc1
+		set ZAMT=zhist.tamt
+		set ZCK=zhist.zckstm
+		set ZTSO=zhist.tso
+
+		write ZBRCD_$C(9)_ZTJD_$C(9)_ZETC_$C(9)_ZITC_$C(9)_ZCK_$C(9)_ZAMT,!
+	}
+
+	quit
+
+
+ZRECEIPT // Update flag for pdfflag or hosttsoflg to zero
+
+	set ZCNT=0
+
+	type DbSet db=Db.selectDbSet("ZUTBLRECEIPT","PDFFLAG IS NULL OR HOSTTSOFLG IS NULL")
+	if db.isEmpty() quit
+
+	while db.next() do {
+
+		type RecordZUTBLRECEIPT zreceipt=db.getRecord("ZUTBLRECEIPT")
+		do zreceipt.setAuditFlag(1)
+
+		set ZPDFFLG=zreceipt.pdfflag
+		set ZTSOFLG=zreceipt.hosttsoflg
+
+		if ZPDFFLG.isNull() set zreceipt.pdfflag=0
+		if ZTSOFLG.isNull() set zreceipt.hosttsoflg=0
+
+		do zreceipt.save()
+
+		set ZCNT=ZCNT+1
+	}
+
+	write "Total: "_ZCNT,!
+
+	quit
+
+
+ZACCRUE // Relate program: GETEFD, GETENDBAL, GETBDBAL, GETRATE, CALRATE
+
+	type String %TAB,%READ,VFMQ
+
+	set %TAB("ZTJD")="/DES=Recalculate Month/LEN=10/TYP=D"
+	set %TAB("ZCID")="/DES=Account Number/LEN=12/TYP=T/TBL=[DEP]"
+	set %READ="@@%FN/REV/CEN,,,ZTJD/REQ,ZCID/REQ"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	set ZBMONTH=$$BOMJD^SCADAT(ZTJD,1)
+	set ZEMONTH=$$EOMJD^SCADAT(ZTJD,1)
+
+	type RecordDEP zdep=Db.getRecord("DEP","CID=:ZCID",1)
+	if 'zdep.getMode() quit
+	set ZIDX=zdep.index
+
+	type IO ioout=Class.new("IO")
+	set ioout.fileName="/tmp/zaccure.txt"
+	set ioout.openParams="NEWV/WRITE"
+	set ioout.recordSize=400
+	do ioout.open()
+
+	for i=ZBMONTH:1:ZEMONTH do {
+
+		// Ending balance
+		//set ZENDBAL=$$GETENDBAL(ZCID,i)
+
+		set ZENDBAL=0
+		set ZBDATE=i
+
+		type DbSet db=Db.selectDbSet("HIST","CID=:ZCID AND TJD<=:i AND UID<>9400 AND ENDBAL IS NOT NULL","TJD DESC")
+		if 'db.isEmpty(),db.next() do {
+			type RecordHIST zhist=db.getRecord("HIST")
+			set ZENDBAL=zhist.endbal
+			set ZBDATE=zhist.tjd
+		}
+
+		set ZEFD=$$GETEFD(ZIDX,i) // Effective date
+		set ZBDTBAL=$$GETBDBAL(ZCID,ZBDATE) // Actual back date balance
+		set ZACTBAL= ZENDBAL+ZBDTBAL // Calculate actual ending balance
+		set ZACCURE=$$CALRATE(ZIDX,ZEFD,ZACTBAL) // Calculate accure
+
+		set ZDATA=$$DAT^%ZM(i,"DD/MM/YEAR")
+		set ZDATA=ZDATA_$C(9)_ZENDBAL
+		set ZDATA=ZDATA_$C(9)_ZBDTBAL
+		set ZDATA=ZDATA_$C(9)_ZACTBAL
+		set ZDATA=ZDATA_$C(9)_ZACCURE
+
+		do ioout.write(ZDATA)
+	}
+
+	do ioout.close()
+
+	quit
+
+
+GETEFD(ZIDX,ZTJD)
+
+	type DbSet db=Db.selectDbSet("INDEX1","INDEX=:ZIDX AND EFD<=:ZTJD","EFD DESC, SEQ DESC")
+	if 'db.isEmpty(),db.next() do {
+
+		type RecordINDEX1 zindex1=db.getRecord("INDEX1")
+		if 'zindex1.getMode() quit ZTJD
+
+		set ZTJD=zindex1.efd
+	}
+
+	quit ZTJD
+
+
+GETENDBAL(ZCID,ZTJD)
+
+	set ZAMT=0
+
+	type DbSet db=Db.selectDbSet("HIST","CID=:ZCID AND TJD<=:ZTJD AND UID<>9400 AND ENDBAL IS NOT NULL","TJD DESC")
+	if 'db.isEmpty(),db.next() do {
+		type RecordHIST zhist=db.getRecord("HIST")
+		set ZAMT=zhist.endbal
+	}
+
+	quit ZAMT
+
+
+GETBDBAL(ZCID,ZTJD)
+
+	set ZAMT=0
+
+	type DbSet db=Db.selectDbSet("HIST","CID=:ZCID AND TJD>:ZTJD AND EFD<=:ZTJD AND UID NOT IN (9400,9650) AND TAMT IS NOT NULL","TJD DESC")
+	if 'db.isEmpty() do {
+		while db.next() do {
+			type RecordHIST zhist=db.getRecord("HIST")
+
+			if zhist.itc1=0 do {
+				set ZAMT=ZAMT-zhist.tamt
+			}
+			if zhist.itc1=1 do {
+				set ZAMT=ZAMT+zhist.tamt
+			}
+		}
+	}
+
+	quit ZAMT
+
+
+GETRATE(ZIDX,ZTJD)
+
+	set ZRATE=0
+
+	type DbSet db=Db.selectDbSet("INDEX1","INDEX=:ZIDX AND EFD<=:ZTJD","EFD DESC")
+	if 'db.isEmpty(),db.next() do {
+
+		type RecordINDEX1 zindex1=db.getRecord("INDEX1")
+		if 'zindex1.getMode() quit ZRATE
+
+		set ZRATE=zindex1.rate
+	}
+
+	quit ZRATE
+
+
+CALRATE(ZIDX,ZEFD,ZAMT)
+	// Example: D CALRATE^ZBOYTEST("zTUxEJ",61924,-3000000)
+
+	set ZACCURE=0
+	set ZPREV=0
+	set ZFIN=0
+	set ZSUM=0
+	set ZSTR=""
+
+	if ZAMT<0 do {
+
+		type DbSet db=Db.selectDbSet("INDEX1","INDEX=:ZIDX AND EFD=:ZEFD","EFD DESC, SEQ DESC")
+		if 'db.isEmpty() do {
+
+			while db.next() do {
+
+				type RecordINDEX1 zindex1=db.getRecord("INDEX1")
+				if 'zindex1.getMode() quit
+
+				set ZRMIN=+zindex1.rmin
+
+				// Quit to calculate next rate
+				if (ZRMIN'<0)!(ZFIN=1) set ZSTR=ZSTR_"0"_$C(9) quit
+
+				if zindex1.rate'=0 do {
+					set ZRATE=+zindex1.rate
+					if ZRATE=0 set ZRATE=+$$GETRATE(zindex1.rate,ZEFD)
+				}
+				else  set ZRATE=+zindex1.rate
+
+				if ZAMT<ZRMIN do {
+					set ZRANGE=ZPREV-ZRMIN
+					set ZACCURE=(ZRANGE*ZRATE/36500)
+				}
+
+				if ZAMT'<ZRMIN do {
+					set ZFIN=1
+					set ZRANGE=ZPREV-ZAMT
+					set ZACCURE=(ZRANGE*ZRATE/36500)
+				}
+
+				set ZPREV=ZRMIN
+				set ZSUM=ZSUM+ZACCURE
+				set ZSTR=ZSTR_"="_ZRANGE_"*"_ZRATE_"/36500"_$C(9)
+			}
+		}
+	}
+
+	quit ZSTR_ZSUM
+
+
+CKDTJ
+
+	set ZSTR=""
+	set ZRESULT=""
+	set ZUID=90053
+	set ZTJD="17/05/2010"
+	set ZTJD=$$^SCAJD(ZTJD,"DD/MM/YEAR")
+
+	set SPLDIR="/tmp/"
+	set ZFILE="zckdtj_1.txt"
+	set TDRV=$$FILE^%TRNLNM(ZFILE,SPLDIR)
+
+	set Z=$$FILE^%ZOPEN(TDRV,"READ",5)
+	if Z.piece("|",1)=0 do { quit
+		write $$MSG^%TRMVT("Error:"_Z.piece("|",2),"",1)
+	}
+
+	type IO io=Class.new("IO")
+	set io.fileName=TDRV
+	set io.openParams="READ"
+	set io.timeout=5
+	set io.recordSize=400
+	do io.open()
+
+	type IO ioout=Class.new("IO")
+	set ioout.fileName="/tmp/zckdtj_2.txt"
+	set ioout.openParams="NEWV/WRITE"
+	set ioout.recordSize=400
+	do ioout.open()
+
+	for  set REC=io.read(.ETYP) quit:+ETYP'=0  do {
+
+		set TREC=$$RTB^%ZFUNC(REC)
+		if TREC=""!(TREC=$C(26))!(TREC=$C(13)) quit
+
+		set ZCKNO=+REC.piece("|",1)
+		set ZCID=+REC.piece("|",2)
+		set ZAMT=+REC.piece("|",3)
+		set ZSTR=ZCKNO_$C(9)_ZCID_$C(9)_ZAMT_$C(9)
+
+		set ZSQL="TJD=:ZTJD AND UID=:ZUID AND CHKNUM=:ZCKNO AND TAMT=:ZAMT"
+		type DbSet db1=Db.selectDbSet("ZTMPBCHUID",ZSQL)
+		if 'db1.isEmpty() set ZRESULT="DTJ"
+		if db1.isEmpty() do {
+			set ZSQL="TJD=:ZTJD AND UID=:ZUID AND CK=:ZCKNO AND TAMT=:ZAMT"
+			type DbSet db2=Db.selectDbSet("EXC",ZSQL)
+			if 'db2.isEmpty() set ZRESULT="EXC"
+			if db2.isEmpty() set ZRESULT="NO DATA"
+		}
+
+		do ioout.write(ZSTR_ZRESULT)
+	}
+
+	do ioout.close()
+	do io.close()
+
+	quit
+
+
+ZCKREG
+
+	set SPLDIR="/tmp/"
+	set ZFILE="zckreg_1.txt"
+	set TDRV=$$FILE^%TRNLNM(ZFILE,SPLDIR)
+
+	set Z=$$FILE^%ZOPEN(TDRV,"READ",5)
+	if Z.piece("|",1)=0 do { quit
+		write $$MSG^%TRMVT("Error:"_Z.piece("|",2),"",1)
+	}
+
+	type IO io=Class.new("IO")
+	set io.fileName=TDRV
+	set io.openParams="READ"
+	set io.timeout=5
+	set io.recordSize=400
+	do io.open()
+
+	type IO ioout=Class.new("IO")
+	set ioout.fileName="/tmp/zckreg_2.txt"
+	set ioout.openParams="NEWV/WRITE"
+	set ioout.recordSize=400
+	do ioout.open()
+
+	for  set REC=io.read(.ETYP) quit:+ETYP'=0  do {
+		set TREC=$$RTB^%ZFUNC(REC)
+		if TREC=""!(TREC=$C(26))!(TREC=$C(13)) quit
+
+		set ZBR=+$$TRIM^%ZS($E(REC,1,3))
+
+		type DbSet db=Db.selectDbSet("ZUTBLBKBR","BK=6 AND CKREG=:ZBR")
+		if db.isEmpty() quit
+
+		while db.next() do {
+
+			type RecordZUTBLBKBR zbkbr=db.getRecord("ZUTBLBKBR")
+			if 'zbkbr.getMode() quit
+
+			set ZBRCD=+zbkbr.brcd
+			set ZNAME=zbkbr.brnam
+
+			do ioout.write(ZBR_$C(9)_ZBRCD_$C(9)_ZNAME)
+		}
+	}
+
+	do ioout.close()
+	do io.close()
+
+	quit
+
+
+ZSTATCHQ
+
+	set ZCNT=0
+	set ZBRCD=""
+	set ZSTAT=""
+
+	type DbSet db=Db.selectDbSet("ZCHECK",,"BRCD,CHKSTS ASC")
+	if db.isEmpty() quit
+
+	while db.next() do {
+
+		type RecordZCHECK zcheck=db.getRecord("ZCHECK")
+		if 'zcheck.getMode() quit
+
+		if ZBRCD=zcheck.brcd, ZSTAT=zcheck.chksts do {
+			set ZCNT=ZCNT+1
+		}
+		else  do {
+			write ZBRCD_$C(9)_ZSTAT_$C(9)_ZCNT,!
+			set ZSTAT=zcheck.chksts
+			set ZBRCD=zcheck.brcd
+			set ZCNT=1
+		}
+	}
+
+	quit
+
+
+ZSTATDEP
+
+	set ZCNT=0
+	set ZGRP=""
+	set ZSTAT=""
+	set ZDESC=""
+
+	type DbSet db=Db.selectDbSet("DEP",,"GRP,STAT ASC")
+	if db.isEmpty() quit
+
+	while db.next() do {
+
+		type RecordDEP zdep=db.getRecord("DEP")
+		if 'zdep.getMode() quit
+
+		if ZGRP=zdep.grp, ZSTAT=zdep.stat do {
+			set ZCNT=ZCNT+1
+		}
+		else  do {
+			write ZGRP_$C(9)_ZSTAT_$C(9)_ZDESC_$C(9)_ZCNT,!
+			set ZSTAT=zdep.stat
+			set ZDESC=zdep.zstat
+			set ZGRP=zdep.grp
+			set ZCNT=1
+		}
+	}
+
+	quit
+
+
+ZTMPUID
+
+	type String %TAB,%READ,VFMQ
+
+	set %TAB("ZTJD")="/DES=Transaction Date/LEN=10/TYP=D"
+	set %TAB("ZGRP")="/DES=Group Type/LEN=3/TYP=T"
+	set %TAB("ZETC")="/DES=Transaction Code/LEN=5/TYP=T"
+	set %TAB("ZAMT")="/DES=Amount/LEN=12/TYP=T"
+	set %READ="@@%FN/REV/CEN,,,ZTJD/REQ,ZGRP/REQ,ZETC/REQ,ZAMT/REQ"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	type DbSet db1=Db.selectDbSet("ZTMPBCHUID","GRP=:ZGRP AND TJD=:ZTJD AND ETC=:ZETC AND TAMT=:ZAMT")
+	if db1.isEmpty() quit
+
+	while db1.next() do {
+
+		type RecordZTMPBCHUID ztmp=db1.getRecord("ZTMPBCHUID")
+		if 'ztmp.getMode() quit
+
+		set ZCID1=ztmp.cid
+		set ZCID2=ztmp.tcmt.piece("TFR-",2)
+
+		type DbSet db2=Db.selectDbSet("ZTMPBCHUID","GRP=:ZGRP AND TJD=:ZTJD AND ETC<>:ZETC AND TAMT=:ZAMT AND CID=:ZCID2")
+		if db2.isEmpty() do {
+
+			type DbSet db3=Db.selectDbSet("RFLG","CID=:ZCID2")
+			if db3.isEmpty() write ZCID1_" "_ZCID2_" RFLG not found.",! quit
+
+			while db3.next() do {
+
+				type RecordRFLG zrflg=db3.getRecord("RFLG")
+				if 'zrflg.getMode() write ZCID1_" "_ZCID2_" RFLG no data.",! quit
+
+				set ZRES=zrflg.desc
+				write ZCID1_" "_ZCID2_" "_ZRES,!
+			}
+		}
+
+		if 'db2.isEmpty() write ZCID1_" "_ZCID2,!
+	}
+
+	quit
+
+
+ZCHQCLR
+
+	set SPLDIR="/tmp/"
+	set ZFILE="zchqclr_1.txt"
+	set TDRV=$$FILE^%TRNLNM(ZFILE,SPLDIR)
+
+	set Z=$$FILE^%ZOPEN(TDRV,"READ",5)
+	if Z.piece("|",1)=0 do { quit
+		write $$MSG^%TRMVT("Error:"_Z.piece("|",2),"",1)
+	}
+
+	type IO io=Class.new("IO")
+	set io.fileName=TDRV
+	set io.openParams="READ"
+	set io.timeout=5
+	set io.recordSize=400
+	do io.open()
+
+	type IO ioout=Class.new("IO")
+	set ioout.fileName="/tmp/zchqclr_2.txt"
+	set ioout.openParams="NEWV/WRITE"
+	set ioout.recordSize=400
+	do ioout.open()
+
+	for  set REC=io.read(.ETYP) quit:+ETYP'=0  do {
+
+		set TREC=$$RTB^%ZFUNC(REC)
+		if TREC=""!(TREC=$C(26))!(TREC=$C(13)) quit
+
+		set ZCKNO=+REC.piece("|",1)
+		set ZCID=+REC.piece("|",2)
+		set ZSTR=ZCKNO_$C(9)_ZCID
+
+		type ResultSet rs=Db.select("AMT,FTC","ZCHQCLR","CHQ=:ZCKNO AND CID=:ZCID")
+		if rs.isEmpty() do ioout.write(ZSTR_"-") quit
+
+		while rs.next() do {
+			set ZAMT=rs.getCol(1)
+			set ZFTC=rs.getCol(2)
+		}
+
+		do ioout.write(ZSTR_$C(9)_ZAMT_$C(9)_ZFTC)
+	}
+
+	do ioout.close()
+	do io.close()
+
+	quit
+
+
+ZTAXCHQ
+
+	set SPLDIR="/tmp/"
+	set ZFILE="ztaxchq_1.txt"
+	set TDRV=$$FILE^%TRNLNM(ZFILE,SPLDIR)
+
+	set Z=$$FILE^%ZOPEN(TDRV,"READ",5)
+	if Z.piece("|",1)=0 do { quit
+		write $$MSG^%TRMVT("Error:"_Z.piece("|",2),"",1)
+	}
+
+	type IO io=Class.new("IO")
+	set io.fileName=TDRV
+	set io.openParams="READ"
+	set io.timeout=5
+	set io.recordSize=400
+	do io.open()
+
+	type IO ioout=Class.new("IO")
+	set ioout.fileName="/tmp/ztaxchq_2.txt"
+	set ioout.openParams="NEWV/WRITE"
+	set ioout.recordSize=400
+	do ioout.open()
+
+	for  set REC=io.read(.ETYP) quit:+ETYP'=0  do {
+
+		set TREC=$$RTB^%ZFUNC(REC)
+		if TREC=""!(TREC=$C(26))!(TREC=$C(13)) quit
+
+		set ZPIN=+$$TRIM^%ZS(REC)
+
+		type DbSet db1=Db.selectDbSet("ZUTBLTAXCHQ","PIN=:ZPIN")
+		if db1.isEmpty() do ioout.write(ZPIN) quit
+
+		while db1.next() do {
+
+			type RecordZUTBLTAXCHQ ztaxchq=db1.getRecord("ZUTBLTAXCHQ")
+			set ZDATA=ztaxchq.pin
+			set ZDATA=ZDATA_"|"_ztaxchq.chkno
+			set ZDATA=ZDATA_"|"_ztaxchq.tin
+			set ZDATA=ZDATA_"|"_ztaxchq.title
+			set ZDATA=ZDATA_"|"_ztaxchq.name
+			set ZDATA=ZDATA_"|"_ztaxchq.surname
+			set ZDATA=ZDATA_"|"_ztaxchq.chqamt
+			set ZDATA=ZDATA_"|"_ztaxchq.duedate
+			set ZDATA=ZDATA_"|"_ztaxchq.pflag
+			set ZDATA=ZDATA_"|"_ztaxchq.pdate
+			set ZDATA=ZDATA_"|"_ztaxchq.ptime
+			set ZDATA=ZDATA_"|"_ztaxchq.brcd
+			set ZDATA=ZDATA_"|"_ztaxchq.uid
+			set ZDATA=ZDATA_"|"_ztaxchq.impdate
+			set ZDATA=ZDATA_"|"_ztaxchq.imptime
+			set ZDATA=ZDATA_"|"_ztaxchq.cid
+			set ZDATA=ZDATA_"|"_ztaxchq.delflg
+
+			do ioout.write(ZDATA)
+		}
+	}
+
+	do ioout.close()
+	do io.close()
+
+	quit
+
+
+ZCHQALLA(ZCID,ZLCHQ,ZHCHQ) // Allocate cheque
+
+	if ZLCHQ'>0 write "ZLCHQ<=0" quit
+	if ZHCHQ'>0 write "ZHCHQ<=0" quit
+	if ZLCHQ.length()>7 write "ZLCHQ.length>7" quit
+	if ZHCHQ.length()>7 write "ZHCHQ.length>7" quit
+	if ZHCHQ<ZLCHQ write "ZHCHQ<=ZLCHQ " quit
+
+	type DbSet db=Db.selectDbSet("ZCHQALLA","CID=:ZCID AND HCHQ>=:ZLCHQ AND LCHQ<=:ZHCHQ")
+	if db.isEmpty() write "CHQ "_ZLCHQ_"-"_ZHCHQ_" can allocate" quit
+
+	while db.next() do {
+		type RecordZCHQALLA zchqalla=db.getRecord("ZCHQALLA")
+		write zchqalla.cid_"|"_zchqalla.lchq_"|"_zchqalla.hchq_"|"_zchqalla.chkcnt,!
+	}
+
+	quit
+
+
+CHKOPT
+	type public Number ER
+	type public String RM, X, CHKOPT
+
+	//1411 - Invalid option
+	if '{List}"1,2".contains(X) set ER = 1,RM = $$^MSG(1411)
+	set CHKOPT = X
+	quit
+
+
+ZCKADD1 // delete record for dupplicate chq
+
+	type String %TAB,%READ,VFMQ
+
+	set ZPID=%ProcessID_%CurrentTime
+	set SPLDIR="/tmp/"
+	set ZFILE="zallocatechq.txt"
+	set TDRV=$$FILE^%TRNLNM(ZFILE,SPLDIR)
+
+	set %TAB("TDRV")="/DES=Source File/LEN=30/TYP=T"
+	set %TAB("ZTYPE")="/DES=Cheque option (1)PERS (2)Money Transfer/LEN=1/TYP=N/XPP=D CHKOPT^ZBOYTEST"
+	set %READ="@@%FN/REV/CEN,,,TDRV/REQ,ZTYPE/REQ"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	set Z=$$FILE^%ZOPEN(TDRV,"READ",5)
+	if Z.piece("|",1)=0 do { quit
+		write $$MSG^%TRMVT("Error:"_Z.piece("|",2),"",1)
+	}
+
+	type IO io=Class.new("IO")
+	set io.fileName=TDRV
+	set io.openParams="READ"
+	set io.timeout=5
+	set io.recordSize=400
+	do io.open()
+
+	type IO ioout=Class.new("IO")
+	set ioout.fileName="/tmp/zallocatelog.txt"
+	set ioout.openParams="NEWV/WRITE"
+	set ioout.recordSize=400
+	do ioout.open()
+
+	for  set REC=io.read(.ETYP) quit:+ETYP'=0  do {
+
+		set TREC=$$RTB^%ZFUNC(REC)
+		if TREC=""!(TREC=$C(26))!(TREC=$C(13)) quit
+
+		set ZCID=+REC.piece("|",1)
+		set ZLCHQ=+REC.piece("|",2)
+		set ZHCHQ=+REC.piece("|",3)
+
+		if ZHCHQ=0 set ZHCHQ=ZLCHQ
+
+		if (ZLCHQ'>0) ! (ZHCHQ'>0) ! (ZLCHQ.length()>7) ! (ZHCHQ.length()>7) ! (ZHCHQ<ZLCHQ) do ioout.write("|error length||"_ZCID_"|"_ZLCHQ_"|"_ZHCHQ_"|") quit
+
+		type RecordDEP zdep=Db.getRecord("DEP","CID=:ZCID",1)
+		if 'zdep.getMode() do ioout.write("|error cid||"_ZCID_"|"_ZLCHQ_"|"_ZHCHQ_"|") quit
+
+		set ZCHKS=zdep.zchks
+		set ZTJD=%SystemDate
+
+		if ZTYPE=1 {
+			do Db.delete("ZCHECK","CID=:ZCID AND CHKS=:ZCHKS")
+			//do ioout.write("PERS|deleted|ZCHECK|"_ZCID_"|"_ZLCHQ_"|"_ZHCHQ_"|"_ZCHKS)
+
+			do Db.delete("ZCHQALLA","CID=:ZCID AND CHKS=:ZCHKS")
+			//do ioout.write("PERS|deleted|ZCHQALLA|"_ZCID_"|"_ZLCHQ_"|"_ZHCHQ_"|"_ZCHKS)
+
+			do Db.delete("ZLCHQALL","CID=:ZCID AND CHKS=:ZCHKS")
+			//do ioout.write("PERS|deleted|ZLCHQALL|"_ZCID_"|"_ZLCHQ_"|"_ZHCHQ_"|"_ZCHKS)
+
+			do ALLOC^ZCKALLOC(ZCID,ZLCHQ,ZHCHQ,ZPID,ZTJD,ZCHKS)
+			do ioout.write("PERS|allocated|ALLOC|"_ZCID_"|"_ZLCHQ_"|"_ZHCHQ_"|"_ZCHKS)
+		}
+		else  {
+			type DbSet db=Db.selectDbSet("ZCHQALLA","CID=:ZCID AND CHKS=:ZCHKS")
+			while db.next() do {
+				type RecordZCHQALLA zchqalla=db.getRecord("ZCHQALLA")
+				if 'zchqalla.getMode() do ioout.write("MT||ZCHQALLA|"_ZCID_"|"_ZLCHQ_"|"_ZHCHQ_"|"_ZCHKS) quit
+
+				do Db.delete("ZARS","CID=:ZCID AND CKNO>=:zchqalla.lchq AND CKNO<=:zchqalla.hchq")
+				//do ioout.write("MT|deleted|ZARS|"_ZCID_"|"_zchqalla.lchq_"|"_zchqalla.hchq_"|"_ZCHKS)
+
+				do Db.delete("ARS","CID=:ZCID AND CKNO>=:zchqalla.lchq AND CKNO<=:zchqalla.hchq")
+				//do ioout.write("MT|deleted|ARS|"_ZCID_"|"_zchqalla.lchq_"|"_zchqalla.hchq_"|"_ZCHKS)
+			}
+
+			do Db.delete("ZCHQALLA","CID=:ZCID AND CHKS=:ZCHKS")
+			//do ioout.write("MT|deleted|ZCHQALLA|"_ZCID_"|"_ZLCHQ_"|"_ZHCHQ_"|"_ZCHKS)
+
+			do Db.delete("ZLCHQALL","CID=:ZCID AND CHKS=:ZCHKS")
+			//do ioout.write("MT|deleted|ZLCHQALL|"_ZCID_"|"_ZLCHQ_"|"_ZHCHQ_"|"_ZCHKS)
+
+			do MTALLOC^ZCKALLOC(ZCID,ZLCHQ,ZHCHQ,ZPID,ZTJD,ZCHKS)
+			do ioout.write("MT|allocated|MTALLOC|"_ZCID_"|"_ZLCHQ_"|"_ZHCHQ_"|"_ZCHKS)
+		}
+	}
+
+	do ioout.close()
+	do io.close()
+
+	quit
+
+
+ZCKADD2 // update record for dupplicate chq
+
+	type String %TAB,%READ,VFMQ
+
+	set ZPID=%ProcessID_%CurrentTime
+	set SPLDIR="/tmp/"
+	set ZFILE="zallocatechq.txt"
+	set TDRV=$$FILE^%TRNLNM(ZFILE,SPLDIR)
+
+	set %TAB("TDRV")="/DES=Source File/LEN=30/TYP=T"
+	set %TAB("ZTYPE")="/DES=Cheque option (1)PERS (2)Money Transfer/LEN=1/TYP=N/XPP=D CHKOPT^ZBOYTEST"
+	set %READ="@@%FN/REV/CEN,,,TDRV/REQ,ZTYPE/REQ"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	set Z=$$FILE^%ZOPEN(TDRV,"READ",5)
+	if Z.piece("|",1)=0 do { quit
+		write $$MSG^%TRMVT("Error:"_Z.piece("|",2),"",1)
+	}
+
+	type IO io=Class.new("IO")
+	set io.fileName=TDRV
+	set io.openParams="READ"
+	set io.timeout=5
+	set io.recordSize=400
+	do io.open()
+
+	type IO ioout=Class.new("IO")
+	set ioout.fileName="/tmp/zallocatelog.txt"
+	set ioout.openParams="NEWV/WRITE"
+	set ioout.recordSize=400
+	do ioout.open()
+
+	for  set REC=io.read(.ETYP) quit:+ETYP'=0  do {
+
+		set TREC=$$RTB^%ZFUNC(REC)
+		if TREC=""!(TREC=$C(26))!(TREC=$C(13)) quit
+
+		set ZCID=+REC.piece("|",1)
+		set ZCHQ=+REC.piece("|",2)
+
+		type RecordDEP zdep=Db.getRecord("DEP","CID=:ZCID",1)
+		if 'zdep.getMode() do ioout.write("PERS|invalid account|"_ZCID_"|"_ZCHQ_"|") quit
+
+		set ZCHKS=zdep.zchks
+		set ZTJD=%SystemDate
+
+		if ZTYPE=1 {
+			type RecordZCHECK zcheck=Db.getRecord("ZCHECK","CID=:ZCID,CHKS=:ZCHKS,CHKNUM=:ZCHQ",1)
+
+			if zcheck.getMode() {
+				do zcheck.setAuditFlag(1)
+				set zcheck.chksts=11
+				do zcheck.bypassSave()
+				do ioout.write("PERS|update stat|"_ZCID_"|"_ZCHQ_"|"_ZCHKS)
+			}
+
+			if 'zcheck.getMode() {
+				do ALLOC^ZCKALLOC(ZCID,ZCHQ,ZCHQ,ZPID,ZTJD,ZCHKS)
+				do ioout.write("PERS|allocated|"_ZCID_"|"_ZCHQ_"|"_ZCHKS)
+			}
+		}
+
+		if ZTYPE=2 {
+			type DbSet ds = Db.selectDbSet("ZCHQALLA","CID=:ZCID AND CHKS=:ZCHKS AND LCHQ>=:ZCHQ AND HCHQ<=:ZCHQ")
+			if 'ds.isEmpty() {
+				type RecordZARS zars=Db.getRecord("ZARS","CID=:ZCID,CKNO=:ZCHQ")
+
+				if zars.getMode() {
+					do zars.setAuditFlag(1)
+					set zars.zstat="O"
+					do zars.bypassSave()
+					do ioout.write("MT|update stat|"_ZCID_"|"_ZCHQ_"|"_ZCHKS)
+				}
+
+				if 'zars.getMode() {
+					do ioout.write("MT|not in zars|"_ZCID_"|"_ZCHQ_"|"_ZCHKS)
+				}
+			}
+
+			if ds.isEmpty() {
+				do MTALLOC^ZCKALLOC(ZCID,ZCHQ,ZCHQ,ZPID,ZTJD,ZCHKS)
+				do ioout.write("MT|allocated||"_ZCID_"|"_ZCHQ_"|"_ZCHKS)
+			}
+		}
+	}
+
+	do ioout.close()
+	do io.close()
+
+	quit
+
+
+ZCMPSTAT
+
+	type String %TAB,%READ,VFMQ
+
+	set ZPID=%ProcessID_%CurrentTime
+	set SPLDIR="/tmp/"
+	set ZFILE="zars_1.txt"
+	set TDRV=$$FILE^%TRNLNM(ZFILE,SPLDIR)
+
+	set %TAB("TDRV")="/DES=Source File/LEN=30/TYP=T"
+	set %READ="@@%FN/REV/CEN,,,TDRV/REQ"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	set Z=$$FILE^%ZOPEN(TDRV,"READ",5)
+	if Z.piece("|",1)=0 do { quit
+		write $$MSG^%TRMVT("Error:"_Z.piece("|",2),"",1)
+	}
+
+	type IO io=Class.new("IO")
+	set io.fileName=TDRV
+	set io.openParams="READ"
+	set io.timeout=5
+	set io.recordSize=400
+	do io.open()
+
+	type IO ioout=Class.new("IO")
+	set ioout.fileName="/tmp/zars_2.txt"
+	set ioout.openParams="NEWV/WRITE"
+	set ioout.recordSize=400
+	do ioout.open()
+
+	for  set REC=io.read(.ETYP) quit:+ETYP'=0  do {
+
+		set TREC=$$RTB^%ZFUNC(REC)
+		if TREC=""!(TREC=$C(26))!(TREC=$C(13)) quit
+
+		set ZCID=+REC.piece("|",1)
+		set ZCHQ=+REC.piece("|",2)
+		set ZAMT=+REC.piece("|",3)
+		set ZSTAT=REC.piece("|",4)
+
+		type RecordZARS zars=Db.getRecord("ZARS","CID=:ZCID,CKNO=:ZCHQ",1)
+		if 'zars.getMode() do ioout.write("0|"_ZCID_"|"_ZCHQ_"|"_ZAMT_"|"_ZSTAT_"|") quit // Not found
+		if 'zars.zstat=ZSTAT do ioout.write("1|"_ZCID_"|"_ZCHQ_"|"_ZAMT_"|"_ZSTAT_"|"_zars.zstat) // Stat changed
+		else  do ioout.write("2|"_ZCID_"|"_ZCHQ_"|"_ZAMT_"|"_ZSTAT_"|"_zars.zstat) // Stat not changed
+	}
+
+	do ioout.close()
+	do io.close()
+
+	quit
+
+
+GENSCD(ZCID,ZCK)
+
+	type Number INT=10000
+	new PIECE1,PIECE2,PIECE3,ZSCD
+
+	//Piece1 of Secret Code (Position 1-4)
+	set CKNO=ZCK			//Check Number
+	set PIECE1=$$BASECONV^ZKTBUTIL(CKNO,36,4) //Change CKNO to 4 Secret Codes in Base36
+
+	//Piece2 of Secret Code (Position 5)
+	type RecordDEP dep=Db.getRecord("DEP","CID=:ZCID")	
+	set PIECE2=dep.zchks //Official Check Type at this Position		
+
+	//Piece3 of Secret Code (Position 6)
+	set PIECE3="ABCDEFQHIJKLMNOPQRSTUVWXYZ".extract(INT.random()#26) //Julian Time at this Position
+	if PIECE3="" set PIECE3="Z"
+
+	set ZSCD=PIECE1_PIECE2_PIECE3 //Combine 3 Pieces	
+
+	quit ZSCD
+
+
+ZGENSCD
+
+	type IO ioout=Class.new("IO")
+	set ioout.fileName="/tmp/zgenscd.txt"
+	set ioout.openParams="NEWV/WRITE"
+	set ioout.recordSize=400
+	do ioout.open()
+
+	set WTIME=1
+	set ZCID=1527900003
+	set ZHCHQ=593000
+	set ZLCHQ=562001
+
+	for i=ZLCHQ:1:ZHCHQ do {
+		set ZSCD=$$GENSCD(ZCID,i)
+		do ioout.write(ZCID_"|"_i_"|"_ZSCD)
+		//set X=$$WAIT^%ZFUNC(WTIME)
+	}
+
+	do ioout.close()
+
+	quit
+
+
+
+ZSUMCC
+
+	type String %TAB,%READ,VFMQ
+
+	set SPLDIR="/tmp/"
+	set ZFILE="zsumcc.txt"
+	set TDRV=$$FILE^%TRNLNM(ZFILE,SPLDIR)
+
+	set %TAB("TDRV")="/DES=Source File/LEN=30/TYP=T"
+	set %READ="@@%FN/REV/CEN,,,TDRV/REQ"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	set Z=$$FILE^%ZOPEN(TDRV,"READ",5)
+	if Z.piece("|",1)=0 do { quit
+		write $$MSG^%TRMVT("Error:"_Z.piece("|",2),"",1)
+	}
+
+	type IO io=Class.new("IO")
+	set io.fileName=TDRV
+	set io.openParams="READ"
+	set io.timeout=5
+	set io.recordSize=400
+	do io.open()
+
+	for  set REC=io.read(.ETYP) quit:+ETYP'=0  do {
+
+		set TREC=$$RTB^%ZFUNC(REC)
+		if TREC=""!(TREC=$C(26))!(TREC=$C(13)) quit
+
+		set ZCC=+REC.piece("|",1)
+		set ZCID=+REC.piece("|",2)
+		set ZITC=REC.piece("|",3)
+		set ZAMT=+REC.piece("|",4)
+
+		type RecordZTMPIO ztmp=Db.getRecord("ZTMPIO","CC=:ZCC",1)
+		if (ZCID'="16036950"),(ZITC="DR") set ztmp.dr1=(+ztmp.dr1)+ZAMT
+		if (ZCID'="16036950"),(ZITC="CR") set ztmp.cr1=(+ztmp.cr1)+ZAMT
+		if (ZCID="16036950"),(ZITC="DR") set ztmp.dr2=(+ztmp.dr2)+ZAMT
+		if (ZCID="16036950"),(ZITC="CR") set ztmp.cr2=(+ztmp.cr2)+ZAMT
+		do ztmp.save()
+	}
+
+	do io.close()
+
+	quit
+
+
+ZGFCHQ
+
+	type String %TAB,%READ,VFMQ
+
+	set SPLDIR="/tmp/"
+	set ZFILE="zgfcid1.txt"
+	set TDRV=$$FILE^%TRNLNM(ZFILE,SPLDIR)
+
+	set %TAB("TDRV")="/DES=Source File/LEN=30/TYP=T"
+	set %READ="@@%FN/REV/CEN,,,TDRV/REQ"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	set Z=$$FILE^%ZOPEN(TDRV,"READ",5)
+	if Z.piece("|",1)=0 do { quit
+		write $$MSG^%TRMVT("Error:"_Z.piece("|",2),"",1)
+	}
+
+	type IO io=Class.new("IO")
+	set io.fileName=TDRV
+	set io.openParams="READ"
+	set io.timeout=5
+	set io.recordSize=400
+	do io.open()
+
+	type IO ioout=Class.new("IO")
+	set ioout.fileName="/tmp/zgfcid2.txt"
+	set ioout.openParams="NEWV/WRITE"
+	set ioout.recordSize=400
+	do ioout.open()
+
+	for  set REC=io.read(.ETYP) quit:+ETYP'=0  do {
+
+		set TREC=$$RTB^%ZFUNC(REC)
+		if TREC=""!(TREC=$C(26))!(TREC=$C(13)) quit
+
+		set ZCID=+REC
+		set ZCLSTR=""
+		set ZBCSTR=""
+		set ZCBSTR=""
+		set ZCKTSTR=""
+		set ZSTART=$$^SCAJD("01/11/2010","DD/MM/YEAR")
+
+		for i=1:1:5 do {
+
+			set ZCLCNT=0
+			set ZCLSUM=0
+			set ZBCCNT=0
+			set ZBCSUM=0
+			set ZCBCNT=0
+			set ZCBSUM=0
+			set ZCKTCNT=0
+			set ZCKTSUM=0
+			set ZEND=$$DDMATH^SCADAT(ZSTART,"1/0/0",1)
+	
+			type RecordZUTBLGFCID zgfcid=Db.getRecord("ZUTBLGFCID","CID=:ZCID",1)
+			if 'zgfcid.getMode() quit
+	
+			type DbSet db=Db.selectDbSet("ZCLCHQ","EJD>=:ZSTART AND EJD<:ZEND AND DRCR=0 AND CUSTCID=:ZCID")
+			while db.next() do {
+	
+				type RecordZCLCHQ zclchq=db.getRecord("ZCLCHQ")
+	
+				// CL
+				if {List}"1,2,3,19".contains(zclchq.hldcon) do {
+					set ZCLCNT=ZCLCNT+1
+					set ZCLSUM=ZCLSUM+zclchq.amt
+				}
+	
+				// BC
+				if {List}"4,5,6,10,11".contains(zclchq.hldcon) do {
+					set ZBCCNT=ZBCCNT+1
+					set ZBCSUM=ZBCSUM+zclchq.amt
+				}
+			}
+	
+			type DbSet db=Db.selectDbSet("ZCBCHQ","EJD>=:ZSTART AND EJD<:ZEND AND CUSTCID=:ZCID")
+			while db.next() do {
+	
+				type RecordZCBCHQ zcbchq=db.getRecord("ZCBCHQ")
+	
+				set ZCBCNT=ZCBCNT+1
+				set ZCBSUM=ZCBSUM+zcbchq.amt
+			}
+	
+			type DbSet db=Db.selectDbSet("ZCKTCHQ","TJD>=:ZSTART AND TJD<:ZEND AND CUSTCID=:ZCID AND ECFLG=0")
+			while db.next() do {
+	
+				type RecordZCKTCHQ zcktchq=db.getRecord("ZCKTCHQ")
+	
+				set ZCKTCNT=ZCKTCNT+1
+				set ZCKTSUM=ZCKTSUM+zcktchq.amt
+			}
+
+			set ZSTART=ZEND
+			set ZCLSTR=ZCLSTR_ZCLCNT_"|"_ZCLSUM_"|"
+			set ZBCSTR=ZBCSTR_ZBCCNT_"|"_ZBCSUM_"|"
+			set ZCBSTR=ZCBSTR_ZCBCNT_"|"_ZCBSUM_"|"
+			set ZCKTSTR=ZCKTSTR_ZCKTCNT_"|"_ZCKTSUM_"|"
+		}
+
+		do ioout.write(ZCID_"|"_ZCLSTR_"|"_ZBCSTR_"|"_ZCBSTR_"|"_ZCKTSTR)
+	}
+
+	do ioout.close()
+	do io.close()
+
+	quit
+
+
+ZRFLG
+
+	type String %TAB,%READ,VFMQ
+
+	set SPLDIR="/tmp/"
+	set ZFILE="zrflg1.txt"
+	set TDRV=$$FILE^%TRNLNM(ZFILE,SPLDIR)
+
+	set %TAB("TDRV")="/DES=Source File/LEN=30/TYP=T"
+	set %READ="@@%FN/REV/CEN,,,TDRV/REQ"
+
+	do ^UTLREAD
+
+	if VFMQ="Q" quit
+
+	set Z=$$FILE^%ZOPEN(TDRV,"READ",5)
+	if Z.piece("|",1)=0 do { quit
+		write $$MSG^%TRMVT("Error:"_Z.piece("|",2),"",1)
+	}
+
+	type IO io=Class.new("IO")
+	set io.fileName=TDRV
+	set io.openParams="READ"
+	set io.timeout=5
+	set io.recordSize=400
+	do io.open()
+
+	type IO ioout=Class.new("IO")
+	set ioout.fileName="/tmp/zrflg2.txt"
+	set ioout.openParams="NEWV/WRITE"
+	set ioout.recordSize=400
+	do ioout.open()
+
+	for  set REC=io.read(.ETYP) quit:+ETYP'=0  do {
+
+		set TREC=$$RTB^%ZFUNC(REC)
+		if TREC=""!(TREC=$C(26))!(TREC=$C(13)) quit
+
+		set ZCID=+REC
+
+		type DbSet db=Db.selectDbSet("RFLG","CID=:ZCID")
+		while db.next() do {
+			do ioout.write(ZCID)
+		}
+	}
+
+	do ioout.close()
+	do io.close()
+
+	quit
+
+
+ZFINDACC
+
+	type IO ioout=Class.new("IO")
+        set ioout.fileName="zboytest.txt"
+        set ioout.directory="/tmp"
+        set ioout.openParams="NEWV/WRITE"
+        set ioout.recordSize=700
+        do ioout.open()
+
+	set BOM(1)="4/1/2011"
+	set BOM(2)="1/2/2011"
+	set BOM(3)="1/3/2011"
+	set BOM(4)="1/4/2011"
+	set BOM(5)="3/5/2011"
+	set BOM(6)="1/6/2011"
+
+	set EOM(1)="30/12/2010"
+	set EOM(2)="31/1/2011"
+	set EOM(3)="28/2/2011"
+	set EOM(4)="31/3/2011"
+	set EOM(5)="29/4/2011"
+	set EOM(6)="31/5/2011"
+
+	for i=1:1:6 do {
+		set ZBOM=$$^SCAJD(BOM(i),"DD/MM/YEAR")
+		set ZEOM=$$^SCAJD(EOM(i),"DD/MM/YEAR")
+
+		type DbSet db1=Db.selectDbSet("ZDAYENDEFD","TJD=:ZBOM")
+		while db1.next() do {
+			type RecordZDAYENDEFD zdayend=db1.getRecord("ZDAYENDEFD")
+			set ZCID=+zdayend.cid
+
+			type DbSet db2=Db.selectDbSet("HIST","TJD=:ZEOM AND CID=:ZCID AND ITC4=1 AND TCMT LIKE '%/NEGACRUN%'")
+			while db2.next() do {
+				type RecordHIST zhist=db2.getRecord("HIST")
+				set ZTSEQ=zhist.tseq
+				set ZCID=zhist.cid
+				set ZTJD=zhist.tjd
+				set ZEFD=zhist.efd
+				set ZETC=zhist.etc
+				set ZTAMT=zhist.tamt
+				set ZTCMT=zhist.tcmt
+				set ZREC=ZTSEQ_"|"_ZCID_"|"_ZTJD_"|"_ZEFD_"|"_ZETC_"|"_ZTAMT_"|"_ZTCMT
+	 			do ioout.write(ZREC)
+			}
+		}
+	}
+
+	do ioout.close()
+	quit

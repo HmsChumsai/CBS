@@ -1,0 +1,204 @@
+//DO NOT MODIFY  Rerun Batch for IB Dep HIST|ZREIBDEP||||||ZSTMTIB|FLG=:ZFLG||100|32000|ZTJD,ZFLG,SDATE,EDATE|0|||10|10|0||0||1
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	type String %READ,%TAB(),TBL(),VFMQ,X
+
+	/*
+	set TBL(0)="Rerun Date"
+	set TBL(1)="New(1)/Exist(2)"
+
+	set %TAB("XTJD")="|10||[SYSDEV,DTJ]TJD|||||D|Rerun Date"
+	set %TAB("ZRUN")="|1|||||||N|New(1)/Exist(2)"
+	set %READ="@@%FN,,,XTJD/REQ,ZRUN/REQ"
+
+	do ^UTLREAD if VFMQ="Q" set %BatchExit=1 quit
+	*/
+	
+	if XTJD.get()="" set %BatchExit=1 quit
+	if ZRUN.get()="" set %BatchExit=1 quit	
+	
+	set XTJD = $$FDAT^%ZM(XTJD,"YEARMMDD")
+	set ZTJD = XTJD
+	
+	set FNAME=""
+	set FILEDT=$$DAT^%ZM(XTJD,"YEARMMDD")
+	
+	if ZRUN=1 do {
+		set EDATE=XTJD+1
+		set SDATE=$$NJD^UFRE(EDATE,"12MA",,1)
+		set SDATE=SDATE-1
+		
+		set ZFLG=1
+		set FNAME="IB_ACCHIS_NEW_"_FILEDT_"_IN.TXT"
+		set OUTF="IB_ACCHIS_NEW_"_FILEDT_"_OUT"
+	}
+	if ZRUN=2 do {
+		set SDATE=XTJD-1
+		set EDATE=XTJD+1		
+
+		set ZFLG=2
+		set FNAME="IB_ACCHIS_EXIST_"_FILEDT_"_IN.TXT"
+		set OUTF="IB_ACCHIS_EXIST_"_FILEDT_"_OUT"
+	}
+	
+	set ZPATH=$$TRNLNM^%ZFUNC("SCAU_SPOOL_IBANKING")_"/"_FNAME
+	set ZY=$$SYS^%ZFUNC("ls "_ZPATH_" 2>/dev/null")
+	if ZY'=0 do { quit
+		set %BatchExit=1
+		type IO ionull = Class.new("IO")	
+		set ionull.directory =$$TRNLNM^%ZFUNC("SCAU_SPOOL_IBANKING")
+		set ionull.fileName =OUTF_".TXT"
+		set ionull.openParams = "NEWV/WRITE"
+		do ionull.open()
+		do ionull.write("H")
+		do ionull.write("F0000000")
+		set IOTYP="RMS"	
+		do ionull.close()
+		
+		type IO ionull2 = Class.new("IO")	
+		set ionull2.directory =$$TRNLNM^%ZFUNC("SCAU_SPOOL_IBANKING")
+		set ionull2.fileName =OUTF_".SW"
+		set ionull2.openParams = "NEWV/WRITE"
+		do ionull2.open()
+		set IOTYP="RMS"	
+		do ionull2.close()	
+		
+	}
+	
+	do Db.fastDelete("ZSTMTIB")
+	
+	// Read file
+	type IO io = Class.new("IO")	
+	set io.directory =$$TRNLNM^%ZFUNC("SCAU_SPOOL_IBANKING")
+	set io.fileName = FNAME	
+	set io.openParams = "READ"
+	do io.open()
+	set ZCNTCID=0
+	for  set REC = io.read(.ETYP) quit:(+ETYP'=0)  do {
+		set CHK=REC.extract(1,1)
+		
+		if CHK="F" do {
+			set ZFOOT=+REC.extract(2,8)
+			if ZCNTCID'=ZFOOT do {
+				do Db.fastDelete("ZSTMTIB",)
+			}
+		}
+		if (CHK'="H"),(CHK'="F"),(REC.get()'="") do {
+			set REC=+REC
+			type RecordZSTMTIB zstmtib=Db.getRecord("ZSTMTIB","FLG=:ZFLG,CID=:REC",1)
+			set zstmtib.flg=ZFLG
+			set zstmtib.cid=REC
+			do zstmtib.save()
+			set ZCNTCID=ZCNTCID+1
+		}
+		
+	}
+	
+	set IOTYP="RMS"
+	do io.close()
+	
+	if ZCNTCID=0 do { quit
+		set %BatchExit=1
+		type IO ionull = Class.new("IO")	
+		set ionull.directory =$$TRNLNM^%ZFUNC("SCAU_SPOOL_IBANKING")
+		set ionull.fileName =OUTF_".TXT"
+		set ionull.openParams = "NEWV/WRITE"
+		do ionull.open()
+		do ionull.write("H")
+		do ionull.write("F0000000")
+		set IOTYP="RMS"	
+		do ionull.close()
+		
+		type IO ionull2 = Class.new("IO")	
+		set ionull2.directory =$$TRNLNM^%ZFUNC("SCAU_SPOOL_IBANKING")
+		set ionull2.fileName =OUTF_".SW"
+		set ionull2.openParams = "NEWV/WRITE"
+		do ionull2.open()
+		set IOTYP="RMS"	
+		do ionull2.close()
+	}
+	
+	do Db.fastDelete("ZIBSTMT")
+	
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	set ZDAT=$$DAT^%ZM(ZTJD,"YEARMMDD")
+	
+	if ZFLG=1 set ZFILENAME="IB_ACCHIS_NEW_"_ZDAT_"_OUT"
+	if ZFLG=2 set ZFILENAME="IB_ACCHIS_EXIST_"_ZDAT_"_OUT"
+	// CREATE EXTRACT FILE (STATMENT) 
+	
+	type IO io1 = Class.new("IO")	
+	set io1.directory =$$TRNLNM^%ZFUNC("SCAU_SPOOL_IBANKING")
+	set io1.fileName =ZFILENAME_".TXT"
+	set io1.openParams = "NEWV/WRITE"
+	do io1.open()
+	do io1.write("H")
+	
+	new ztseq1,REC,ZCCNT,ZDCNT,ZCSUM,ZDSUM
+	set REC=""
+	set FILLER=""
+	set (ZCCNT,ZDCNT,ZCSUM,ZDSUM)=0
+	
+	set ZCOUNT=0
+	
+	//type ResultSet zcastmt=Db.select("PID,CID,TSEQ1","ZCASTMT","ITC1 IS NOT NULL")
+	type ResultSet zcastmt=Db.select("PID,CID,TSEQ1","ZIBSTMT")
+	while zcastmt.next() do {
+		new ZECFLG
+		set ZECFLG="0"
+		set ZPID=zcastmt.getCol("PID")
+		set ZCID=zcastmt.getCol("CID")
+		set ztseq1=zcastmt.getCol("TSEQ1")
+		
+		set ZCOUNT=ZCOUNT+1
+		type RecordZIBSTMT zibstmt=Db.getRecord("ZIBSTMT","PID=:ZPID,CID=:ZCID,TSEQ1=:ztseq1")
+		set REC=zibstmt.rec
+		do io1.write(REC)
+	}
+	
+	set REC="F"_ZCOUNT.zero(7)
+	do io1.write(REC)
+	
+	set IOTYP="RMS"	
+	do io1.close()
+	
+	type IO io2 = Class.new("IO")	
+	set io2.directory =$$TRNLNM^%ZFUNC("SCAU_SPOOL_IBANKING")
+	set io2.fileName =ZFILENAME_".SW"
+	set io2.openParams = "NEWV/WRITE"
+	do io2.open()
+	set IOTYP="RMS"	
+	do io2.close()
+	do Db.fastDelete("ZUTBLCAREP",)
+	do Db.fastDelete("ZSTMTORQ",)
+	
+	quit
+	
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	do Runtime.rollback()
+	set ZPID=%ProcessID
+	
+	set ZFDATE=SDATE
+	set ZTDATE=EDATE
+	
+	type RecordZSTMTIB zstmtib=Db.getRecord("ZSTMTIB","FLG=:FLG,CID=:CID")
+	set ZCID=zstmtib.cid
+	do RUN^ZBSTMTIB(CID)
+	
+	quit
+	
+---------- THREXIT ------ Section marker

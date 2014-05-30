@@ -1,0 +1,207 @@
+//DO NOT MODIFY  DTJFM Extract|ZBDTJFM||||||DTJFM|TJD=:ZTJD||100|32000|ZTJD,ZRND,ZEOM,BCHEOM,ZSEPATH,ZCJD|0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	do SYSVAR^SCADRV0()
+	set ZTJD=%SystemDate-1
+	set ZCJD=%SystemDate
+	set ZRND=$$DAT^%ZM(ZTJD,"YEARMMDD")
+	
+	//Statement Engine Path
+	set ZSEPATH=$$EXTPATH^ZSTMEG("SE",ZRND)
+	
+	//Statement Engine
+	type public IO io1,io2,io3,io4
+	new ZSENAM
+	set ZSENAM=""
+	
+	set ZSENAM="STMEP.CBS.SA1T36"
+	do OPENIO^ZSTMEG(ZSEPATH,"NEWV/WRITE",ZSENAM,.io1)
+	
+	set ZSENAM="STMEP.CBS.CA1T36"
+	do OPENIO^ZSTMEG(ZSEPATH,"NEWV/WRITE",ZSENAM,.io2)
+	
+	set ZSENAM="STMEP.CBS.FX1T36"
+	do OPENIO^ZSTMEG(ZSEPATH,"NEWV/WRITE",ZSENAM,.io3)
+	
+	set ZSENAM="STMEP.CBS.SF1T36"
+	do OPENIO^ZSTMEG(ZSEPATH,"NEWV/WRITE",ZSENAM,.io4)
+	
+	set IOTYP="RMS"
+	do io1.close()
+	do io2.close()
+	do io3.close()
+	do io4.close()
+	
+	
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	
+	
+	new IOTYP,ZSENAM1,ZSENAM2,ZSENAM3,ZSENAM4,ZCNT1,ZCNT2,ZCNT3,ZCNT4,ZFIXFLG,ZSFIXFLG
+	set (ZSENAM1,ZSENAM2,ZSENAM3,ZSENAM4)=""
+	set (ZCNT1,ZCNT2,ZCNT3,ZCNT4,ZFIXFLG,ZSFIXFLG)=0
+	
+	//Statement Engine
+	type public IO io1,io2,io3,io4
+	
+	set ZSENAM1="STMEP.CBS.SA1T36"
+	do OPENIO^ZSTMEG(ZSEPATH,"APPEND",ZSENAM1,.io1)
+	
+	set ZSENAM2="STMEP.CBS.CA1T36"
+	do OPENIO^ZSTMEG(ZSEPATH,"APPEND",ZSENAM2,.io2)
+	
+	set ZSENAM3="STMEP.CBS.FX1T36"
+	do OPENIO^ZSTMEG(ZSEPATH,"APPEND",ZSENAM3,.io3)
+	
+	set ZSENAM4="STMEP.CBS.SF1T36"
+	do OPENIO^ZSTMEG(ZSEPATH,"APPEND",ZSENAM4,.io4)
+	
+	
+	//write Header for Statement Engine
+	do SEHEAD^ZSTMEG("AcctInf",.io1,315)
+	do SEHEAD^ZSTMEG("AcctInf",.io2,315)
+	do SEHEAD^ZSTMEG("TermInfo",.io3,235)
+	do SEHEAD^ZSTMEG("TermInfo",.io4,235)
+	
+	set (ZCLS,ZGRP,ZTYP,ZCID,ZREC)=""
+	
+	for  set ZCLS=$O(^TMP("ZSEINFO",ZTJD,ZCLS)) quit:ZCLS=""  do {
+		for  set ZGRP=$O(^TMP("ZSEINFO",ZTJD,ZCLS,ZGRP)) quit:ZGRP=""  do {
+			for  set ZTYP=$O(^TMP("ZSEINFO",ZTJD,ZCLS,ZGRP,ZTYP)) quit:ZTYP=""  do {
+				set ZREC=""
+				for  set ZCID=$O(^TMP("ZSEINFO",ZTJD,ZCLS,ZGRP,ZTYP,ZCID)) quit:ZCID=""  do {
+					
+					if ZGRP="SAV" do {
+						//SAV Info
+						set ZREC=^TMP("ZSEINFO",ZTJD,ZCLS,ZGRP,ZTYP,ZCID)
+						do io1.write(ZREC)
+						set ZCNT1=ZCNT1+1
+					}
+						
+					if ZGRP="DDA" do {
+						//DDA Info
+						set ZREC=^TMP("ZSEINFO",ZTJD,ZCLS,ZGRP,ZTYP,ZCID)
+						do io2.write(ZREC)
+						set ZCNT2=ZCNT2+1
+					}
+				
+					if ZGRP="CD" do {
+						type RecordZUTBLKTBMISC zktbmisc=Db.getRecord("ZUTBLKTBMISC","INTRFACE='ZSPA'",1)
+						//if '(zktbmisc.prodtyp[ZTYP) set ZFIXFLG=1
+						if zktbmisc.prodtyp[ZTYP set ZSFIXFLG=1
+						else  set ZFIXFLG=1
+						
+						//Fix
+						if ZFIXFLG do {
+							//Fix Info
+							set ZREC=^TMP("ZSEINFO",ZTJD,ZCLS,ZGRP,ZTYP,ZCID)
+							do io3.write(ZREC)
+							set ZCNT3=ZCNT3+1
+						}
+						//Special Fix
+						if ZSFIXFLG do {
+							//Special Fix Info
+							set ZREC=^TMP("ZSEINFO",ZTJD,ZCLS,ZGRP,ZTYP,ZCID)
+							do io4.write(ZREC)
+							set ZCNT4=ZCNT4+1
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	do SETAILER^ZSTMEG(ZCNT1,io1,362)
+	do SETAILER^ZSTMEG(ZCNT2,io2,362)
+	do SETAILER^ZSTMEG(ZCNT3,io3,440)
+	do SETAILER^ZSTMEG(ZCNT4,io4,440)
+	
+	set IOTYP="RMS"
+	do io1.close()
+	do io2.close()
+	do io3.close()
+	do io4.close()
+	
+	kill ^TMP("ZSEINFO")
+	
+	quit
+	
+	
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	do Runtime.rollback()
+	type public Cache %CACHE()
+	
+	new ZINFREC,ZFIXFLG,ZSFIXFLG
+	set ZINFREC=""
+	set (ZFIXFLG,ZSFIXFLG)=0
+	
+	//MIS DEP File
+	if CLS="D" do {
+		type RecordDEP zdep=Db.getRecord("DEP","CID=:CID",1)
+		
+		//Check CID already exists in DTJNA, DTJCL, DTJ
+		if ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID).data() quit
+		
+		if zdep.grp="SAV" do {
+			//SAV Info
+			do SESDINF^ZSTMEG(zdep,zdep.grp,.ZINFREC)
+			set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID)=ZINFREC
+			
+		}
+			
+		if zdep.grp="DDA" do {
+			//DDA Info
+			do SESDINF^ZSTMEG(zdep,zdep.grp,.ZINFREC)
+			set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID)=ZINFREC
+		}
+		
+		if zdep.grp="CD" do {
+			type RecordZUTBLKTBMISC zktbmisc=Db.getRecord("ZUTBLKTBMISC","INTRFACE='ZSPA'",1)
+			//if '(zktbmisc.prodtyp[zdep.type) set ZFIXFLG=1
+			if zktbmisc.prodtyp[zdep.type set ZSFIXFLG=1
+			else  set ZFIXFLG=1
+			
+			//Fix
+			if ZFIXFLG do {
+				//Fix Info
+				do SEFXACINF^ZSTMEG(zdep,.ZINFREC)
+				set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID)=ZINFREC
+			}
+			//Special Fix
+			if ZSFIXFLG do {
+				//Special Fix Info
+				do SEFXACINF^ZSTMEG(zdep,.ZINFREC)
+				set ^TMP("ZSEINFO",ZTJD,zdep.cls,zdep.grp,zdep.type,CID)=ZINFREC
+			}
+			
+		}
+		
+	}
+	
+	quit
+	
+EXC	// Log error to dayend
+
+	if $G(DESC)="" set DESC="ZBCHDTJFM"
+
+	do LOG^UTLEXC($T(+0),"*",DESC,,,$G(RM))
+	kill RM
+	
+	quit
+
+---------- THREXIT ------ Section marker
+
+	

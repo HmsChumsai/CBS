@@ -1,0 +1,133 @@
+//DO NOT MODIFY  Extract EFD.SQL[INDEX]|ZBCHEFD||||||EFD|||100|32000|XTJD,ZTJD,ZJOB,DEL,BCHEOM,ZBDAT,ZDARCLPDT|0|10000|10000|10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+	/*
+	ORIG: Poramate to.
+	DESC: Extract INDEX from EFD.SQL and save the value into the field TMPEFD1.INDEX
+	
+	---- Comments --------------------------------------------------------
+	This batch will be run at CRP machine at Dayend batch 5301??? (BOD).
+	---- Revision History ------------------------------------------------
+	
+	23/07/2012 - Poramate To.
+	             Modified from the copy of ZBCHACN.
+	
+	*/
+	
+---------- OPEN    ------ Section marker
+
+	set ZTJD=%SystemDate-1					/* Thread Context: Julian System Date - 1 */
+
+---------- SCHINIT ------ Section marker
+
+	
+
+	//set ZBDAT						/* Thread Context: ZTJD if not specified */
+	set XTJD=$$DAT^%ZM(ZTJD,"YEARMMDD")			/* Thread Context: ZTJD in the format YEARMMDD */	
+	set BCHEOM=+BCHEOM.get()				/* Thread Context: Flag to identify if End of Month */
+	set DEL="|"						/* Thread Context: Delimeter */		
+	set ZJOB=%ProcessID					/* Thread Context: Process ID */	
+	set ZDARCLPDT=CUVAR.DARCLPDT.toString("YEARMMDD")	/* Thread Context: ??? Not use */
+
+
+	if (+%SystemDate.day())=1 set BCHEOM=1
+	if ZBDAT.get().isNull() set ZBDAT=ZTJD			
+	if BCHEOM=1 set ZBDAT=$$BOMJD^SCADAT(ZTJD)
+	
+	
+
+
+	
+	
+	//Delete temp index info
+	//do Db.fastDelete("ZDWFNIDX")
+	//do ZFINDEX(ZTJD)
+
+	quit
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	type public Number ZJOB						/* Thread Context: Process ID */
+	type public Boolean BCHEOM					/* Thread Context: Flag to identify if End of Month */
+	
+	
+	/* Writing to files */	
+	/*
+	type String ZPATH,PARAM
+	set PARAM="NEWV/WRITE"
+	set ZPATH=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")
+	
+	if BCHEOM do {
+		do DEPACW(ZJOB,PARAM)
+	}	
+	*/
+	quit
+	
+
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	//do Runtime.rollback()						/* ??? */
+
+
+	type RecordEFD rec=Db.getRecord("EFD","EFDATE=:EFDATE,BUFF=:BUFF,SEQ=:SEQ",1)
+	
+	do ZPARSE(.rec)
+	
+	quit
+	
+
+	
+	
+ZPARSE(RecordEFD rec)
+
+
+	type Number SETPOS,WHEREPOS,INDEXPOS
+	type Number SETCOUNT
+	type String SQL,SETPARAMS,PARAM,INDEXVAL
+	
+
+	set SQL=rec.sql
+			
+	set SETPOS=$FIND(SQL," SET ")
+	if 0<SETPOS do {
+		
+		set WHEREPOS=$FIND(SQL," WHERE ",SETPOS)
+		if 0<WHEREPOS do {
+			/* Extract setting fields between keyword SET and WHERE */
+			set SETPARAMS=$EXTRACT(SQL,SETPOS,WHEREPOS-8)			// WHEREPOS-1-$L(" WHERE ") 
+			set PARAMCOUNT=$LENGTH(SETPARAMS,",")
+			
+			for I=1:1:PARAMCOUNT do {
+				set PARAM=$PIECE(SETPARAMS,",",I)
+				
+				/* Test if the param piece contains INDEX */
+				set INDEXPOS=$FIND(PARAM,"INDEX")
+				if 0<INDEXPOS do {
+					set INDEXVAL=$PIECE(PARAM,"'",2)
+					
+					type RecordTMPEFD1 tmp=Class.new("RecordTMPEFD1")
+					set tmp.efdate=rec.efdate
+					set tmp.buff=rec.buff
+					set tmp.seq=rec.seq
+					set tmp.cid=rec.cid	
+					set tmp.zindex=INDEXVAL
+					do tmp.bypassSave()
+					
+				}
+			}
+		}
+	}
+		
+	quit 
+	
+
+---------- THREXIT ------ Section marker

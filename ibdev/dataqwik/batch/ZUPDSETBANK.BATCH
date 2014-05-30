@@ -1,0 +1,119 @@
+//DO NOT MODIFY  UPDATE Settlement Bank Account|ZBUPDSET||||||ZCONVTIME||5|100|300||0||10000|10|10|||0||0
+---------- REVHIST ------ Section marker
+
+	05/04/04 - CHOK
+		   Modified SCHEXIT to add cheque hold with cheque amount 
+		   minus cheque effect limit.	
+		   Modified SCHEXIT to throw the error if file not found.	   
+
+---------- OPEN    ------ Section marker
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	catch ERROR1 {
+                new ET
+                set ET=ERROR1.type
+                if ET["%GTM-" do ZE^UTLERR
+                set ET=ET_"-"_ERROR1.thrownAt
+                if $G(RM)="" set RM=ET
+                do LOG^UTLEXC($T(+0),"*",$G(%FN),,$G(%ZTSEQ),RM)
+                }
+                
+	set SPLDIR=$$TRNLNM^%ZFUNC("PROFILE_DIR")_"/extract/"
+	type IO io=Class.new("IO")
+	set io.fileName="settlement.txt"
+	set io.directory=SPLDIR
+	set io.recordSize=100
+	set io.openParams="READ"
+
+        new XCID,XEFLIM,XEFFUSE,XGFUND,XTOTCK
+        new dep
+
+	set XTJD=%SystemDate
+	if '$$BD^UNBD(%SystemDate) set XTJD=$$NBD^UNBD(%SystemDate,1,0)
+	
+        do io.open()
+        if $G(ER) do { quit
+                set RM="Directory not found - "_SPLDIR_"."
+                throw Class.new("Error","ZUPDSETBANK")
+                }
+        for  set REC=io.read() quit:+ETYP'=0  do {
+                set XCID=+$$TRIM^%ZS($P(REC,"|",1))
+                set XEFLIM=+$$TRIM^%ZS($P(REC,"|",2))
+                set XGFUND=+$$TRIM^%ZS($P(REC,"|",3))
+                set XTOTCK=+$$TRIM^%ZS($P(REC,"|",4))
+                set XEFFUSE=+$$TRIM^%ZS($P(REC,"|",5))                
+                if Db.isDefined("DEP","CID=:XCID") do {
+                        type RecordDEP dep=Db.getRecord("DEP","CID=:XCID")
+                        do dep.setAuditFlag(1)
+                        set dep.type=1202
+                        set dep.zckeflim=XEFLIM*1000000
+                        if XTOTCK>0 do {
+                        	set dep.chkhld=XTOTCK-XEFFUSE
+                        	if (XTOTCK-dep.zckeflim)>0 set dep.chkhld=dep.chkhld+(dep.zckeflim-XTOTCK)
+                        	
+                        	set dep.zckefnuse=XTOTCK-XEFFUSE
+
+				if Db.isDefined("HLD8","CID=:XCID,EXPDT=:XTJD") do {
+					type RecordHLD8 hld8=Db.getRecord("HLD8","CID=:XCID,EXPDT=:XTJD")
+					set hld8.amt=dep.chkhld
+					do hld8.bypassSave()
+					}
+				if 'Db.isDefined("HLD8","CID=:XCID,EXPDT=:XTJD") do {
+					type RecordHLD8 hld8=Class.new("RecordHLD8")
+					set hld8.cid=XCID
+					set hld8.expdt=XTJD
+					set hld8.amt=dep.chkhld
+					do hld8.bypassSave()
+					}
+				if Db.isDefined("HLD7","CID=:XCID,EXPDT=:XTJD") do {
+					type RecordHLD7 hld7=Db.getRecord("HLD7","CID=:XCID,EXPDT=:XTJD")
+					set hld7.amt=XTOTCK
+					do hld7.bypassSave()
+					}
+				if 'Db.isDefined("HLD7","CID=:XCID,EXPDT=:XTJD") do {
+					type RecordHLD7 hld7=Class.new("RecordHLD7")
+					set hld7.cid=XCID
+					set hld7.expdt=XTJD
+					set hld7.amt=XTOTCK
+					do hld7.bypassSave()
+					}				
+				
+				type RecordZHLDRM zhldrm=Class.new("RecordZHLDRM")
+				set zhldrm.expdt=XTJD
+				set zhldrm.hldcon=77
+				set zhldrm.brcd=0
+				set zhldrm.cid=XCID
+				set zhldrm.chamt=dep.chkhld
+				set zhldrm.fhamt=XTOTCK
+				do zhldrm.bypassSave()
+
+				if Db.isDefined("ZHLDRM","EXPDT=:XTJD,HLDCON=1,BRCD=0,CID=:XCID") do Db.delete("ZHLDRM","EXPDT=:XTJD AND HLDCON=1 AND BRCD=0 AND CID=:XCID")
+                        	}
+                        set dep.zgfund=XGFUND
+                        set dep.zckef=0
+                        set dep.zckefuse=0
+                        do dep.bypassSave()	
+                }
+        }
+        do io.close()
+
+	quit
+
+---------- THRINIT ------ Section marker
+
+	
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	
+	
+	
+---------- THREXIT ------ Section marker

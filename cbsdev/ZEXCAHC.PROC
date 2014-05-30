@@ -1,0 +1,129 @@
+//DO NOT MODIFY  Extract achoc data.|ZEXCAHC|||||||1
+	/*
+	 ORIG: Duangporn N.- 09/08/2010
+	 DESC: Extract achoc data.
+	
+	 ---- Comments --------------------------------------------------------
+	
+	 ---- Revision History ------------------------------------------------
+	
+	 ****** Consider using setAuditFlag for all objects in this procedure
+	   example :do dep.setAuditFlag(1)
+	
+	*/
+	
+	
+	quit
+	
+REF
+
+	// Extract ref no. of card is wrong.
+
+	set FNAME="CRD_REFNO.txt"
+	type IO io=Class.new("IO")
+	set io.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_FNAME
+	set io.openParams="WRITE/NEWV"
+	set io.recordSize=200
+	do io.open()
+
+	type ResultSet rscrd=Db.select("CRDTYP,CRDNUM,ISDT,ZREFNO,STAT,FEECID,ACN","CRD","ISDT>=:62092","CRDTYP DESC")	
+	if 'rscrd.isEmpty() while rscrd.next() do { 
+
+		set crdtyp=rscrd.getCol(1)
+		set crdnum=rscrd.getCol(2)
+		set isdt=rscrd.getCol(3)
+		set zrefno=rscrd.getCol(4)
+		set stat=rscrd.getCol(5)
+		set cid=rscrd.getCol(6)
+		set acn=rscrd.getCol(7)
+	
+		set REC=""
+		set isdt=$$DAT^%ZM(isdt,"YEARMMDD")
+		set zrefno=zrefno.trim()
+		if zrefno.length()=13 do {
+			set crdcode=+(zrefno.extract(5,6))			
+			type ResultSet crdtyp=Db.select("ZCRDCODE,ZENDREF","CRDTYP","CARDTYPE=:crdtyp")	
+			if 'crdtyp.isEmpty() while crdtyp.next() do { 
+			
+				set zstart=crdtyp.getCol(1)
+				set zend=crdtyp.getCol(2)
+				
+				if (crdcode<zstart)!(crdcode>zend) set REC=cardtyp_"|"_crdnum_"|"_isdt_"|"_zrefno_"|"_stat_"|"_cid_"|"_acn_"|"_zstart_"|"_zend    
+							
+			}			
+			
+		}
+		else  do {
+			
+			set REC=cardtyp_"|"_crdnum_"|"_isdt_"|"_zrefno_"|"_stat_"|"_cid_"|"_acn_"|"_zstart_"|"_zend 
+		}
+		
+		do io.write(REC)
+	}
+	
+
+	do io.close()
+
+	quit
+	
+	
+CRDNOTCALFEE
+
+	//Extract account open by smart and cannot add hold card issue fee.
+	
+	// Define system variables
+	do SYSVAR^SCADRV0() 	
+	
+	new %TAB,%READ
+		
+	set REQDATE=%SystemDate
+	set %TAB("REQDATE")="/DES=Date for matching/LEN=10/TYP=D/REQ"
+	
+	//Set parameter for screen in read part
+ 	set %READ="@@%FN/REV/CEN,,,REQDATE"
+ 	
+	set BLANK=" "
+	do ^UTLREAD
+	
+	set FNAME="CRD_NOTCALFEE"_$$DAT^%ZM(REQDATE,"YEARMMDD")_".txt"
+	
+	write !,FNAME
+	type IO io=Class.new("IO")
+	set io.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_FNAME
+	set io.openParams="WRITE/NEWV"
+	set io.recordSize=200
+	do io.open()
+
+	type ResultSet rs=Db.select("CID,TJD","DTJNA","TJD>=:REQDATE")	
+	if 'rs.isEmpty() while rs.next() do { 
+	
+		set ZCID=rs.getCol(1)
+		set ZTJD=rs.getCol(2)
+		set ZTJD=$$DAT^%ZM(ZTJD,"YEARMMDD")
+		
+		type ResultSet crd=Db.select("CRDTYP,CRDNUM","CRDGRP","CID=:ZCID AND PRIMCRD=1")	
+		if 'crd.isEmpty() while crd.next() do {		
+			
+			set CRDTYP=crd.getCol(1)
+			set CRDNUM=crd.getCol(2)
+		
+			type ResultSet hist=Db.select("CID","HIST","CID=:ZCID AND (ETC='SWCRDF' OR ETC='CWCRDF')")	
+			if 'hist.isEmpty() while hist.next() do {
+				
+				type RecordDEP dep=Db.getRecord("DEP","CID=:ZCID")
+				set ZCIF=dep.acn
+				set ZOPENTYP=dep.zopentyp				
+		 
+		 		set REC=CRDTYP_"|"_CRDNUM_"|"_ZCIF_"|"_ZCID_"|"_ZOPENTYP_"|"_ZTJD
+				do io.write(REC)
+		
+			}		 
+		
+		}
+		
+	}
+	
+	do io.close()
+
+	quit	
+	

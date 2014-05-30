@@ -1,0 +1,10 @@
+//DO NOT MODIFY  Before Update SIDQ|1|0|0|0|0|0||||
+	if zikq.sid="" quit
+	set ID=zikq.sid
+	if Db.isDefined("ZIKQ","SID=:ID") do {
+		set SID=$O(^ZIKQ(""),-1)
+		set SID=SID+1
+		set zikq.sid=SID
+		set RM="SID already exist system running new number SID"
+	} 
+	quit 

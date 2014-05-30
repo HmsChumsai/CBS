@@ -1,0 +1,1356 @@
+//DO NOT MODIFY  Account Projection Utility|UANTIC|||||||1
+UANTIC	
+	/*
+	Account Projection Utility
+	
+	DESC:  This routine calculates anticipated cash flows for
+               a particular account. It will simulate the running of
+               DAYEND processing to generate known activities that may
+               impact an account, including (but not limited to):
+  
+            Interest Posting 
+            Pre-Authorized Transfers
+            Maturity Processing (Rollovers)
+            Service Fees
+            Future-Dated Transactions
+            Billing
+            Payment and Interest Offset Processing
+
+	EXAMPLE:
+            Entry is normally made via the EXEC linetag.
+            Arguments passed through EXEC include acn object, ttx object, 
+            Maturity Date, an Inquiry array, and a control flag.
+
+	    do EXEC^UANTIC(.acn, .ttx, , , 55400, CTL)
+
+	---- Revision History ------------------------------------------------
+	
+	04/03/12 - Tom Locke - BAAC
+		   Added call to ZRUNSUB
+		   
+	03/07/10 - Pete Chenard
+		   Modified EXEC to initialize ACRADJ.  See corresponding change in
+		   EVENTL^UANTICLN.
+	
+	01/29/10 - Tom Locke
+		   Added checking of variable ZPROJPAYOFF to UID section.
+		   
+	12/29/09 - Pete Chenard
+		   Modified EVNTEXEC section to return a more descriptive error in
+		   the event an error occurs and RM is not set.  Some processes called
+		   from here (PROCAUTO, for example) set error messages in variable ET, 
+		   not RM.  But this procedure only looks at RM, so when an error occurs
+		   in a process that this calls, the real cause of the error would be
+		   unknown.
+		   
+	11/11/09 - Pete Chenard
+		   Removed previous change.
+		   
+	11/08/09 - Pete Chenard
+		   Add the following fix from Core Profile:
+		   	08/26/08 - BIJOY CHELORA - CR 34699
+		   		Re-added the initialization of the ACRADJ array to section 
+		   		EXEC as part of an effort to have ACRADJ properly accrue 
+		   		adjustments again.
+
+	01/16/09 - Bijoy Chelora - CR 36443
+		   Addressed the issue with inability to reapply file 
+		   maintenance (FM) during a loan payoff.
+		   - Modified EXEC section to remove quit for closed accounts
+		   since it prevented any reapplication when processing a loan
+		   payoff while FM should be reapplied in this case. 
+		   - Modified MAIN section to skip BUILDQ section call
+		   for closed accounts since only FM reapplication is 
+		   expected. For that, introduced PAYOFFREV, payoff reversal 
+		   indicator to be checked before setting financial transaction
+		   reapplication events. Added PAYOFFREV flag as parameter to 
+		   RESETHIST^UANTICLN so it can be checked before setting 
+		   accrual event unneeded when reapplying FM only. 
+		   Removed POSTDT array from MAIN section as unused. 
+		   - Modified END section to skip calling ACRADJ^UANTICLN 
+		   to calculate accrual adjustment for closed loan when 
+		   reapplying FM during loan payoff.
+
+	12/24/08 - DHANALAKSHMI R - CR 37288
+		   Modified the sections EXEC, EVNTPGM and END to replace
+		   RLCHGADJ with VATLCHG. T	his corrects .01 difference in VAT 
+		   on late charge while unwind process due to rounding issue.
+
+	12/12/08 - DHANALAKSHMI R - CR 37049
+		   Modified sections EXEC, EVNTPGM and END to set and pass
+		   LCHGTSO this corrects "Unable to locate transaction in 
+		   account history" error while error correction.
+		   Modified sections EXEC to change the scope of LCHGADJ and
+		   RLCHGADJ variables from public to private.
+
+	12/05/08 - Bijoy Chelora - CR 36668
+		   Modified EXEC section to correctly return an error when no
+		   Posting Source is defined for Type=BOFF and Source Code=CF
+		   (cash flow).
+		   	
+	11/20/09 - Clayton Schwartz - CR36076 
+		   Added an empty string to the ACRADJ^UANTICLN call in END for
+		   the SEGMENT. Also modified ACRADJ array declarations to
+		   include 3 subscripts. 
+
+	09/15/08 - DHANALAKSHMI R - CR 35480
+		   Modified the sections EVNTPGM and END to pass Real Interest
+		   Late Charge to RUNLCHG^UANTICLN and ACRADJ^UANTICLN call
+		   respectively to calculate VAT on Real Interest Late Charge.
+		   Modified to accept ACRADJ array as string since it contains 
+		   Nominal Interest, VAT and Real Interest separated by "|".
+
+	06/26/08 - BIJOY CHELORA - CR 34402
+		   Modified the RATECHG section to reset the INDXEFD variable
+		   equal to the teaser expiration date - 1 rather than to the
+		   teaser expiration date itself.  This fixes a problem where 
+		   the system was not projecting the correct amount of interest
+		   when the teaser expiration date fell on an interest change 
+		   date because the system wasn't resetting the interest rate
+		   on that projected date.
+
+	03/05/08 - DSTOUT CR 31693
+
+		   Modified EXEC section to declare the QUEUE array.  If errors
+		   occur during batch processing that calls into UANTIC, then 
+		   QUEUE entries aren't always killed.  This leads to a problem 
+		   when the next account is processed by the batch because the
+		   APPLY section winds up trying to execute the QUEUE entries
+		   for the other account which leads to an error in EVNTEXEC
+		   because APPLY thinks the QUEUE entries for the "other" 
+		   account are for escrow (dep(CID) doesn't exist in this case).
+
+	02/18/08 - DSTOUT - CR 31693
+		   - Modified EXEC section to introduce DEFFEE flag that 
+		   indicates Deferred Fee amortization event completion.
+		   - Modified EVNTPGM section to call the new line tags added 
+		   to UANTICLN procedure: RUNDEFFEE, RUNNETFEE and RUNCYCMSC.
+		   - Modified EXEC section to include the fix for CR 28571:
+		   added .dep() as the 6th parameter to the call to MAIN 
+		   section if CNVDT is defined. Also, removed the 2nd parameter 
+		   to the call to EXTERN^BCHLNREN. CTL was removed from 
+		   EXTERN^BCHLNREN as it is not used in DBI version.
+		   - Modified EXEC section to introduce CYCMSC flag that 
+		   indicates Add-on amortization event completion.
+	
+	11/06/07 - CHHABRIS - CR30077
+		   Modified EXEC section to remove the setting/initialization
+		   of ACRADJ(acn.cid, "ACR"). For projections ACRADJ() array
+		   will be initialized to ln.acr in EVENTL^UANTICLN if it
+		   does not exist. For backdated transactions ACRADJ(,"ACR")
+		   will be set and will be passed on to ^UANTIC but for
+		   projections (future dated transactions) the array needs to
+		   be initialized to ln.acr otherwise it will start with the
+		   null value instead of the actual accrual.
+		   The interest adjustment amount for future dated payoff
+		   status report was calculated wrongly because of the above
+		   issue.
+
+	09/12/07 - SmithCD - CR 28928
+		   Added RecordACNSEG acnseg() parameter to EXEC, and other 
+		   sections as necessary.
+		   
+		   Removed old revision history.
+	
+	08/30/07 - RussellDS - CR28928
+		   Added scope management for call to TRNSINGL^TRNDRV
+
+	08/02/07 - CHHABRIS - CR28570
+		   Modified the EXEC section to add .dep() as the 6th parameter
+		   to the call to MAIN section if CNVDT is defined. Also,
+		   removed the 2nd paramter to the call to EXTERN^BCHLNREN. CTL
+		   was removed from EXTERN^BCHLNREN as it is not used in DBI
+		   version.
+   		   For any process that uses the Account Projection Utility
+		   (UANTIC), accounts with ln.cnvdt defined (which triggers
+		   processing associated with loan renewals), incurs the
+		   undefined error. This error was found when testing MPRC078
+		   in /v72wmmpddevlx.
+
+	01/05/07 - KUMARB - CR24680
+		   Modified section INTFRE to remove "(deposits)" reference
+		   in describing the SEGMENT parameter.
+
+	11/27/06 - KELLYP - CR 24216
+		   Modified the RATECHG section to select INDEX0 records where
+		   EFD < %EffectiveDate.  This ensures that the system doesn't
+		   set up rate changes for dates beyond the "through" date.
+
+	11/09/06 - KELLYP - CR 23991
+		   Modified the RATECHG section to move the INDXEFD parameter
+		   for LOADIX^UINDX from the fourth parameter position to the 
+		   third.  This resolves a problem where accounts backdated
+		   over an interest change date did not pick up the rate change
+		   and had integrity errors on them after creation.
+
+	09/15/06 - NATRAJAH - CR 22040
+		   . Modified RUNEFT section to pass ttxeft as by reference to 
+		     public^BCHEFT call and based on ttxeft object called 
+		     TRNSINGL^TRNDRV to process effective dated EFT order.
+		   . Modified SETEFT section, corrected the WHERE and EVENT 
+		     values, since EFT order QUEUE's generated incorrectly.
+		   	
+	08/18/06 - KELLYP - CR 22734
+		   Modified EVNTPGM to pass LCHGADJ by reference instead of
+		   by value to RUNLCHG^UANTICLN.  This prevents a problem where
+		   not all late charges were being assessed to a loan during
+		   backdated disbursements.
+
+	08/02/06 - KELLYP - CR 22048
+		   Modified SETPAT section to eliminate PRECEDENCE warning.
+	
+	05/17/06 - Mugilvannan - CR 21147
+		   Modified section EVNTEXEC to populate values in BALIRN()
+		   array for Interest Accrual Projection Report if there
+		   is a change in the balance.
+		   Modified section SETPAT as a minor cleanup in %CACHE 
+		   as per Dan's request.
+		   		   
+	03/16/06 - Srinivar - CR 19964
+		   Removed the references of SAVIRN in conjunction with the
+		   changes made in UANTICLN.
+	
+	02/23/06 - SmithCD - CR 19150
+		   Removed "IS" from WHERE clause of dynamic select in SETEFT 
+		   section to prevent Oracle "missing NULL keyword" error.
+	
+	02/09/06 - SmithCD - CR 19505
+		   Changed acn.cid reference to CID in SETEFT section 
+		   (code behind Db.selectDbSet() incorrectly converts acn.cid 
+		   to ACN.CID).
+	
+	01/26/06 - SmithCD - CR 19343 (16890)
+		   Retrofitted changes involving escrow-related CR 2916, and 
+		   interest index fixes from p01. Changes include:
+		   . Modified the ACRADJ parameter, and added new parameter 
+		     dep() in EXEC section to accommodate escrow accounts
+		   . Created REAPPLY and EVNTEXEC sections and moved applicable
+		     sections of code into it to improve modularity and allow 
+		     for multiple account handling
+		   . Made QUEUE(,) a 3-key array by adding CID to accommodate 
+		     multiple accounts
+		   . Changed key structure of ttx1(,) to have account number 
+		     as the second key to handle multiple accounts
+		   . Changed key structure of QUEUE(EVNTJD,EVNTSQ) to
+		     QUEUE(EVNTJD,CID,EVNTSQ) to accommodate multiple accounts
+		   . ACRDT modified to be an array keyed by CID
+		   . Removed ACRCALCE section
+		   . Modified EXEC section to only use cash flow teller / 
+		     branch code if they are not already defined by the calling
+		     function
+		   . Removed EVNTSQ parameter from RUN* calls since they 
+		     are no longer used in those sections
+		   . Added logic to make daily interest rate changes more 
+		     efficient for both loans and deposits (escrow) - brought 
+		     in INTFRE and RATECHG sections
+		   . Modified MAIN and END sections to set ORIGTJD and ORIGTPD 
+		     when bringing loan current so TRNDRV can file using the 
+		     correct teller posting dates (otherwise, account create 
+		     transactions incorrectly will file for dates in the past)
+		   . Corrected some logic problems in SETEFT, SETPAT and RUNPAT
+		     sections (including replacing select on obsolete table 
+		     DAYENDEFT with a dynamic select on EFTPAY)
+		   . Consolidated processing involving BALIRN to EVNTPGM
+		     section and new section BALIRN
+		   . Generally cleaned up code further
+
+	*/
+
+	quit
+
+
+public EXEC(RecordACN acn,		// Account record		/REF:RW
+	    RecordTTX ttx,		// Primary transaction		/NOREQ/REF:R
+	    RecordTTX ttx1(,,),		// Transaction set from history	/NOREQ/REF:RW
+	    Date %EffectiveDate,	// Effective (thru) date	/NOREQ
+	    String CTL,			// Control			/NOREQ
+	    String SKIP,		// Skip control			/NOREQ
+	    String ACRADJ(,,),		// Accrual adjustment amount	/NOREQ/REF:RW
+	    String BALIRN(),		// Interest accrual projection 	/NOREQ/REF:RW
+	    RecordDEP dep(),		// Escrow accounts		/NOREQ/REF:RW
+	    RecordACNSEG acnseg())	// Account segments		/NOREQ/REF:RW
+	     
+	/*
+	Project account %SystemDate through %EffectiveDate
+
+	This function will project account activity through the date range 
+	designated by %SystemDate through %EffectiveDate. Used by transaction 
+	posting, loan modeler, and others.
+
+	Additional notes on ARGUMENTS:
+
+		. ttx1(,,)
+			Contains previously-existing history entries (built by 
+			LNUEFD) that need to be reapplied.
+
+		. %EffectiveDate
+                   	This variable is commonly the actual system date for 
+                  	backdated transactions, or the maturity date for the 
+                  	account / ending date for projections.
+
+		. CTL
+		   	Position:
+		   	1 - Used only for bringing loan current or effective-
+			    dated transactions
+                	   0 - Effective-dated transaction / account projection
+                	   1 - Bring loan current
+                   	2 - Generate cash offset transactions
+                   	   0 - No
+                	   1 - Generate "CI" transactions to offset
+                	       loan payments (needed by cash flow
+                	       processing)
+
+		 . SKIP
+			Position   
+			1 - skip regular loan payments
+                   	2 - skip initial disbursement
+ 
+		. ACRADJ(,)
+            		Used to arrive at the correct
+                  	accrual amount once all processing is complete.
+
+		. BALIRN()
+			Used by Interest Accrual Projection Report (MRPC100)
+			If BALIRN=1, UANTIC will build BALIRN() entries 
+			whenever the interest rate or balance changes:
+			set BALIRN(%SystemDate)=acn.balint_"|"_acn.irn
+		. dep()
+			If passed in, will incorporate the escrow accounts into
+			the reapply process. These should only be escrow 
+			acounts attached to the loan account passed in as acn.
+	*/
+
+	type public Boolean ER, FUPO, LNMDLR, LNPTSRV
+	type public Number BRCD
+	type public Date ORIGTJD, ORIGTPD
+
+	type Boolean BASREL(), CTCH, CYCMSC, DAILYFRE(,), DEFFEE, PAYOFFREV = false
+	type Date CUVAR2, MDT, SAVEFD, SAVTJD
+	type String LCHGTSO = "", QUEUE(,,)
+	type Number LCHGADJ = 0, VATLCHG = 0
+
+	// Init the User ID parameters
+	type Number %ODP
+	type String %UserClass
+	type Number REJMET
+
+	type Date CNVDT
+	
+	set SKIP = SKIP.get()
+	set CTL = CTL.get()
+	set BALIRN = BALIRN.get()
+	set ACRADJ(acn.cid, "ACR") = ACRADJ(acn.cid, "ACR").get()
+
+	// Late charges flag for today
+	set CTCH = 0
+
+	// Miscellaneous Cycled Item Amortization Event flag for today
+	set CYCMSC = 0
+	
+	// Deferred Fee Amortization Event flag for today
+	set DEFFEE = 0
+
+	// Get CUVAR2 directly from disk to prevent old value from being used
+	type RecordCUVAR cuvar = Db.getRecord("CUVAR")
+	set CUVAR2 = cuvar.tjd
+	set SAVTJD = $select('%SystemDate.get().isNull():%SystemDate, 1:CUVAR2)
+
+	// Assign cash flow teller as default if user ID / branch code not 
+	// defined
+	if %UserID.get().isNull() ! (BRCD.get().isNull()) do { quit:ER
+		type RecordUTBLSRC utblsrc = Db.getRecord("UTBLSRC", "SRCTYP='BOFF',KEY='CF'",1)
+		// ~p1 posting source not set up
+		if 'utblsrc.getMode() do Runtime.setErrMSG("UTBLSRC",1184,"BOFF-CF")  quit:ER
+		
+		if %UserID.get().isNull() set %UserID = utblsrc.uid
+		if BRCD.get().isNull() set BRCD=utblsrc.brcd
+		}
+
+
+	do UID(%UserID)	
+
+	// Address situation where end-date is not passed by calling process
+	if '(%EffectiveDate.get()) do {
+
+		// Use maturity date if defined
+		if 'acn.mdt.isNull() set (MDT, %EffectiveDate) = acn.mdt quit
+
+		// Otherwise, anticipate transactions for one year
+		set %EffectiveDate = %SystemDate + $$DY^UIC(11, %SystemDate)
+		}
+
+	set SAVEFD = %EffectiveDate
+
+	// If projection, change from method 2 (manual) to 1 (automatic). 
+	 if CTL = "01" do {
+		type Boolean EC
+		if ttx.exists() set EC = ttx.itc6
+		else  set EC = 0
+		do DISBPROJ(acn.cid, EC)
+		}
+
+	//Determine if loan is set to renew
+	set CNVDT = ""
+	if acn.cls = "L" set CNVDT = $$RENEW^UANTICLN(.acn) 
+
+	/*
+	If a loan is not set up to renew, this will only be passed through
+	once. If a loan is set up to renew, the first pass will set up all
+	QUEUE entries up to the renewal date. The loan will then renew.
+	Then, the second pass will set up all of the QUEUE entries from the
+	renewal date up to EFD.
+	*/
+
+	if CNVDT do { quit:ER
+
+		// Use conversion Date
+		do MAIN(.acn, .ttx, .ttx1(,,), CUVAR2, CTL, .dep(), CNVDT - 1, , , .acnseg(), .PAYOFFREV)  quit:ER
+		
+		do EXTERN^BCHLNREN(.acn)
+		}
+		
+	do MAIN(.acn, .ttx, .ttx1(,,), CUVAR2, CTL, .dep(), %EffectiveDate, ORIGTJD.get(), ORIGTPD.get(), .acnseg(), .PAYOFFREV)  quit:ER	
+
+	do END(.acn, .ttx, CUVAR2, %EffectiveDate, BRCD, .ACRADJ(,,), .dep(), ORIGTJD.get(), ORIGTPD.get(), .acnseg(), PAYOFFREV) quit:ER
+
+
+	quit
+
+
+MAIN(RecordACN acn,		// Account record		/REF:RW
+     RecordTTX ttx,		// Primary transaction		/REF:R
+     RecordTTX ttx1(,,),	// Transaction set		/REF:R
+     Date CUVAR2,		// Current date
+     String CTL,		// Control indicator
+     RecordDEP dep(),		// Escrow accounts		/REF:RW
+     Date %EffectiveDate,	// Effective date
+     Date ORIGTJD,		// Original system date		/NOREQ
+     Date ORIGTPD,		// Original posting date	/NOREQ
+     RecordACNSEG acnseg(),	// Account segments		/REF:RW
+     Boolean PAYOFFREV)		// Payoff Reversal Indicator	/REF:RW
+     
+	// Main processing section
+	
+	type public Boolean ER
+	type public Date CNVDT
+	type public String QUEUE(,,), RM
+	type public String ACRADJ(,)
+	type public Cache %CACHE()
+	
+	type Date ACRDT()
+	
+	/* 
+	If bringing loan current, set original dates for TRNDRV (regular 
+	backdated transactions already have them set at this point, and future projections 
+	do not require them.
+	*/
+	if CTL.extract(1) = 1 set (ORIGTJD, ORIGTPD) = CUVAR2
+
+	/* 
+	 Skip building events for financial transaction if this is a payoff or
+	 closeout - only file maintenance reapplication is allowed then. 
+	 Payoff/closeout reversal is exception from this rule. 
+	 Note that PAYOFFREV flag should always be equal to false unless passed
+	 to RESETHIST^UANTICLN in case of payoff reversal.
+	*/
+	if 'ttx.etc.isNull() , (acn.stat = 4) , (ttx.itc12 ! ttx.itc6) do {
+	
+		type RecordTRN trn = %CACHE("TRN").getRecord("TRN", "ETC=:ttx.etc")
+	
+		// Set the reversal flag for a loan payoff
+		if (acn.cls = "L") , (trn.pcfl5 = true) set PAYOFFREV = true
+
+		// Set the reversal flag for a deposit closeout
+		if (acn.cls = "D") , (trn.pcfd5 = true) set PAYOFFREV = true		
+		}
+			
+	if (acn.stat '= 4) ! (PAYOFFREV = true) do BUILDQ(.acn, .ttx, .ACRDT(), .dep(), .acnseg()) quit:ER
+						
+	// If not set up to renew, include any records passed in ttx1(,,)
+	if 'CNVDT, acn.cls = "L" do RESETHIST^UANTICLN(.acn, .ttx1(,,), PAYOFFREV) quit:ER
+		
+	do APPLY(.acn, .ttx1(,,), .ttx, .ACRDT(), .ACRADJ(,), .QUEUE(,,), .dep(), CTL, .acnseg()) quit:ER
+		
+	quit
+
+
+APPLY(RecordACN priacn,		// Primary account		/REF:RW
+	RecordTTX ttx1(,,),	// Transaction set		/REF:RW
+	RecordTTX ttx,		// Primary transaction		/REF:RW
+	Date ACRDT(),		// Accrual date			/REF:RW
+	String ACRADJ(,),	// Accrual adjustment		/REF:RW
+	String QUEUE(,,),	// Event queue			/REF:RW
+	RecordDEP dep(),	// Escrow accounts		/REF:RW
+	String CTL,		// Control indicators
+	RecordACNSEG acnseg())	// Account segments		/REF:RW
+
+	// Execute QUEUE(,,) going forward
+
+	type public Boolean ER
+	type public Date CUVAR2
+	type public String BALIRN()
+	
+	type String EVENT
+	type Number CID, EVNTSQ
+	type Date EVNTJD
+
+	set (CID, EVNTJD, EVNTSQ) = ""
+	
+	for  set EVNTJD = QUEUE(EVNTJD).order() quit:EVNTJD.isNull()  do { quit:ER
+		for  set CID = QUEUE(EVNTJD, CID).order() quit:CID.isNull()  do { quit:ER
+			for  set EVNTSQ = QUEUE(EVNTJD, CID, EVNTSQ).order() quit:EVNTSQ.isNull()  do { quit:ER
+				
+				// Re-define acn so POST^LNTRB picks up the acn
+				// object corresponding to the correct account 
+				if CID = priacn.cid do EVNTEXEC(.priacn, .ttx, .ttx1(,,), .QUEUE(,,), EVNTJD, EVNTSQ, .acnseg())
+				if CID '= priacn.cid do EVNTEXEC(.dep(CID), .ttx, .ttx1(,,), .QUEUE(,,), EVNTJD, EVNTSQ, .acnseg())
+				}
+			}
+		}
+
+	if ER quit
+
+	quit
+
+
+EVNTEXEC(RecordACN acn, 	// Account			/REF:RW
+	 RecordTTX ttx,		// Primary transaction		/REF:RW
+	 RecordTTX ttx1(,,),	// Transaction set		/REF:RW
+	 String QUEUE(,,),	// Event queue			/REF:RW
+	 Date EVNTJD,		// Event date
+	 Number EVNTSQ,		// Event sequence
+	 RecordACNSEG acnseg())	// Account segments		/REF:RW
+
+	type public Boolean ER	 
+	type public Number CID
+	type public Date ACRDT()
+	type public String ACRADJ(), BALIRN(), CTL, RM
+	
+	type String EVENT
+	type Number BALINT,ORIGIRN,ORIGBI
+
+	if EVNTSQ '= 9999 do {
+		If BALIRN do {
+			if acn.cls = "L" do {
+                        	type RecordLN ln = {RecordLN}acn
+	                        set ORIGBI=ln.balint
+        	                }
+			else  set ORIGBI=$$IRCB^UANTICDP(.acn,,0)
+			}
+		
+		set ORIGIRN = acn.irn
+		set EVENT = QUEUE(EVNTJD, acn.cid, EVNTSQ)
+					
+		do EVNTPGM(.acn, .ttx, .ttx1(,,), EVENT, EVNTJD, CTL, .acnseg()) quit:ER
+		If BALIRN do {
+			if acn.cls = "L" do {
+                        	type RecordLN ln = {RecordLN}acn
+	                        set BALINT=ln.balint
+        	                }
+			else  set BALINT=$$IRCB^UANTICDP(.acn,,0)
+			if acn.irn '= ORIGIRN ! (BALINT '= ORIGBI) do BALIRN(.acn, .BALIRN())
+			}
+	
+		}
+	else  do ACRCALC(.acn, .ttx, EVNTJD, .ACRDT(), .ACRADJ(,), .acnseg())
+
+	// Report detailed error - Projected (reapply)
+	if ER set RM = CID_" "_EVNTJD.toString()_" - "_$$^MSG(1736)_" "_EVENT.piece("|", 1)_": "_$select(RM.get().isNull():ET.get(),1:RM) quit
+		
+	// Maintain QUEUE(,,)as we go to keep the array
+	// as small as possible
+	kill QUEUE(EVNTJD, CID, EVNTSQ)
+
+	quit
+	
+
+BUILDQ(RecordACN acn,		// Account object		/REF:RW
+       RecordTTX ttx,		// Primary transaction		/REF:R
+       Date ACRDT(),		// Accrual date			/REF:RW
+       RecordDEP dep(),		// Escrow accounts		/REF:R
+       RecordACNSEG acnseg())	// Account segments		/REF:RW
+
+	// Build QUEUE(,,)
+
+	type public String BALIRN(), CTL, SKIP
+
+	type Number CID
+
+	/*
+	Go off and perform the specific functions for either deposit or loan 
+	loan accounts
+	*/
+
+	if acn.cls = "L" do {
+
+		// Set up loan event QUEUE
+		do BUILDQ^UANTICLN(.acn, .ttx, %SystemDate, %EffectiveDate, CTL, SKIP, .BALIRN(), .ACRDT(), .acnseg())
+
+		type ResultSet rs = Db.select("CID", "DEP", "AREF=:acn.cid")
+		while rs.next() do {
+			type Number ESCCID = rs.getCol("CID")
+			if 'dep(ESCCID).exists() quit
+
+			// Set up Escrow event QUEUE
+			do BUILDQ^UANTICDP(.dep(ESCCID), %SystemDate, %EffectiveDate, "", .ACRDT(), .acnseg())
+			}	
+		}
+	else  do BUILDQ^UANTICDP(.acn, %SystemDate, %EffectiveDate, .BALIRN(), .ACRDT(), .acnseg()) quit
+
+	quit
+
+
+EVNTPGM(RecordACN acn,		// Account record		/REF:RW
+	RecordTTX ttx,		// Primary Transaction		/NOREQ/REF:R
+	RecordTTX ttx1(,,),	// Transaction set		/NOREQ/REF:RW
+	String EVENT,		// Event data
+	Date EVNTJD,		// Event date
+	String CTL,		// Control			/NOREQ
+	RecordACNSEG acnseg())	// Account segments		/REF:RW
+
+	// Run a single event
+	
+	type public Date CUVAR2, SAVEFD
+	type public Number CID, LCHGADJ, VATLCHG
+	type public String BALIRN(), LCHGTSO, QUEUE(,,)
+	
+	type String EVNTCTL, EVNTNAME, EVNTSEG, EVNTVAR
+
+	// Set up appropriate EFD for applications
+	type Date %EffectiveDate, TPD
+	set (%EffectiveDate, TPD) = EVNTJD
+	
+	set EVNTNAME = EVENT.piece("|", 2)	// Event name
+	set EVNTCTL = EVENT.piece("|", 3)	// Event control indicators
+	set EVNTVAR = EVENT.piece("|", 4)	// Variable / parameter list
+	set EVNTSEG = EVENT.piece("|", 5)	// Segment list (deposits)
+	
+	// Uncomment for trouble-shooting statistics (do not remove)
+	//write !,"Re/apply "_$select(acn.cls = "L":"Loan ", 1:"Deposit ")_CID_": "_EVNTNAME_"("_EVNTCTL_","_EVNTVAR_") "_EVENT.piece("|", 1)_" on "_EVNTJD.toString()
+
+	// Events common to both loan and deposit accounts
+	if EVNTNAME = "RUNEFT" do RUNEFT(.acn, EVNTJD, EVENT, %EffectiveDate, .acnseg()) quit
+	if EVNTNAME = "RUNPAT" do RUNPAT(.acn, .ttx, EVNTJD, EVENT, .acnseg()) quit
+
+	if acn.cls = "L" do {
+		// Loan-specific events
+		
+		// Set up future-date file maintenance
+		if EVNTNAME = "RUNFMEFD" do RUNFMEFD^UANTICLN(.acn, EVNTJD) quit
+
+		// Determine LCAD from custom notice date
+		if EVNTNAME = "RUNCUS" do RUNCUS^UANTICLN(.acn, EVNTJD, CUVAR2) quit
+
+		// Run frequency-based loan fees
+		if EVNTNAME = "RUNFEE" do RUNFEE^UANTICLN(.acn, EVNTJD, .ttx, .acnseg()) quit
+
+		// Maturity Date (loan accounts)
+		if EVNTNAME = "RUNMDTL" do RUNMDTL^UANTICLN(.acn, EVNTJD) quit
+
+		// Generate bill
+		if EVNTNAME = "RUNBIL" do RUNBIL^UANTICLN(.acn, .ttx, EVNTJD, %EffectiveDate, .acnseg()) quit
+
+		// Interest change date - move new rate into loan
+		if EVNTNAME = "RUNICHND" do RUNICHND^UANTICLN(.acn, EVNTJD, CUVAR2) quit
+
+		// Rate change offset date - calculate new rate,  store in PCB array
+		if EVNTNAME = "RUNINTOFF" do RUNINTOFF^UANTICLN(.acn, EVNTJD) quit
+
+		// Loan subsidy review processing
+		if EVNTNAME = "RUNLNSUB" do RUNLNSUB^UANTICLN(.acn, EVNTJD) quit
+
+		// Payment change date
+		if EVNTNAME = "RUNPCHND" do RUNPCHND^UANTICLN(.acn, EVNTJD) quit
+
+		// Payment change offset date - calculate new payment
+		if EVNTNAME = "RUNPCOFF" do RUNPCOFF^UANTICLN(.acn, EVNTJD) quit
+
+		// Post loan payment
+		if EVNTNAME = "RUNPMT" do RUNPMT^UANTICLN(.acn, .ttx, EVNTJD, .acnseg()) quit
+
+		// Post Prepaid (Odd) Interest
+		if EVNTNAME = "RUNPPI" do RUNPPI^UANTICLN(.acn, .ttx, EVNTJD, .acnseg()) quit
+
+		// Scheduled date roll
+		if EVNTNAME = "RUNSCHND" do RUNSCHND^UANTICLN(.acn, EVNTJD, CUVAR2) quit
+		
+		// Change rate on this projected system date - loans
+		if EVNTNAME = "LICHND" do LICHND^UANTICLN(.acn, EVNTJD, CUVAR2, .acnseg()) quit
+
+		// Processing for deferred interest capitalization
+		if EVNTNAME = "RUNDECAP" do RUNDECAP^UANTICLN(.acn, EVNTJD, %EffectiveDate, .acnseg()) quit
+
+		// Processing for capitalized interest due
+		if EVNTNAME = "RUNICAP" do RUNICAP^UANTICLN(.acn, EVNTJD, .acnseg()) quit
+
+		// Post disbursement from disbursement schedule
+		if EVNTNAME = "RUNDSBSCH" do RUNDSBSCH^UANTICLN(.acn, EVNTJD, CUVAR2) quit
+		
+		// Run subsidy payments
+		if EVNTNAME = "ZRUNSUB" do ZRUNSUB^UANTICLN(.acn, EVNTJD, CUVAR2) quit
+
+		// Automatic Loan Payment
+		if EVNTNAME = "RUNAUT" do RUNAUT^UANTICLN(.acn, .ttx, EVNTJD, CUVAR2, .acnseg()) quit
+
+		// Return Process
+		if EVNTNAME = "RUNRTRN" do RUNRTRN^UANTICLN(.acn, EVNTJD) quit
+	
+		// Teaser rate expiration
+		if EVNTNAME = "TEASER" do TEASER(.acn, EVNTJD) quit
+
+		// Month End Balances
+		if EVNTNAME = "RUNEOM" do RUNEOM^UANTICLN(.acn, EVNTJD) quit
+
+		// Recalculate BALINT in BOD after the expiration date
+		if EVNTNAME = "RUNIDGP" do RUNIDGP^UANTICLN(.acn, EVNTVAR) quit
+
+		// Late Charge Processing
+		if EVNTNAME = "RUNLCHG" do RUNLCHG^UANTICLN(.acn, .ttx, EVNTJD, %EffectiveDate, SAVEFD, .LCHGADJ, .VATLCHG, .LCHGTSO, .acnseg()) quit
+
+		// Deferred Loan Fees Amortization
+		if EVNTNAME = "RUNDEFFEE" do RUNDEFFEE^UANTICLN(.acn, EVNTJD)
+		
+		// Net Deferred Loan Fees Amortization
+		if EVNTNAME = "RUNNETFEE" do RUNNETFEE^UANTICLN(.acn, EVNTJD)
+		
+		// Miscellaneous Cycled Items Amortization 
+		if EVNTNAME = "RUNCYCMSC" do RUNCYCMSC^UANTICLN(.acn, EVNTJD)
+
+		//Reprocess history records on their simulated effective date.
+		if EVNTNAME = "RERUNHIST" do RERUNHIST^UANTICLN(.acn, .ttx1(,,), EVNTJD, CUVAR2, .acnseg()) quit
+		}
+	else  do {
+		// Deposit-specific events
+		
+		// Change rate on this projected system date - deposit system
+		if EVNTNAME = "DICHND" do DICHND^UANTICDP(.acn, EVNTJD, EVNTCTL, CUVAR2, EVNTSEG, .acnseg()) quit
+
+		// Maturity Date
+		if EVNTNAME = "RUNMDTD" do RUNMDTD^UANTICDP(.acn, EVNTJD) quit
+
+		// Post interest
+		if EVNTNAME = "INTPOST" do INTPOST^UANTICDP(.acn, EVNTJD, EVNTCTL, .acnseg()) quit
+
+		// Run service charge utility / Usage credit charge
+		if EVNTNAME = "RUNSRV" do RUNSRV^UANTICDP(.acn, EVNTJD, EVNTCTL) quit
+		}		
+
+	quit
+
+
+ACRCALC(RecordACN acn,		// Account record		/REF:RW
+	RecordTTX ttx,		// Primary transaction		/REF:R
+	Date EVNTJD,            // Event date
+	Date ACRDT(),		// Accrual date			/REF:RW
+	String ACRADJ(,),	// Accrual adjustment tracker	/REF:RW
+	RecordACNSEG acnseg())	// Account segments		/REF:RW
+
+	// Calculate accrued interest from ACRDT+1 through EVNTJD
+
+	if acn.cls = "L" do LNACR^UANTICLN(.acn, .ttx, EVNTJD, .ACRDT(), .ACRADJ(,), .acnseg()) quit
+	
+	do DEPACR^UANTICDP(.acn, .ttx, EVNTJD, .ACRDT(), .acnseg())
+
+	quit
+
+
+public SETEFT(RecordACN acn,		// Account record		/REF:RW
+	      Date DATE,		// Date
+	      Date %EffectiveDate,	// Effective date
+	      Number PAR)		// Control parameter
+
+	/*
+	Set EFT orders
+
+	Additional notes on ARGUMENTS:
+		PAR
+	        1 - Payment order (PO, SPO)
+	        2 - Collection order (CO, SCO)
+	*/
+	
+	type Number CID = acn.cid
+	type String EVENT, WHERE
+
+	set WHERE = "PROCDT>=:DATE AND CID=:CID AND PTYSTAT <>0"
+
+	if PAR = 1 do {
+		set EVENT = "EFT Payment Order Processing|RUNEFT"
+		set WHERE = WHERE_" AND EFTTYPE LIKE '%PO%'"
+		}
+	else  do {
+		set EVENT = "EFT Collection Order Processing|RUNEFT"
+		set WHERE = WHERE_" AND EFTTYPE LIKE '%CO%'"
+		}
+		
+	// Dynamic select
+	#ACCEPT DATE=02/02/06;PGM=SmithCD;CR=19505
+	type DbSet ds = Db.selectDbSet("EFTPAY", WHERE)
+	while ds.next() quit:DATE > %EffectiveDate  do {
+		type RecordEFTPAY eftpay = ds.getRecord("EFTPAY")
+
+		set EVENT.piece("|", 1) = "SEQ:"_eftpay.seq_":"_EVENT.piece("|", 1)
+
+		do SETQUE(.acn, eftpay.frequency, eftpay.procdt, 0, 0, EVENT)
+		}
+
+	quit
+
+
+public SETPAT(RecordACN acn,		// Account record		/REF:R
+	      Date %SystemDate,		// System date
+	      Date %EffectiveDate)	// Effective date
+
+	/*
+	Set up PAT entries to post
+
+	OUTPUT:
+	PTFLAG - PTF flag
+	PAT()
+	*/
+	
+	type public Boolean ER, PTFLAG
+	type public String PAT(,,)
+	type public Cache %CACHE()
+
+	type Number PATSEQ
+	type String BATCH, EVNT, REC, SRCTYP, UID
+	type Number BRCD, ORDERSEQ
+	type Date END, START, PATDT
+
+	set PATSEQ = ""
+
+	type DbSet ds = Db.selectDbSet("PAT", "CID=:acn.cid")
+	
+	if ds.isEmpty() set PTFLAG = 0 quit
+		   
+	while ds.next() do { quit:ER
+		type RecordPAT pat = ds.getRecord("PAT")
+
+		// Determine if this is PAT or Payroll processing
+		type ResultSet rs = Db.select("SRCTYP", "UTBLSRC", "KEY=:pat.src")
+		if rs.next() set SRCTYP = rs.getCol("SRCTYP")
+		else  quit
+		
+		type RecordUTBLSRC utblsrc = %CACHE("UTBLSRC").getRecord("UTBLSRC", "SRCTYP=:SRCTYP,KEY=:pat.src")
+
+		set BRCD = utblsrc.brcd
+		set UID = utblsrc.uid
+
+		set PATSEQ = PATSEQ + 1
+		set EVNT = "Pre-Authorized Transfer|RUNPAT"_"||"_PATSEQ
+
+		// Get the next posting date
+		set PATDT = $$PATFRE((%SystemDate + ('utblsrc.eodp)), utblsrc.freq, utblsrc.npd, 1)
+		do SETQUE(.acn, utblsrc.freq, PATDT, 0, 0, EVNT)
+
+		type RecordPAT1 pat1 = Db.getRecord("PAT1", "SRC=:pat.src,ACN=:pat.acn,BATCH=:pat.batch")
+
+		set END = pat1.stop
+		if 'END set END = %EffectiveDate
+
+		set START = pat1.start
+		if 'START set START = PATDT	
+		if START < %SystemDate set START = $$PATFRE(%SystemDate, utblsrc.freq, START, 0)
+
+		set REC.piece("|", 1) = pat.src
+		set REC.piece("|", 2) = utblsrc.brcd
+		set REC.piece("|", 3) = utblsrc.uid		
+		set REC.piece("|", 4) = pat.trncd
+		set REC.piece("|", 5) = pat.cid
+		set REC.piece("|", 6) = pat.amount
+		set REC.piece("|", 10) = SRCTYP
+		set REC.piece("|", 13) = pat1.ccode	
+		set REC.piece("|", 14) = pat1.crcd	
+		set REC.piece("|", 21) = pat.crcd
+		
+		for  quit:START > END  do { quit:ER
+			set ORDERSEQ = PAT(START, PATSEQ, "").order(-1) + 1
+			set PAT(START, PATSEQ, ORDERSEQ) = REC
+			set START = START.nextFreqDate(utblsrc.freq, , 0) quit:ER
+			}
+		}
+
+	quit
+
+
+PATFRE(Date DATE,	// Posting date
+       String FRE,	// Posting frequency
+       Date JD,		// Next posting date
+       String CTL)	// Control indicators
+
+	// Get the next posting date	
+	
+	type public Boolean ER
+
+	// Calculate next payment date
+	if CTL = 0 for  set JD = JD.nextFreqDate(FRE, , CTL) quit:(JD ' <DATE) ! (ER)
+
+	// Use reverse (backwards) calculation
+	if CTL = 1 for  set JD = JD.nextFreqDate(FRE, , CTL) quit:(JD < DATE) ! (ER)
+	
+	quit JD
+
+
+public UID(String %UserID)		// User ID
+
+	/*
+	Initialize User ID Parameters
+	
+	OUTPUT:
+	  %ODP
+	  REJMET
+	*/
+
+	type public Number %ODP, REJMET
+	type public Boolean ZPROJPAYOFF
+
+	type RecordSCAU scau = Db.getRecord("SCAU", "UID=:%UserID")
+	
+	// Force all transactions to be overridden.  Not - only projections
+	// should do this, not backdated transactions.   MRPC078 is setting this 
+	// variable.
+	if ZPROJPAYOFF.get() set %UserClass="SCA"
+	else  set %UserClass = scau.%ucls
+
+	// Reject Method	
+	set REJMET = scau.batrej
+
+	// Overdraft Protection		
+	set %ODP = scau.odp		
+
+	quit
+
+
+END(RecordACN acn,		// Account object		/REF:RW
+    RecordTTX ttx,		// Primary transaction		/NOREQ/REF:R
+    Date %SystemDate,		// System date
+    Date %EffectiveDate,	// Effective date
+    Number BRCD,		// Branch code
+    String ACRADJ(,,),		// Accrual adjustment tracker	/REF:R
+    RecordDEP dep(),		// Escrow accounts		/NOREQ/REF:RW
+    Date ORIGTJD,		// Original system date		/NOREQ
+    Date ORIGTPD,		// Original posting date	/NOREQ
+    RecordACNSEG acnseg(),	// Account segments		/REF:RW
+    Boolean PAYOFFREV)		// Payoff Reversal Indicator
+
+	// Finally done!
+	
+	type public String CTL, LCHGTSO, MFCOFF(,,,,), OFFST(,,,)
+	type public Number LCHGADJ, VATLCHG
+	type public Date CUVAR2, TPD
+		
+	/* 
+	If bringing loan current, set original dates for TRNDRV (regular 
+	backdated transactions already have them set at this point, and future 
+	projections do not require them
+	*/
+	if CTL.extract(1) set (ORIGTJD, ORIGTPD) = CUVAR2
+
+	if acn.cls = "L" do {
+		type Number OLDSTAT
+		
+		// In case account has been closed, but still needs accrual 
+		// adjustment, save old status, and restore after posting
+		set OLDSTAT = acn.stat
+
+		// Future projection
+		if %EffectiveDate > CUVAR2 set acn.stat = 0
+	
+		/* 
+		 Skip accrual adjustment for a loan payoff. In this case, when
+		 a loan is already closed and adjustment is already posted, 
+		 only FM is reapplied. Allow adjustment for payoff reversal.
+		*/
+	 	if (acn.stat '= 4) ! (PAYOFFREV = true) do ACRADJ^UANTICLN(.acn, .ttx, .ACRADJ(,,), CUVAR2, LCHGADJ, VATLCHG, LCHGTSO, .dep(), .acnseg(), "")
+							
+		set acn.stat = OLDSTAT
+		
+		// Only file accumulated offsets when bringing loan current
+		if 'CTL.extract(1) quit
+		
+		// File accumulated loan fee offsets
+		set OFFST = "OFFST"
+		do OFFSET^UMSC(ORIGTPD, BRCD, %UserID, .OFFST(,,,), 1, 1)
+
+		// File accumulated min finance chg offsets (from billing)
+		set MFCOFF = "MFCOFF"
+		do OFFSET^UMSC(ORIGTPD, BRCD, %UserID, .MFCOFF(,,,,), 1, 1)
+		}
+
+	quit
+
+
+DISBPROJ(Number CID,		// Account number
+	 Boolean EC)		// Error correct indicator
+
+	/*
+	Change from Loan Scheduled Disbursement Method 2 (manual) to 1 
+	(automatic) for projection purposes
+	*/
+
+	type Number QUELOC
+	type Date SDD
+	
+	set QUELOC = $$QUELOC("QUE067")
+ 
+	// Only reset method from system date through effective date
+	set SDD = %SystemDate - 1
+
+	type DbSet rs = Db.selectDbSet("LNDS1", "CID=:CID AND SDD>:SDD")	
+	
+	while rs.next() do { quit:(SDD = %EffectiveDate)
+		type RecordLNDS1 lnds1 = rs.getRecord("LNDS1")
+		set SDD = lnds1.sdd
+		
+		if (SDD > %EffectiveDate) ! ((SDD=%EffectiveDate) & ((QUELOC = 1)! EC)) quit
+		
+		set lnds1.sdm = 1
+		do lnds1.bypassSave()
+		}
+
+	quit
+
+
+public QUELOC(String QUEID)	// Queue name
+
+	/*
+	   Queue location
+	   
+	   This section will determine where Queue is placed
+	   in relation to QUE039 (end-of-day or beginning-of-day).
+
+	   RETURNS:
+	       . $$  Queue location               /TYP=N
+	                 0 - not in dayend
+	                 1 - end-of-day
+	                 2 - beginning-of-day
+	   EXAMPLE:
+
+	         S QUELOC=$$QUELOC^UANTIC("QUExxx")
+
+	*/
+
+	if QUEID = "QUE039" quit 1
+	
+	type Number BCH, BCH039, JOB, JOB039
+
+	// Get batch and job numbers of the QUEID
+	type ResultSet rs = Db.select("BCHNUM,JOBNUM", "QUEUEJ", "FUN=:QUEID")
+
+	if rs.next() do {
+		set BCH = rs.getCol("BCHNUM")
+		set JOB = rs.getCol("JOBNUM")
+		}
+	else  quit 0
+
+	// Get batch and job numbers for the QUE039
+	type ResultSet rs1 = Db.select("BCHNUM,JOBNUM", "QUEUEJ", "FUN='QUE039'")
+
+	if rs1.next() do {
+		set BCH039 = rs1.getCol("BCHNUM")
+		set JOB039 = rs1.getCol("JOBNUM")
+		}
+	else  quit 0
+
+	if BCH < BCH039 quit 1
+
+	if BCH = BCH039 ,(JOB < JOB039) quit 1
+	 
+	quit 2
+
+
+TEASER(RecordLN ln,		// Loan account record		/REF:RW
+       Date EVNTJD)		// Event date
+      
+ 
+	// Teaser rate expiration
+	do TEASER^UANTICLN(.ln, EVNTJD)
+
+	quit
+
+
+	/************************************************************
+		Events applied for both loans and deposits
+	*************************************************************
+	*/
+
+
+RUNEFT(RecordACN acn,		// Account record		/REF:RW
+       Date %SystemDate,	// System date
+       String EVENT,		// Event
+       Date %EffectiveDate,	// Effective (thru) date	/NOREQ
+       RecordACNSEG acnseg())	// Account segments		/REF:RW
+
+	// Process an EFT order
+
+	type public Boolean ER
+	
+	// Manage scope for structures used by TRNSINGL^TRNDRV
+	type RecordTTX TTXOBJS()
+	type String TRNDRVI(,,), TRNPSSTK
+
+	type Number EFTSEQ
+	type RecordTTX ttxeft
+
+	set EFTSEQ = EVENT.piece(":", 2)
+	
+        // Create and post transactions
+	do public^BCHEFT(acn.cid, EFTSEQ, , , , 1, .ttxeft, 1) quit:ER
+
+	if 'ttxeft.exists() quit
+	
+	set ttxeft.efd=%SystemDate
+	do TRNSINGL^TRNDRV(.ttxeft, .acn, %SystemDate, BRCD, 4,,,,,,,.acnseg())
+	
+	quit
+
+
+RUNPAT(RecordACN acn,		// Account record		/REF:RW
+       RecordTTX ttx,		// Primary transaction		/NOREQ/REF:R
+       Date %SystemDate,	// System date
+       String EVENT,		// Event data
+       RecordACNSEG acnseg())	// Account segments		/REF:RW
+
+	// Post Pre-Authorized Transfer
+	
+	type public Boolean ER
+	type public Date CUVAR2, TPD
+	type public String PAT(,,)
+	type public Number EVNTSQ
+
+	type String %UserID, CCODE, CRCD, CRCDBASE, ETC, ITC, PASRC, REC, SRC
+	type String STAR, STARTR, TAG, TAMT, TSO
+	type Number BRCD, CID, EVNTSEQ, EXCAMT, PATSEQ, TOT
+
+	set TPD = %SystemDate 
+	set TOT = 0
+
+	set EVNTSQ = EVENT.piece("|", 4)
+	set PATSEQ = ""
+
+	for  set PATSEQ = PAT(%SystemDate, EVNTSQ, PATSEQ).order() quit:PATSEQ.isNull()  do {
+	
+		set REC = PAT(%SystemDate, EVNTSQ, PATSEQ)
+		
+		// Set variables for RUNPAT
+		do PATVAR(REC)
+
+		if TAMT.extract()?1A do { if ER quit
+			type Boolean NC
+			set TAG = TAMT.piece("_", 1) 
+			if TAMT.piece("_", 2) = "NC" set NC = 1
+			set TAG = TAG_"^PATOPT" 
+			set TAMT = 0 
+			do @TAG
+			}
+
+		if TAMT = "*" do { quit
+			set STAR = 1
+			set STARTR = REC
+			}
+
+		if TAMT '> 0 quit	
+
+		// Payoff logic	
+		if acn.cls = "L" do { 
+			type Number PAYOFF
+			set PAYOFF = $$PAYOFF^UANTICLN(.acn, TAMT)
+			if 'PAYOFF quit
+			set PAYOFF = $$EXEC^LNTCP1(.acn, .ttx, .acnseg()) 
+
+			if TAMT '< PAYOFF do {
+				type public Cache %CACHE()
+        			type RecordPRODCTL prodctl = %CACHE("PRODCTL").getRecord("PRODCTL", "TYPE=:acn.type")
+				set ETC = prodctl.crtrci 
+				set TAMT = PAYOFF
+				}
+			}
+
+		set EXCAMT = TAMT
+		if CRCD '= CRCDBASE do { quit:ER
+			do EXC^CRCDUTL(CRCDBASE, CRCD, TAMT, 0, 'ITC, "00", CCODE, , 1)
+			set EXCAMT = EXCAMT.roundCur(CRCD)
+			}
+
+		set TOT = TOT + $select(ITC:EXCAMT, 1:-EXCAMT)
+	
+		// Create and post transaction
+		do POST^LNTRB(.ttx, acn.cid, ETC, TAMT, %SystemDate, %UserStation, , , CRCD,,,,,, .acnseg()) quit:ER
+		}	// End of For
+
+	if STAR.get() do {
+		do PATVAR(STARTR)
+
+		if ((TOT > 0) & (ITC)) ! ((TOT < 0) & ('ITC)) quit
+		set EXCAMT = $select(TOT < 0:-TOT, 1:TOT)
+		if CRCD '= CRCDBASE do { quit:ER
+			do EXC^CRCDUTL(CRCDBASE, CRCD, EXCAMT, 1, 'ITC, "00", CCODE, , 1)
+			set EXCAMT = EXCAMT.roundCur(CRCD)
+			}
+		set TAMT = EXCAMT
+		if TAMT '> 0 quit
+
+		// Create and post transaction
+        	do POST^LNTRB(.ttx, acn.cid, ETC, TAMT, %SystemDate, %UserStation, , , CRCD,,,,,, .acnseg())
+		}
+
+	quit
+
+
+PATVAR(String REC)
+	/*
+	Set variables for PAT processing.
+	*/
+	type public Cache %CACHE()
+	type public Number BRCD, CID
+	type public String CCODE, CRCD, CRCDBASE, ETC, ITC, PASRC, SRC
+	type public String TAMT, TSO
+
+	set SRC = REC.piece("|", 1)
+	set BRCD = REC.piece("|", 2)
+	set %UserID = REC.piece("|", 3)
+	do UID(%UserID)
+	set ETC = REC.piece("|", 4)
+	set CID = REC.piece("|", 5)
+	set TAMT = REC.piece("|", 6)
+	set TSO = REC.piece("|", 10)
+	// "PAY" or "PAT"
+	set PASRC = REC.piece("|", 12)
+	set CCODE = REC.piece("|", 13)
+	if CCODE.isNull() set CCODE = 0
+	set CRCDBASE = REC.piece("|", 14)
+	if CRCDBASE.isNull() set CRCDBASE = %SystemCurrency
+	set CRCD = REC.piece("|", 21)
+	if CRCD.isNull() set CRCD = %SystemCurrency
+
+	// Internal Transaction Code
+        type RecordTRN trn=%CACHE("TRN").getRecord("TRN", "ETC=:ETC")
+
+	set ITC = trn.itc
+
+	quit
+	
+
+private	SETQUE(RecordACN acn,		// Account record	/REF:R
+	       String FRE,		// Frequency of event	/NOREQ
+	       Date NJD,		// Projected date
+	       Number OFF,		// Billing date offset
+	       Boolean PLUS1,		// Offset
+	       String EVNT)		// Event data
+
+	// Set the processing queue
+	
+	if 'NJD quit
+	
+	set FRE = FRE.get()
+	if FRE = "*2" quit
+	
+	if acn.cls = "L" do SETQUE^UANTICLN(.acn, FRE, NJD, OFF, PLUS1, EVNT, false) quit
+	
+	do SETQUE^UANTICDP(.acn, FRE, NJD, OFF, PLUS1, EVNT)
+
+	quit
+	
+	
+private	INTFRE(RecordACN acn,		// Account			/REF:R
+	       String INDEX,		// Int/div index
+	       String INTFRE,		// Int/div change frequency
+	       Date ICHND,		// Next int/div change date
+	       String EVNT,		// Event name
+	       Number INDXTYPE,		// Index type
+	       Number SEGMENT,		// Segment number 		/NOREQ
+	       RecordACNSEG acnseg)	// Account segment		/REF:RW
+
+	/*
+	Interest change date
+	
+	Additional notes on ARGUMENTS:
+		. INDXTYPE
+			Position 0  Interest index
+				 1  Segment interest index
+				 2  Available interest index
+        */
+	
+	type public Boolean BASREL(), DAILYFRE(,), ER
+
+	type Number AF
+	type Date JD
+
+	type RecordINDEX index = Db.getRecord("INDEX", "INDEX=:INDEX")
+
+	// Non-basis index
+	if index.basrel set BASREL(INDEX) = 1
+	else  set BASREL(INDEX) = 0
+
+	// Find Annual Factor
+	set JD = %SystemDate.nextFreqDate(INTFRE, .AF) quit:ER
+	
+	// Daily frequency - let accruals handle bumping of interest 
+	// change dates, and set events for possible interest rate change
+	if AF > 360 do { quit
+		set DAILYFRE(acn.cid, INDXTYPE) = 1
+		do RATECHG(.acn, INDEX, EVNT, .acnseg)
+		}
+	else  set DAILYFRE(acn.cid, INDXTYPE) = 0
+
+	// For non-basis indexes, set events for possible interest change 
+	// using the index change dates in INDEX0 table
+	if BASREL(INDEX) do RATECHG(.acn, INDEX, EVNT, .acnseg)
+
+	// Set events based on interest change frequency for all non-daily 
+	// frequencies
+	do SETQUE(.acn, INTFRE, ICHND, 0, 0, EVNT)
+	
+	quit
+
+
+RATECHG(RecordACN acn,		// Account			/REF:R
+	String INDEX,		// Int/div index
+	String EVNT,		// Event name
+	RecordACNSEG acnseg)	// Account segment		/REF:R
+
+	// Daily index rate change - mark dates in which the index changed 
+	// to force an accrual break
+	
+	type public String IX(,)
+	type public Date ACRDT()
+	type public Number SEGMENT
+
+	type Date INDXEFD
+
+	do SETQUE(.acn, "", %SystemDate, 0, 0, EVNT)
+
+	set INDXEFD = ACRDT(acn.cid)
+
+	// Use Last Accrual Date or Teaser Rate Expiration Date
+	if acn.trexd > INDXEFD set INDXEFD = acn.trexd - 1
+	
+	type DbSet ds = Db.selectDbSet("INDEX0", "INDEX=:INDEX AND EFD>:INDXEFD AND EFD<:%EffectiveDate")
+	while ds.next() do {
+		type RecordINDEX0 index0 = ds.getRecord("INDEX0")
+		set INDXEFD = index0.efd
+		if 'IX(INDEX, INDXEFD).exists(), '$$LOADIX^UINDX(.acn, INDEX, INDXEFD, , 1, .acnseg) quit
+		do SETQUE(.acn, "", INDXEFD, 0, 0, EVNT)
+		}
+
+	quit
+
+
+BALIRN(RecordACN acn,			// Account			/REF:R
+       String BALIRN())			// Interest Accrual Projection	/REF:W
+
+	// For Interest Accrual Projection Report (MRPC100), record balance and 
+	// interest rate when the rate or balance changes
+	
+	type public Date EVNTJD
+	
+	if acn.cls = "L" do {
+		type RecordLN ln = {RecordLN}acn
+		set BALIRN(EVNTJD) = ln.balint_"|"_ln.irn
+		}
+	else  do {
+		type RecordDEP dep = {RecordDEP}acn
+		set BALIRN(EVNTJD) = dep.bal_"|"_dep.irn
+		}
+	
+	quit

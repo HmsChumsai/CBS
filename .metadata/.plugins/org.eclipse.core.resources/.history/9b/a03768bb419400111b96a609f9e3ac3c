@@ -1,0 +1,32 @@
+//DO NOT MODIFY  Extract ZUTBLMINISTRY2 |ZEXTMIN2|||||||1
+
+	/*
+ORIG: Ravipong Chumsai Na Ayuthaya  - 07/02/2012
+DESC: Extract data from Table - ZUTBLMINISTRY1
+	*/
+	
+
+	do SYSVAR^SCADRV0()
+	
+	new io1,output
+	set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"ZUTBLMINISTRY2_"_ZEXTDAT_".TXT"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CERT_OFFICE_SUBTYPE1_CD"_"|"_"CERT_OFFICE_TYPE_CD"_"|"_"DESCRIPTION"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLMINISTRY2")
+	while ds.next() do {
+		set i=i+1
+		set output=""
+		set output.piece("|",1) = ds.getRecord().ZMINISTRYCD2
+		set output.piece("|",2) = ds.getRecord().ZMINISTRYCD1
+		set output.piece("|",3) = ds.getRecord().DESC_"|"
+		do io1.write(output)
+		}
+	do io1.write(i_"|")	
+		
+		
+	quit

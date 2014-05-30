@@ -1,0 +1,116 @@
+//DO NOT MODIFY  Extact Collateral Contract|ZBCONVCN||||||ZCONTRACT|CTRCT<1000||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	
+	
+	type RecordZCONTRACT zcnt = Db.getRecord("ZCONTRACT","CTRCT=:CTRCT")
+	type RecordTMPRPT2 ext = Class.new("RecordTMPRPT2")
+	type RecordTMPRPT2 ext2 = Class.new("RecordTMPRPT2")
+	
+	//Extract ALL
+	set ext.PID = "ZCONVCNT"
+	set ext.KEY1 = zcnt.ctrct
+	set ext.KEY2 = 0
+	set ext.DATA = zcnt.BOO_"|"_zcnt.CC_"|"_zcnt.CONTRREL_"|"_zcnt.CONVDT_"|"_zcnt.CRTDATE_"|"_zcnt.CRTUSER_"|"_zcnt.CTRCT_"|"_zcnt.CTRCTDT_"|"_zcnt.CTRSTAT_"|"_zcnt.MCTRCT_"|"_zcnt.PLDGAMT_"|"_zcnt.PLDGSEQ_"|"_zcnt.RELDATE_"|"_zcnt.REMARKS_"|"_zcnt.RESPUNIT
+	do ext.bypassSave()
+	
+	if zcnt.CTRSTAT=0 do {
+		set ext2.PID = "ZCONVCNT"
+		set ext2.KEY1 = zcnt.ctrct
+		set ext2.KEY2 = 1
+		set ext2.DATA = zcnt.BOO_"|"_zcnt.CC_"|"_zcnt.CONTRREL_"|"_zcnt.CONVDT_"|"_zcnt.CRTDATE_"|"_zcnt.CRTUSER_"|"_zcnt.CTRCT_"|"_zcnt.CTRCTDT_"|"_zcnt.CTRSTAT_"|"_zcnt.MCTRCT_"|"_zcnt.PLDGAMT_"|"_zcnt.PLDGSEQ_"|"_zcnt.RELDATE_"|"_zcnt.REMARKS_"|"_zcnt.RESPUNIT
+		do ext2.bypassSave()	
+		
+		type ResultSet rs = Db.select("COLL","zctrctcol","ZCTRCTCOL.CTRCT=:zcnt.ctrct")	
+		while rs.next() do {			
+			set ZRSCOL = rs.getCol(1)	
+			type RecordZCOL zcol = Db.getRecord("ZCOL","COLL=:ZRSCOL")
+			type RecordTMPRPT1 extcol = Class.new("RecordTMPRPT1")
+			set extcol.PID = "ZCONVCOL"
+			set extcol.KEY1 = zcol.COLL		
+			
+			set ZDATA = zcol.AMPHUR_"|"_zcol.AO_"|"_zcol.APDCODE_"|"_zcol.APPBOO_"|"_zcol.APPBY_"|"_zcol.APPDT_"|"_zcol.APPOFF1_"|"_zcol.APPOFF2_"|"_zcol.APPOFF3_"|"_zcol.APPTID_"|"_zcol.APPVAL_"|"_zcol.ASDATE_"|"_zcol.BKNUMBER_"|"_zcol.BLASTID_"|"_zcol.BLDCODE
+			set ZDATA = ZDATA_"|"_zcol.BLDNAME_"|"_zcol.BLDNUM_"|"_zcol.BLDTYPE_"|"_zcol.BLDVAL_"|"_zcol.BOO_"|"_zcol.BOOTFR_"|"_zcol.BOTCODE_"|"_zcol.BOTRSKRT_"|"_zcol.BSOI
+			set ZDATA = ZDATA_"|"_zcol.BSTRTID_"|"_zcol.BUILDNO_"|"_zcol.CACN_"|"_zcol.CC_"|"_zcol.CCRDT_"|"_zcol.CCRNUM_"|"_zcol.CERNO_"|"_zcol.CID_"|"_zcol.CMDCD_"|"_zcol.COLL_"|"_zcol.COLSUBT_"|"_zcol.COLTYP_"|"_zcol.CONDPAR_"|"_zcol.CONVDT
+			set ZDATA = ZDATA_"|"_zcol.CRCD_"|"_zcol.DATETRF_"|"_zcol.DESC_"|"_zcol.DOB_"|"_zcol.ENGCAP_"|"_zcol.EXTRSKR_"|"_zcol.FLOOR_"|"_zcol.GRPNO_"|"_zcol.INSREQ_"|"_zcol.KTBRKR_"|"_zcol.LNDINFO_"|"_zcol.LNDVAL_"|"_zcol.LNDVOL1
+			set ZDATA = ZDATA_"|"_zcol.LNDVOL2_"|"_zcol.LNDVOL3_"|"_zcol.LNDVOL4_"|"_zcol.LOC1_"|"_zcol.LOC2_"|"_zcol.LOC3_"|"_zcol.LQCD_"|"_zcol.LRTRVDT_"|"_zcol.MCODE1_"|"_zcol.MCODE2_"|"_zcol.NONCRM_"|"_zcol.OPRIMKEY_"|"_zcol.OWNLNDVOL1_"|"_zcol.OWNLNDVOL2
+			set ZDATA = ZDATA_"|"_zcol.OWNLNDVOL3_"|"_zcol.OWNLNDVOL4_"|"_zcol.OWNPORTN_"|"_zcol.PACN_"|"_zcol.PAGENO_"|"_zcol.PARTLFLG_"|"_zcol.PAYPARTY_"|"_zcol.PCHPRICE_"|"_zcol.PCOLVAL_"|"_zcol.PERSONID_"|"_zcol.PROVINCE_"|"_zcol.RAVANG_"|"_zcol.REASON
+			set ZDATA = ZDATA_"|"_zcol.REMARKS_"|"_zcol.RESPUNIT_"|"_zcol.RIGHBAL_"|"_zcol.RIGHVAL_"|"_zcol.RMAREA_"|"_zcol.RMKPORTN_"|"_zcol.RMNUMBER_"|"_zcol.ROAD_"|"_zcol.RSCD_"|"_zcol.RULCOST_"|"_zcol.SEQNO_"|"_zcol.SHRHLDRG_"|"_zcol.SHRTNAME_"|"_zcol.STCKNO
+			set ZDATA = ZDATA_"|"_zcol.STOREY_"|"_zcol.SUBBOT_"|"_zcol.SYMBOL_"|"_zcol.TAMBOL_"|"_zcol.TOTPORTN_"|"_zcol.UNITCD_"|"_zcol.USEDSTDT_"|"_zcol.USEFULIF_"|"_zcol.ZATEEXP_"|"_zcol.ZATEISSUEDT_"|"_zcol.ZATEISSUER_"|"_zcol.ZATENUM
+			set ZDATA = ZDATA_"|"_zcol.ZCERTBAL_"|"_zcol.ZCERTCID_"|"_zcol.ZCERTGRP_"|"_zcol.ZCERTLOTH_"|"_zcol.ZCERTLOTL_"|"_zcol.ZCERTPERIOD_"|"_zcol.ZCERTUNIT_"|"_zcol.ZLGISSUEDT_"|"_zcol.ZLGNUM_"|"_zcol.ZRADUR_"|"_zcol.ZRAEXP_"|"_zcol.ZRAISSUER_"|"_zcol.ZRANUM_"|"_zcol.ZRATYPE
+			
+			set extcol.DATA = ZDATA
+			do extcol.bypassSave()
+			}
+			
+	if zcnt.CTRSTAT=1 do {
+		type ResultSet rs = Db.select("COLL","zctrctcol","ZCTRCTCOL.CTRCT=:zcnt.ctrct")			
+		while rs.next() do {			
+			set ZRSCOL = rs.getCol(1)	
+			type RecordZCOL zcol = Db.getRecord("ZCOL","COLL=:ZRSCOL")
+			if (zcol.coltyp=1)!(zcol.coltyp=2)!(zcol.coltyp=8)!(zcol.coltyp=11) do {				
+				type RecordTMPRPT1 extcol = Class.new("RecordTMPRPT1")
+				set extcol.PID = "ZCONVCOL"
+				set extcol.KEY1 = zcol.COLL
+				
+			
+				set ZDATA = zcol.AMPHUR_"|"_zcol.AO_"|"_zcol.APDCODE_"|"_zcol.APPBOO_"|"_zcol.APPBY_"|"_zcol.APPDT_"|"_zcol.APPOFF1_"|"_zcol.APPOFF2_"|"_zcol.APPOFF3_"|"_zcol.APPTID_"|"_zcol.APPVAL_"|"_zcol.ASDATE_"|"_zcol.BKNUMBER_"|"_zcol.BLASTID_"|"_zcol.BLDCODE
+				set ZDATA = ZDATA_"|"_zcol.BLDNAME_"|"_zcol.BLDNUM_"|"_zcol.BLDTYPE_"|"_zcol.BLDVAL_"|"_zcol.BOO_"|"_zcol.BOOTFR_"|"_zcol.BOTCODE_"|"_zcol.BOTRSKRT_"|"_zcol.BSOI
+				set ZDATA = ZDATA_"|"_zcol.BSTRTID_"|"_zcol.BUILDNO_"|"_zcol.CACN_"|"_zcol.CC_"|"_zcol.CCRDT_"|"_zcol.CCRNUM_"|"_zcol.CERNO_"|"_zcol.CID_"|"_zcol.CMDCD_"|"_zcol.COLL_"|"_zcol.COLSUBT_"|"_zcol.COLTYP_"|"_zcol.CONDPAR_"|"_zcol.CONVDT
+				set ZDATA = ZDATA_"|"_zcol.CRCD_"|"_zcol.DATETRF_"|"_zcol.DESC_"|"_zcol.DOB_"|"_zcol.ENGCAP_"|"_zcol.EXTRSKR_"|"_zcol.FLOOR_"|"_zcol.GRPNO_"|"_zcol.INSREQ_"|"_zcol.KTBRKR_"|"_zcol.LNDINFO_"|"_zcol.LNDVAL_"|"_zcol.LNDVOL1
+				set ZDATA = ZDATA_"|"_zcol.LNDVOL2_"|"_zcol.LNDVOL3_"|"_zcol.LNDVOL4_"|"_zcol.LOC1_"|"_zcol.LOC2_"|"_zcol.LOC3_"|"_zcol.LQCD_"|"_zcol.LRTRVDT_"|"_zcol.MCODE1_"|"_zcol.MCODE2_"|"_zcol.NONCRM_"|"_zcol.OPRIMKEY_"|"_zcol.OWNLNDVOL1_"|"_zcol.OWNLNDVOL2
+				set ZDATA = ZDATA_"|"_zcol.OWNLNDVOL3_"|"_zcol.OWNLNDVOL4_"|"_zcol.OWNPORTN_"|"_zcol.PACN_"|"_zcol.PAGENO_"|"_zcol.PARTLFLG_"|"_zcol.PAYPARTY_"|"_zcol.PCHPRICE_"|"_zcol.PCOLVAL_"|"_zcol.PERSONID_"|"_zcol.PROVINCE_"|"_zcol.RAVANG_"|"_zcol.REASON
+				set ZDATA = ZDATA_"|"_zcol.REMARKS_"|"_zcol.RESPUNIT_"|"_zcol.RIGHBAL_"|"_zcol.RIGHVAL_"|"_zcol.RMAREA_"|"_zcol.RMKPORTN_"|"_zcol.RMNUMBER_"|"_zcol.ROAD_"|"_zcol.RSCD_"|"_zcol.RULCOST_"|"_zcol.SEQNO_"|"_zcol.SHRHLDRG_"|"_zcol.SHRTNAME_"|"_zcol.STCKNO
+				set ZDATA = ZDATA_"|"_zcol.STOREY_"|"_zcol.SUBBOT_"|"_zcol.SYMBOL_"|"_zcol.TAMBOL_"|"_zcol.TOTPORTN_"|"_zcol.UNITCD_"|"_zcol.USEDSTDT_"|"_zcol.USEFULIF_"|"_zcol.ZATEEXP_"|"_zcol.ZATEISSUEDT_"|"_zcol.ZATEISSUER_"|"_zcol.ZATENUM
+				set ZDATA = ZDATA_"|"_zcol.ZCERTBAL_"|"_zcol.ZCERTCID_"|"_zcol.ZCERTGRP_"|"_zcol.ZCERTLOTH_"|"_zcol.ZCERTLOTL_"|"_zcol.ZCERTPERIOD_"|"_zcol.ZCERTUNIT_"|"_zcol.ZLGISSUEDT_"|"_zcol.ZLGNUM_"|"_zcol.ZRADUR_"|"_zcol.ZRAEXP_"|"_zcol.ZRAISSUER_"|"_zcol.ZRANUM_"|"_zcol.ZRATYPE
+		
+				set extcol.DATA = ZDATA
+				do extcol.bypassSave()
+			}
+		}
+	}
+	/*	
+	
+	type ResultSet rs = Db.select("COLL","zctrctcol,zcol","ZCTRCTCOL.CTRCT=:zcnt.ctrct and zctrctcol.coll=zcol.coll and zcol.coltyp in (1,2,8,11)")
+		while rs.next() do {
+		type RecordTMPRPT1 extcol = Class.new("RecordTMPRPT1")
+		set zcoll = rs.getCol(1)
+		set extcol.PID = "ZCONVCOL"
+		set extcol.KEY1 = zcoll
+		type RecordZCOL zcol = Db.getRecord("ZCOL","COLL=:zcoll")
+		
+	set ZDATA = zcol.AMPHUR_"|"_zcol.AO_"|"_zcol.APDCODE_"|"_zcol.APPBOO_"|"_zcol.APPBY_"|"_zcol.APPDT_"|"_zcol.APPOFF1_"|"_zcol.APPOFF2_"|"_zcol.APPOFF3_"|"_zcol.APPTID_"|"_zcol.APPVAL_"|"_zcol.ASDATE_"|"_zcol.BKNUMBER_"|"_zcol.BLASTID_"|"_zcol.BLDCODE
+	set ZDATA = ZDATA_"|"_zcol.BLDNAME_"|"_zcol.BLDNUM_"|"_zcol.BLDTYPE_"|"_zcol.BLDVAL_"|"_zcol.BOO_"|"_zcol.BOOTFR_"|"_zcol.BOTCODE_"|"_zcol.BOTRSKRT_"|"_zcol.BSOI
+	set ZDATA = ZDATA_"|"_zcol.BSTRTID_"|"_zcol.BUILDNO_"|"_zcol.CACN_"|"_zcol.CC_"|"_zcol.CCRDT_"|"_zcol.CCRNUM_"|"_zcol.CERNO_"|"_zcol.CID_"|"_zcol.CMDCD_"|"_zcol.COLL_"|"_zcol.COLSUBT_"|"_zcol.COLTYP_"|"_zcol.CONDPAR_"|"_zcol.CONVDT
+	set ZDATA = ZDATA_"|"_zcol.CRCD_"|"_zcol.DATETRF_"|"_zcol.DESC_"|"_zcol.DOB_"|"_zcol.ENGCAP_"|"_zcol.EXTRSKR_"|"_zcol.FLOOR_"|"_zcol.GRPNO_"|"_zcol.INSREQ_"|"_zcol.KTBRKR_"|"_zcol.LNDINFO_"|"_zcol.LNDVAL_"|"_zcol.LNDVOL1
+	set ZDATA = ZDATA_"|"_zcol.LNDVOL2_"|"_zcol.LNDVOL3_"|"_zcol.LNDVOL4_"|"_zcol.LOC1_"|"_zcol.LOC2_"|"_zcol.LOC3_"|"_zcol.LQCD_"|"_zcol.LRTRVDT_"|"_zcol.MCODE1_"|"_zcol.MCODE2_"|"_zcol.NONCRM_"|"_zcol.OPRIMKEY_"|"_zcol.OWNLNDVOL1_"|"_zcol.OWNLNDVOL2
+	set ZDATA = ZDATA_"|"_zcol.OWNLNDVOL3_"|"_zcol.OWNLNDVOL4_"|"_zcol.OWNPORTN_"|"_zcol.PACN_"|"_zcol.PAGENO_"|"_zcol.PARTLFLG_"|"_zcol.PAYPARTY_"|"_zcol.PCHPRICE_"|"_zcol.PCOLVAL_"|"_zcol.PERSONID_"|"_zcol.PROVINCE_"|"_zcol.RAVANG_"|"_zcol.REASON
+	set ZDATA = ZDATA_"|"_zcol.REMARKS_"|"_zcol.RESPUNIT_"|"_zcol.RIGHBAL_"|"_zcol.RIGHVAL_"|"_zcol.RMAREA_"|"_zcol.RMKPORTN_"|"_zcol.RMNUMBER_"|"_zcol.ROAD_"|"_zcol.RSCD_"|"_zcol.RULCOST_"|"_zcol.SEQNO_"|"_zcol.SHRHLDRG_"|"_zcol.SHRTNAME_"|"_zcol.STCKNO
+	set ZDATA = ZDATA_"|"_zcol.STOREY_"|"_zcol.SUBBOT_"|"_zcol.SYMBOL_"|"_zcol.TAMBOL_"|"_zcol.TOTPORTN_"|"_zcol.UNITCD_"|"_zcol.USEDSTDT_"|"_zcol.USEFULIF_"|"_zcol.ZATEEXP_"|"_zcol.ZATEISSUEDT_"|"_zcol.ZATEISSUER_"|"_zcol.ZATENUM
+	set ZDATA = ZDATA_"|"_zcol.ZCERTBAL_"|"_zcol.ZCERTCID_"|"_zcol.ZCERTGRP_"|"_zcol.ZCERTLOTH_"|"_zcol.ZCERTLOTL_"|"_zcol.ZCERTPERIOD_"|"_zcol.ZCERTUNIT_"|"_zcol.ZLGISSUEDT_"|"_zcol.ZLGNUM_"|"_zcol.ZRADUR_"|"_zcol.ZRAEXP_"|"_zcol.ZRAISSUER_"|"_zcol.ZRANUM_"|"_zcol.ZRATYPE
+	
+	set extcol.DATA = ZDATA
+	do extcol.bypassSave()
+	*/
+		
+	
+	quit
+		
+	
+---------- THREXIT ------ Section marker

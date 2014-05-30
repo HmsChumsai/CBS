@@ -1,0 +1,27 @@
+//DO NOT MODIFY  After Update trigger for all columns|0|0|0|0|1|0||||
+
+	/*
+        ---- Revision History ------------------------------------------------
+ 
+        05/15/01 - VETSENM - 43026
+                   Set error message for Non-PROFILE account if Conversion
+                   Account (DEP.CONVACN) is not defined.
+
+                   Set XBAD message if user attempts to perform file
+                   maintenance on a Non-PROFILE account (PRODCTL.NONPA=1)
+	
+	07/29/01 - VETSENM - 46279
+		   Code for DEP.CONVACN has been removed to AU_CONVACN.
+
+	*/
+
+
+	new NONPA,TYPE
+	
+        set TYPE=dep.type
+        set NONPA=Db.getOneRow("NONPA","PRODCTL","TYPE")
+
+        // File Maintenance Require Approval
+        if NONPA=1 do Runtime.setErrXBAD("DEP",3005) quit:ER
+
+        quit

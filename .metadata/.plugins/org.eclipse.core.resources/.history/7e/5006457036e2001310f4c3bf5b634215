@@ -1,0 +1,513 @@
+//DO NOT MODIFY  To modify existing Account tariff|ZMODTARI|||||||1
+
+ZMODTARIF
+	/*
+	 ORIG: 1 - 15/11/2013
+	 DESC: 
+
+	 ---- Comments --------------------------------------------------------
+
+	 ---- Revision History ------------------------------------------------
+	 5 Feb 2014 Ravipong Chumsaiset 
+	  Consider using setAuditFlag for all objects in this procedure
+	   example :do dep.setAuditFlag(1)
+
+	*/
+
+MAIN(FLG,IM,OM,ERRCD,ERRDESC)
+
+	type String ZIM,ZOM,ZERRDESC,ZARRIN,ZARROUT,RM,OUTPUT
+	type Number ZERRCD,ZFLG,ER,IsAsterisk,ZSEQ,ZINDX,ZNUMREC
+	set ER=0
+	set ZSEQ=0
+	set (ZIM,ZOM,ZERRDESC,RM,OUTPUT)=""
+	set (ZERRCD,ZFLG)=""
+	set ZIM=IM
+	set ZFLG=FLG
+	set IsAsterisk=0
+
+
+
+
+	do {
+
+		catch ZMODTARIF {
+			set ER = 1
+			set RM = ZMODTARIF.description
+			set ZERRCD="E9999"
+			//set ZERRDESC="UNABLE TO PROCESS - OTHER ERROR"
+			set ZARROUT("StatusCode")="10"
+			set ZARROUT("ErrorAppId")=ZARRIN("RqAppId")
+			set ZARROUT("ErrorAppAbbrv")="PCB"
+			set ZARROUT("ErrorCode")=ZERRCD
+			type ResultSet zerdesc = Db.select("ERRDESC","ZUTBLITFERCD","ERRCD=:ZERRCD")
+			while zerdesc.next() do {
+				set ZARROUT("ErrorDesc")=zerdesc.getCol(1)
+			}
+			//set ZARROUT("ErrorDesc")=ZARRIN("ErrorDesc").get()
+			set ZARROUT("ErrorSeverity")="02"
+			do FAPOUT(ZFLG,.ZOM,.ZERRCD,.ZERRDESC)
+
+		}
+
+		do FAPIN(ZFLG,.ZIM,.ZOM,.ZERRCD,.ZERRDESC)
+		do PROC
+		do FAPOUT(ZFLG,.ZOM,.ZERRCD,.ZERRDESC)
+		//write !,"ZOM "_ZOM
+	}
+
+	set OM=ZOM
+	set ERRCD=ZERRCD
+	set ERRDESC=ZERRDESC
+
+
+	quit OUTPUT
+
+FAPIN(ZFLG,ZIM,ZOM,ZERRCD,ZERRDESC)
+
+	if ZFLG=1 do DELIMIN(ZFLG,.ZIM,.ZOM,.ZERRCD,.ZERRDESC)
+	if ZFLG=2 do FIXIN(ZFLG,.ZIM,.ZOM,.ZERRCD,.ZERRDESC)
+
+	quit
+
+FAPOUT(ZFLG,ZOM,ZERRCD,ZERRDESC)
+
+	if ZFLG=1 do DELIMOUT(.ZOM,.ZERRCD,.ZERRDESC)
+	if ZFLG=2 do FIXOUT(.ZOM,.ZERRCD,.ZERRDESC)
+
+	quit
+
+DELIMOUT(ZOM,ZERRCD,ZERRDESC)
+
+
+	//Error Segment
+	type String ZERSEG,ZSEGOM
+	set ZSEGOM=""
+	set ZERSEG="["_ZARROUT("ErrorAppId").get()_";;"_ZARROUT("ErrorAppAbbrv").get()_";;"_ZARROUT("ErrorCode").get()
+	set ZERSEG=ZERSEG_";;"_ZARROUT("ErrorDesc").get()_";;"_ZARROUT("ErrorSeverity").get()_"]"
+
+	if '(ZERRCD.get()).isNull() do {
+		set ZOM.piece(":;",1)=ZARROUT("FuncNm").get()
+		set ZOM.piece(":;",2)=ZARROUT("RqUID").get()
+		set ZOM.piece(":;",3)=ZARROUT("RsAppId").get()
+		set ZOM.piece(":;",4)=ZARROUT("RsUID").get()
+		set ZOM.piece(":;",5)=ZARROUT("RsDt").get()
+		set ZOM.piece(":;",6)=ZARROUT("StatusCode").get()
+		set ZOM.piece(":;",7)=ZERSEG
+		set ZOM=ZOM_":;"_ZARROUT("CorrID").get()
+		set ZOM=ZOM_":;"_ZARROUT("ReqAuthUserId").get()
+		set ZOM=ZOM_":;"_ZARROUT("ReqAuthLevel").get()
+		//set ZOM.piece(":;",8)=ZARROUT("CorrID").get()
+		set ZOM=ZOM_":;"
+
+
+	}
+	else do {
+
+		set ZOM.piece(":;",1)=ZARROUT("FuncNm").get()
+		set ZOM.piece(":;",2)=ZARROUT("RqUID").get()
+		set ZOM.piece(":;",3)=ZARROUT("RsAppId").get()
+		set ZOM.piece(":;",4)=ZARROUT("RsDt").get()
+		set ZOM.piece(":;",5)=ZARROUT("StatusCode").get()
+		set ZOM.piece(":;",6)="[]"
+		set ZOM.piece(":;",7)=$$PADDING(ZARROUT("AcctId").get(),2,10)
+		set ZOM.piece(":;",8)=$$PADDING(ZARROUT("DomBranchId").get(),2,4)
+
+	}
+
+	quit
+
+DELIMIN(ZFLG,ZIM,ZOM,ZERRCD,ZERRDESC)
+
+	//type String ZFUNCNM,ZRQUID,ZRQDT,ZRQAPPID,ZUSERID,ZTERMID,ZULANG,ZCORRID,ZAUTHUID,ZAUTHLV,ZCID
+	set ZARRIN("FuncNm")=ZIM.piece(":;",1)
+	set ZARRIN("RqUID")=ZIM.piece(":;",2)
+	set ZARRIN("RqDt")=ZIM.piece(":;",3)
+	set ZARRIN("RqAppId")=ZIM.piece(":;",4)
+	set ZARRIN("UserId")=ZIM.piece(":;",5)
+	set ZARRIN("ATMTerminalID")=ZIM.piece(":;",7)
+	set ZARRIN("AcctId")=ZIM.piece(":;",8)
+	set ZARRIN("SvcBranchId")=ZIM.piece(":;",9)
+	//set ZARRIN("StatusSearchCriteria")=ZIM.piece(":;",10)
+
+	quit
+
+PROC
+	//***Init***
+	// Time Stamp
+	// Ex. ZDATE=$$DTSTAMP()
+	// ZDATE >> 2013-12-02T17:37:57.45+07:00
+
+	do SYSVAR^SCADRV0()
+	type RecordCUVAR cuvar=Db.getRecord("CUVAR")
+
+
+	type String ZSTAMP,ZTIM,ZDAT,ZLangPref
+	set ZLangPref=""
+	set (ZSTAMP,ZTIM,ZDAT)=""
+
+	type Number MICSEC,isTh,ZMAXOCC,ZSKIP,ZACTIVE
+	set ZACTIVE=0
+	set ZSKIP=0
+	set ZMAXOCC=0
+	set isTh=1
+	set MICSEC=""
+
+	set MICSEC=$$GETTIM^%ZFUNC()
+	set MICSEC=MICSEC.extract(MICSEC.length()-6,MICSEC.length()-5)
+
+
+	if ZFLG=1 do {
+		set ZDAT=$$DAT^%ZM(%CurrentDate,"YEAR-MM-DD")
+		set ZTIM=$$TIM^%ZM(%CurrentTime,"24:60:SS")
+		set ZSTAMP=ZDAT_"T"_ZTIM_"."_MICSEC_"+07:00"
+	}
+	else do {
+		set ZDAT=$$DAT^%ZM(%CurrentDate,"YEARMMDD")
+		set ZTIM=$$TIM^%ZM(%CurrentTime,"2460SS")
+
+		set ZSTAMP=ZDAT_ZTIM
+	}
+	//
+
+	//Header
+	set ZARROUT("FuncNm")=ZARRIN("FuncNm").get()
+	set ZARROUT("RqUID")=ZARRIN("RqUID").get()
+	set ZARROUT("RsAppId")=cuvar.zappid
+
+	//p'new
+	set ZARROUT("RsUID")=ZARRIN("RqUID").get()
+
+	//set ZARROUT("RsDt")=ZDAT_"T"_ZTIM_"."_MICSEC_"+07:00"
+	set ZARROUT("RsDt")=ZSTAMP
+	set ZARROUT("CorrID")=ZARRIN("CorrID").get()
+	//
+	//Validate Common Header
+	//if ZARRIN("FuncNm ").get().isNull() set ZERRCD="E9999",ZERRDESC="FuncNm field is Null"
+	//if (ZARRIN("FuncNm").get()'="RetrieveComSightAcctSubBal")!(ZARRIN("FuncNm").get().isNull()) set ZERRCD="E9999",ZERRDESC="Invalid FuncNm"
+	if $G(ZARRIN("RqUID")).isNull() set ZERRCD="E0014"
+	if $G(ZARRIN("RqDt")).isNull() set ZERRCD="E0016"
+	if ($G(ZARRIN("RqAppId")).isNull()) set ZERRCD="E0038"
+	if $G(ZARRIN("UserId")).isNull() set ZERRCD="E0017"
+	if ($G(ZARRIN("AcctId")).length()'=10) set ZERRCD="E0002"
+
+
+	if '(ZERRCD.get()).isNull() set ZSKIP=1
+
+
+	if $G(ZARRIN("AcctId")).isNull() set ZERRCD="E0002",ZSKIP=1
+	if $$ISINT^ZITFUTL($G(ZARRIN("AcctId")),)=0 set ZERRCD="E0002",ZSKIP=1
+	set AcctId = +ZARRIN("AcctId").get()
+	set ZARROUT("AcctId")=ZARRIN("AcctId").get()
+
+
+	if ZARRIN("SvcBranchId").isNull() set ZERRCD="E0026",ZSKIP=1
+	else do {
+		type Number ZBRCD
+		set ZBRCD=ZARRIN("SvcBranchId").get()
+		if $$ISINT^ZITFUTL(ZBRCD,)=0 set ZERRCD="E0026",ZSKIP=1
+		set ZBRCD=+ZBRCD
+		if 'Db.isDefined("ZUTBLBRCD","BRCD=:ZBRCD") set ZERRCD="E0026",ZSKIP=1
+	}
+
+
+
+	if 'ZSKIP do {
+		if 'Db.isDefined("DEP","CID=:AcctId") do {
+			set ZERRCD="E0002"
+			//error
+
+		}
+
+		else do {
+			type Number isMisCode,ZMISCODE
+			set isMisCode=0
+			type RecordDEP DEP = Db.getRecord("DEP","CID=:AcctId")		
+			type ResultSet zrflg = Db.select("RFLG","RFLG","CID=:AcctId")
+			if zrflg.next() do {
+				set ZMISCODE=zrflg.getCol(1)
+				set ZMISCODE=","_ZMISCODE.extract(1,2)_","
+				if ",28,29,30,31,33,37,40,"[ZMISCODE set isMisCode=1
+				if isMisCode,((ZMISCODE=",28,")!(ZMISCODE=",40,")),(DEP.GRP="SAV") set ZERRCD="RMS"_(zrflg.getCol(1)).extract(1,2) quit
+				if isMisCode set ZERRCD="RMC"_(zrflg.getCol(1)).extract(1,2)
+				
+				//if "28"[ZMISCODE set ZERRCD="RMC28"
+				//if "29"[ZMISCODE set ZERRCD="RMC29"
+				//if "30"[ZMISCODE set ZERRCD="RMC30"
+				//if "31"[ZMISCODE set ZERRCD="RMC31"
+				//if "33"[ZMISCODE set ZERRCD="RMC33"
+				//if "37"[ZMISCODE set ZERRCD="RMC37"
+				//if "40"[ZMISCODE set ZERRCD="RMC40"
+				//if ZMISCODE=",28," set isMisCode=1
+			}
+			//if isMisCode set ZERRCD="RMC28" quit
+			if isMisCode quit		
+
+			//type RecordDEP DEP = Db.getRecord("DEP","CID=:AcctId")
+			
+			if (DEP.GRP'="SAV")!(DEP.ZSTATCD=4) set ZERRCD="E0062" quit
+			if (DEP.TYPE=2001),(DEP.TYPE=2001),(DEP.PBI=0),(DEP.PBKBAL=""),(DEP.PBKSN="")  set ZERRCD="E0005" quit
+
+			set BRCD=ZARRIN("SvcBranchId").get()
+			set %UID= ZARRIN("UserID").get()
+			set TLO = ZARRIN("ATMTerminalID").get()
+
+			set DEP.TYPE=2001
+			set DEP.PBI=0
+			set DEP.PBKBAL = ""
+			set DEP.PBKSN = ""
+			set ZARROUT("DomBranchld")=$$PADDING(DEP.boo,2,4)
+			do DEP.setAuditFlag()
+			do DEP.save()
+
+
+		}
+
+	}
+	set ZARROUT("AcctId")=$$PADDING(AcctId.get(),2,10)
+
+
+	//set ZARROUT("RsAppId")=$$PADDING(ZARROUT("RsAppId").get(),1,5)
+	if (ZERRCD.get()).isNull() do {
+		set ZARROUT("StatusCode")="00"
+
+
+	}
+	else do {
+		set ZARROUT("StatusCode")="10"
+		//set ZARROUT("ErrorAppId")="668"
+		set ZARROUT("ErrorAppId")=cuvar.zappid
+		//set ZARROUT("ErrorAppId")=$$PADDING(ZARROUT("ErrorAppId").get(),1,5)
+		set ZARROUT("ErrorAppAbbrv")="PCB"
+		set ZARROUT("ErrorCode")=$$PADDING(ZERRCD.get(),1,30)
+
+
+		type ResultSet zerdesc = Db.select("ERRDESC","ZUTBLITFERCD","ERRCD=:ZERRCD")
+		while zerdesc.next() do {
+			set ZARROUT("ErrorDesc")=$$PADDING(zerdesc.getCol(1),1,80)
+		}
+		//set ZARROUT("ErrorDesc")=ZARRIN("ErrorDesc").get()
+		set ZARROUT("ErrorSeverity")="02"
+	}
+	//OUPUT
+	set OUTPUT.piece(":;",1)=ZARRIN("RqAppId").get()
+	set OUTPUT.piece(":;",2)=ZARRIN("FuncNm").get()
+	set OUTPUT.piece(":;",3)=""
+	set OUTPUT.piece(":;",4)=ZARRIN("RqDt").get()
+	set OUTPUT.piece(":;",5)=ZARRIN("RqUID").get()
+	set OUTPUT.piece(":;",6)=ZERRCD
+	set OUTPUT.piece(":;",7)=AcctId
+
+
+	quit
+
+
+FIXIN(ZFLG,ZIM,ZOM,ZERRCD,ZERRDESC)
+
+
+	set ZARRIN("FuncNm")=ZIM.extract(1,20).trim()
+	set ZARRIN("RqUID")=ZIM.extract(21,67).trim()
+	set ZARRIN("RqDt")=ZIM.extract(68,81).trim()
+	set ZARRIN("RqAppId")=ZIM.extract(82,86).trim()
+	set ZARRIN("UserId")=ZIM.extract(87,94).trim()
+	set ZARRIN("ATMTerminalID")=ZIM.extract(106,121).trim()
+	set ZARRIN("AcctId")=ZIM.extract(122,131).trim()
+	set ZARRIN("SvcBranchId")=ZIM.extract(132,135).trim()
+
+
+
+	quit
+
+FIXOUT(ZOM,ZERRCD,ZERRDESC)
+
+	type String ZERRSEG
+	set ZERRSEG=""
+
+	set ZOM=ZOM_$$PADDING(ZARROUT("FuncNm").get(),1,20)
+	set ZOM=ZOM_$$PADDING(ZARROUT("RqUID").get(),1,47)
+	set ZOM=ZOM_$$PADDING(ZARROUT("RsAppId").get(),1,5)
+	set ZOM=ZOM_$$PADDING(ZARROUT("RsDt").get(),1,14)
+	set ZOM=ZOM_$$PADDING(ZARROUT("StatusCode").get(),2,2)
+
+
+	if '(ZERRCD.get()).isNull() do {
+		do ZCREJMSG(ZFLG,ZIM,.ZOM,"10",.ZERRCD)
+
+	}
+	else do {
+		set ZERRSEG=$J("",115)
+		set ZOM=ZOM_ZERRSEG.get()
+		set ZOM=ZOM_$$PADDING(ZARROUT("AcctId").get(),2,10)
+		set ZOM=ZOM_$$PADDING(ZARROUT("DomBranchld").get(),2,4)
+		set ZOM=ZOM_$J("",23)
+	}
+
+
+	quit
+
+PADDING(array,flg,fixL)
+
+	type String out
+	type Number zlength
+	set out=""
+
+	//Blank padding
+	if flg=1 do {
+		type String in
+		set in=array.get()
+		set zlength=in.length()
+		set out=in_$J("",fixL-zlength)
+		//set out=in_$J("""",fixL-zlength)
+
+	}
+	//Zero padding
+	if flg=2 do {
+		type Number in
+		set in=array.get()
+		set zlength=in.length()
+		set out=in.zero(fixL)
+	}
+	//MainFrame
+	if flg=3 do {
+		type Number in,ZER
+		type String ZRM
+		set ZER=0
+		set ZRM=""
+		set in=array.get()*100
+		do CONVENC^ZITFUTL(1,in,.out,.ZER,.ZRM)
+	}
+	//Balance
+	if flg=4 do {
+		type Number in
+		set in=array.get()
+		set out=in.zero(fixL,2,0,0)
+	}
+	quit out
+
+CHECKPOINT
+
+	quit
+
+RQIN(FLG,IM,RET)
+
+	type String ZRET=""
+	set ZRET.piece(":;",1)=ZARRIN("RqAppId").get()
+	set ZRET.piece(":;",2)=ZARRIN("FuncNm").get()
+	set ZRET.piece(":;",3)=""
+	set ZRET.piece(":;",4)=ZARRIN("RqDt").get()
+	set ZRET.piece(":;",5)=ZARRIN("RqUID").get()
+	set RET=ZRET
+
+
+	quit
+
+ZCREJMSG(ZFLG,ZIM,ZOM,ZSTATCD,ZERRCD)
+
+
+	do SYSVAR^SCADRV0()
+
+	type String ZSTAMP,ZTIM,ZDAT
+	set (ZSTAMP,ZTIM,ZDAT)=""
+
+	type Number MICSEC
+
+	set MICSEC=""
+
+	set MICSEC=$$GETTIM^%ZFUNC()
+	set MICSEC=MICSEC.extract(MICSEC.length()-6,MICSEC.length()-5)
+
+	set ZDAT=$$DAT^%ZM(%CurrentDate,"YEARMMDD")
+	set ZTIM=$$TIM^%ZM(%CurrentTime,"2460SS")
+	set ZSTAMP=ZDAT_ZTIM
+
+	type RecordCUVAR cuvar=Db.getRecord("CUVAR")
+
+	set ZARRIN("FuncNm")=ZIM.piece(":;",1)
+	set ZARRIN("RqUID")=ZIM.piece(":;",2)
+	set ZARRIN("RqDt")=ZIM.piece(":;",3)
+	set ZARRIN("RqAppId")=ZIM.piece(":;",4)
+	set ZARRIN("UserId")=ZIM.piece(":;",5)
+	set ZARRIN("TerminalId")=ZIM.piece(":;",6)
+	set ZARRIN("UserLangPref")=ZIM.piece(":;",7)
+	set ZARRIN("CorrID")=ZIM.piece(":;",8)
+	set ZARRIN("AuthUserId")=ZIM.piece(":;",9)
+	set ZARRIN("AuthLevel")=ZIM.piece(":;",10)
+	set ZARRIN("Filler")=ZIM.piece(":;",11)
+	set ZARRIN("AcctId")=ZIM.piece(":;",12)
+
+	set ZARROUT("FuncNm")=ZARRIN("FuncNm").get()
+	set ZARROUT("RqUID")=ZARRIN("RqUID").get()
+	set ZARROUT("RsAppId")=cuvar.zappid
+
+	//p'new
+	set ZARROUT("RsUID")=ZARRIN("RqUID").get()
+
+	set ZARROUT("RsDt")=ZSTAMP
+
+	set ZARROUT("CorrID")=ZARRIN("CorrID").get()
+
+	set ZARROUT("StatusCode")=ZSTATCD
+	set ZARROUT("ErrorAppId")=cuvar.zappid
+	set ZARROUT("ErrorAppAbbrv")="PCB"
+	set ZARROUT("ErrorCode")=ZERRCD
+	type ResultSet zerdesc = Db.select("ERRDESC","ZUTBLITFERCD","ERRCD=:ZERRCD")
+	while zerdesc.next() do {
+		set ZERRDESC=zerdesc.getCol(1)
+		set ZARROUT("ErrorDesc")=zerdesc.getCol(1)
+	}
+	//set ZARROUT("ErrorDesc")=ZARRIN("ErrorDesc").get()
+	set ZARROUT("ErrorSeverity")="02"
+
+	//Error Segment
+	type String ZERSEG
+
+	if ZFLG=1 do {
+
+		set ZERSEG="["_ZARROUT("ErrorAppId").get()_";;"_ZERRCD.get()
+		set ZERSEG=ZERSEG_";;"_ZARROUT("ErrorDesc").get()_"]"
+
+
+		set ZOM.piece(":;",1)=ZARROUT("FuncNm").get()
+		set ZOM.piece(":;",2)=ZARROUT("RqUID").get()
+		set ZOM.piece(":;",3)=ZARROUT("RsAppId").get()
+		set ZOM.piece(":;",5)=ZARROUT("RsDt").get()
+		if ZSTATCD.get()="" set ZSTATCD="10"
+		set ZOM.piece(":;",6)=ZSTATCD
+		set ZOM.piece(":;",7)=ZERSEG
+		set ZOM=ZOM_":;"_ZARROUT("CorrID").get()
+		set ZOM=ZOM_":;"_ZARROUT("ReqAuthUserId").get()
+		set ZOM=ZOM_":;"_ZARROUT("ReqAuthLevel").get()
+		//set ZOM.piece(":;",8)=ZARROUT("CorrID").get()
+		set ZOM=ZOM_":;"
+
+	}
+	else do {
+
+		set ZARRIN("FuncNm")=ZIM.extract(1,20).trim()
+		set ZARRIN("RqUID")=ZIM.extract(21,67).trim()
+
+		set ZARROUT("FuncNm")=ZARRIN("FuncNm").get()
+		set ZARROUT("RqUID")=ZARRIN("RqUID")
+		set ZARROUT("RsAppId")=cuvar.zappid
+		set ZARROUT("RsDt")=ZSTAMP
+		set ZARROUT("StatusCode")=ZSTATCD
+		set ZARROUT("ErrorAppId")=cuvar.zappid
+		set ZARROUT("ErrorAppAbbrv")="PCB"
+		set ZARROUT("ErrorCode")=ZERRCD
+
+		set ZOM=$$PADDING(ZARROUT("FuncNm").get(),1,20)
+		set ZOM=ZOM_$$PADDING(ZARROUT("RqUID").get(),1,47)
+		set ZOM=ZOM_$$PADDING(ZARROUT("RsAppId").get(),1,5)
+		set ZOM=ZOM_$$PADDING(ZARROUT("RsDt").get(),1,14)
+		set ZOM=ZOM_$$PADDING(ZARROUT("StatusCode").get(),2,2)
+
+		set ZERRSEG=""
+		set ZERRSEG=ZERRSEG_$$PADDING(ZARROUT("ErrorAppId").get(),1,5)
+		set ZERRSEG=ZERRSEG_$$PADDING(ZARROUT("ErrorCode").get(),1,30)
+		set ZERRSEG=ZERRSEG_$$PADDING(ZARROUT("ErrorDesc").get(),1,80)
+		set ZOM=ZOM_ZERRSEG_$J("",37)
+
+	}
+
+
+	quit

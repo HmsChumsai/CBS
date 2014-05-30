@@ -1,0 +1,454 @@
+//DO NOT MODIFY  Batch Debit Credit|ZBDRCR|||||||1
+	/*
+	 ORIG: 1 - 12/11/2013
+	 DESC: 
+	
+	 ---- Comments --------------------------------------------------------
+	status ZBDRCRF
+	1 : check file complete
+	2 : posting
+	3 : post file complete
+	4 : gen file complete
+	9 : Error (look at CMT field)
+	 ---- Revision History ------------------------------------------------
+	
+	 ****** Consider using setAuditFlag for all objects in this procedure
+	   example :do dep.setAuditFlag(1)
+	
+	*/
+	
+MAIN(ZAPP,ZITFKEY,ZFNAME)
+	
+	do SYSVAR^SCADRV0()
+	set ZTJD=%SystemDate
+	set ZRM=""
+	set (ZER,ZCHKH,ZCHKT)="0"
+	
+	set ZPFDIR = $$TRNLNM^%ZFUNC("PROFILE_DIR")
+	type RecordZUTBLITFFTP itf = Db.getRecord("ZUTBLITFFTP","ZPFDIR,ZAPP,ZITFKEY")
+	set ZINLPATH = itf.inlp
+	set ZINLPATH = $$CFTPPATH^ZITFUTL(ZINLPATH)
+	
+	// if ZAPP=626 and ZITFKEY=ADHOC (GCP ADHOC)
+	// ZFNAME must have value (not null)
+	if ZFNAME.get()="" do {		
+		set ZFNAME = itf.inlf
+		set ZFNAME = $$CFTPFUNC^ZITFUTL(ZFNAME)
+	}
+	
+	set ZLOCKF = $$CHKLOCK(ZTJD,ZAPP,ZFNAME)
+	if ZLOCKF set ZER=1,ZRM="This file name is processing" quit 
+	
+	set ZAPP = ZAPP.trim(-1,0)
+	set ZFSEQ=Db.nextVal("ZBDRCRF","ZTJD,ZAPP")
+	set ZTFSEQ = ZFSEQ.zero(3)
+	set ZTYPE = ZAPP_"_"_ZTFSEQ
+ 	
+ 	type RecordZBDRCRF rcf=Db.getRecord("ZBDRCRF","ZTJD,ZAPP,ZFSEQ",1)
+	if rcf.stat '= "" set ZER=1,ZRM="File has been check" quit
+	
+ 	set rcf.fname=ZFNAME
+ 	set rcf.curtim=$$TIM^%ZM(%CurrentTime,"24:60:SS")
+ 	do rcf.save()
+	
+	do READFILE
+	if ZER do DELTABLE quit
+	
+	quit
+	
+READFILE
+	new ETYP
+	set ETYP=""
+	
+	set ZRECCNT=0
+	set (ZTCAMT,ZTDAMT)=0
+	
+	
+	
+	type IO ioIN=Class.new("IO")
+	set ioIN.fileName=ZFNAME
+	set ioIN.directory=ZINLPATH
+	set ioIN.openParams="READ"
+	set ioIN.recordSize=900
+	
+	do ioIN.open()
+	
+	type String ZREC=""
+	type String ZOLDREC=""
+	
+	for  set ZREC=ioIN.read(.ETYP) quit:+ETYP'=0!ZER  do {
+		set ZREC=ZREC.replace($C(10),"")
+		set ZREC=ZREC.replace($C(13),"")
+		
+		if ZREC="" quit
+		
+		do RECCALL	
+	}	
+	do ioIN.close()
+	
+	if ZER do DELTABLE quit
+	if (ZCHKH'="1") ! (ZCHKT'="1") do { quit
+		set ZER = 1
+		set ZRM = "File don't have header or tailer"
+		do DELTABLE
+	}
+	
+	
+	type RecordZBDRCRF rcf=Db.getRecord("ZBDRCRF","ZTJD,ZAPP,ZFSEQ",1)
+	set rcf.stat = "1"
+	set rcf.cmt = "Read file complete"	
+	do rcf.save()
+	
+	quit
+	
+RECCALL
+	set ZRECTYPE=ZREC.extract(1,3)
+	
+	do ALLREC
+	if ZER quit
+	
+	set ZOLDREC=ZRECTYPE
+	
+	if ZRECTYPE="H01" do HEADER quit
+	else if ZRECTYPE="T01" do TAILER quit
+	else  do DATA quit
+	
+	quit
+	
+ALLREC
+ 	if (ZOLDREC="T01") set ZER=1,ZRM="Tailer record must be last record." quit
+ 	if (ZOLDREC=""),(ZRECTYPE'="H01") set ZER=1,ZRM="Header record must be the first record." quit
+ 
+ 	quit
+ 	
+HEADER
+	//if +ZREC.extract(60,65)'=1 set ZER=1,ZRM="FileSEQNum field is not 000001" quit 
+	set ZCHKH = "1"
+	
+	set ZSYSDATE=ZREC.extract(4,36).trim()
+	set ZBUSDATE=ZREC.extract(37,46).trim()
+	set ZAPPID=ZREC.extract(47,51).trim()
+	set ZFTYPE=ZREC.extract(52,59).trim()
+	
+	if ZSYSDATE.isNull() set ZER=1,ZRM="SysDt field is Null" quit
+	if ZBUSDATE.isNull() set ZER=1,ZRM="BusinessDt field is Null" quit
+	set ZAPPID=+ZAPPID
+	if ZAPPID="0" set ZER=1,ZRM="Invalid Application ID" quit
+	if ZAPPID'=ZAPP set ZER=1,ZRM="Invalid Input Application ID" quit
+	
+	set ZCBUSDATE = ZBUSDATE.replace("-","")
+	set ZCBUSDATE = $$FDAT^%ZM(ZCBUSDATE,"YYYYMMDD")
+	if ZCBUSDATE'=ZTJD set ZER=1,ZRM="Invalid Business Date" quit
+	
+	type RecordZBDRCRF rcf=Db.getRecord("ZBDRCRF","ZTJD,ZAPP,ZFSEQ",1)
+	set rcf.sysdt=ZSYSDATE
+	set rcf.busdt=ZBUSDATE
+	set rcf.appid=ZAPPID
+	set rcf.ftype=ZFTYPE
+	do rcf.save()
+	
+	quit
+	
+DATA
+	set ZRECCNT=ZRECCNT+1
+ 	new XSTCD,XERCD,XERDESC,ZAUTHNULL
+ 	set (XSTCD,XERCD,XERDESC,ZAUTHNULL)=""
+ 	
+ 	set ZSRCUID = ZREC.extract(1,40)
+ 	set ZRQUID = ZREC.extract(41,87).trim()
+	set ZOPERTYPE = ZREC.extract(88,89)
+	set ZOPERCODE = ZREC.extract(90,91)
+	set ZSUBOPERCODE = ZREC.extract(92,95)
+	set ZUID = ZREC.extract(96,103).trim()
+	set ZTERMID = ZREC.extract(104,111).trim()
+	set ZVALDATE = ZREC.extract(112,121)
+	set ZCVALDATE = ZVALDATE.replace("-","")
+	set ZCVALDATE = $$FDAT^%ZM(ZCVALDATE,"YYYYMMDD")
+	set ZCONC1 = ZREC.extract(122,166).trim()
+	set ZCONC2 = ZREC.extract(167,221).trim()
+	set ZCID = ZREC.extract(222,231)
+	set ZAMT = ZREC.extract(232,249)
+	set ZFEE = ZREC.extract(250,267)
+	set ZBRCD = ZREC.extract(268,271)
+	set ZAUTHID = ZREC.extract(272,286).trim()
+	if ZAUTHID.get().isNull() set ZAUTHNULL=1
+	set ZAUTHLVL = ZREC.extract(287,289)
+	set ZEXTDATE = ZREC.extract(290,299).trim()
+	set ZEXTDATE = ZEXTDATE.replace("-","")
+	set ZCEXTDATE = $$CONDATE^ZITFUTL(ZEXTDATE,"YEARMMDD")
+	set ZUSEBRANCH = ZREC.extract(300,300).trim()
+	set ZICA = ZREC.extract(301,303)
+	set ZCHKNUM = ZREC.extract(304,311)
+ 	
+
+ 	set ZCHKCID = $$ISINT^ZITFUTL(ZCID,10)
+ 	set ZAMT = +ZAMT
+ 	set ZFEE = +ZFEE
+	//========================================================= Validate ============================================================
+ 	if ZRQUID.isNull() set XSTCD="10",XERCD="E0014"
+ 	else if (ZOPERTYPE.isNull()) ! ((ZOPERTYPE'="CR") & (ZOPERTYPE'="DR")) set XSTCD="10",XERCD="E0020"	
+ 	else if ZOPERCODE.isNull() set XSTCD="10",XERCD="E0021"	
+ 	else if ZSUBOPERCODE.isNull() set XSTCD="10",XERCD="E0022"	
+ 	else if ZUID.isNull() set XSTCD="10",XERCD="E0017"	
+ 	else if ZTERMID.isNull() set XSTCD="10",XERCD="E0079"	
+ 	else if ZVALDATE.isNull() set XSTCD="10",XERCD="E0023"	
+ 	else if ('ZCHKCID) set XSTCD="10",XERCD="E0002"	
+ 	else if ('ZAMT.isInteger()) ! ('ZAMT) set XSTCD="10",XERCD="E0024"	
+ 	else if ('ZFEE.isInteger()) set XSTCD="10",XERCD="E0025"	
+ 	else if ZBRCD.isNull() set XSTCD="10",XERCD="E0026"
+ 	else if (ZEXTDATE.isNull()) ! (ZCEXTDATE = "-1") set XSTCD="10",XERCD="E0027"
+ 	else if (ZUSEBRANCH.isNull()) ! ((ZUSEBRANCH'="Y") & (ZUSEBRANCH'="N")) set XSTCD="10",XERCD="E0028"
+ 	else if ZICA.isNull() set XSTCD="10",XERCD="E0029"
+
+	set ZCID = +ZCID
+	set ZBRCD = +ZBRCD
+	set ZAUTHLVL = +ZAUTHLVL
+	set ZAMT = ZAMT/100
+	set ZFEE = ZFEE/100
+	set ZICA = ZICA.trim(-1,"0")
+
+ 	//----------------------------- Count DEBIT/CREDIT ----------------------------------
+ 	if ZOPERTYPE = "CR"  do {
+ 		set ZTCAMT = ZTCAMT+ZAMT
+ 		set ZTDAMT = ZTDAMT+ZFEE
+ 	}
+ 	else if ZOPERTYPE = "DR"  do {
+ 		set ZTDAMT = ZTDAMT+ZAMT
+ 		set ZTDAMT = ZTDAMT+ZFEE
+ 	}
+ 	
+	
+	if XSTCD.get() do { if 1
+ 		type RecordZUTBLITFERCD ercd = Db.getRecord("ZUTBLITFERCD","ERRCD=:XERCD")
+		set XERDESC = ercd.errdesc
+		if ercd.zerrbnk'="1" set XERCD="E9999"
+ 	}
+ 	else  do {
+		if 'Db.isDefined("SCAU","UID=:ZUID") set XSTCD="10",XERCD="E0017"
+		else if ('Db.isDefined("UTBLBRCD","BRCD=:ZBRCD")) set XSTCD="10",XERCD="E0026"
+		else if ('ZAUTHNULL) & ('Db.isDefined("SCAU","UID=:ZAUTHID")) set XSTCD="10",XERCD="E0018"
+		
+		else if ('Db.isDefined("DEP","CID=:ZCID")) set XSTCD="10",XERCD="E0002"
+		else if Db.isDefined("DEP","CID=:ZCID") do {
+			type RecordDEP rcdep = Db.getRecord("DEP","CID=:ZCID")
+			if rcdep.stat="4" set XSTCD="10",XERCD="OST4"
+		}
+		
+				
+		if XSTCD.get() do {
+	 		type RecordZUTBLITFERCD ercd = Db.getRecord("ZUTBLITFERCD","ERRCD=:XERCD")
+			set XERDESC = ercd.errdesc
+			if ercd.zerrbnk'="1" set XERCD="E9999"
+ 		}
+ 	}
+	//============================================================================================================================
+	
+	
+	if $$CHKDUP^ZMRPC777(ZRQUID,.XSTCD,.XERCD) do {		// Check duplicate RQUID
+ 		type RecordZUTBLITFERCD ercd = Db.getRecord("ZUTBLITFERCD","ERRCD=:XERCD")
+		set XERDESC = ercd.errdesc
+ 	}
+	
+ 	set ZSEQ=ZRECCNT
+ 	
+ 	type RecordZBDRCRD rcd=Db.getRecord("ZBDRCRD","ZTJD,ZAPP,ZFSEQ,ZSEQ",1)
+ 	set rcd.fname = ZFNAME
+ 	set rcd.srcuid = ZSRCUID
+ 	set rcd.rquid = ZRQUID
+ 	set rcd.opertype = ZOPERTYPE
+ 	set rcd.opercd = ZOPERCODE
+ 	set rcd.subopercd = ZSUBOPERCODE
+ 	set rcd.uid = ZUID
+ 	set rcd.termid = ZTERMID
+ 	set rcd.valdt = ZCVALDATE
+ 	set rcd.conc1 = ZCONC1
+ 	set rcd.conc2 = ZCONC2
+ 	set rcd.cid = ZCID
+ 	set rcd.tamt = ZAMT
+ 	set rcd.fee = ZFEE
+ 	set rcd.brcd = ZBRCD
+ 	if 'Db.isDefined("DEP","CID=:ZCID") set rcd.boo = ""
+ 	else  do {
+	 	type RecordDEP dep=Db.getRecord("DEP","ZCID")
+	 	set rcd.boo = dep.boo
+ 	}
+ 	set rcd.authid = ZAUTHID
+ 	set rcd.authlvl = ZAUTHLVL
+ 	set rcd.extdt = ZEXTDATE
+ 	set rcd.usebrcd = ZUSEBRANCH
+ 	set rcd.ica = ZICA
+ 	set rcd.chknum = ZCHKNUM
+ 	set rcd.statcd = XSTCD.get()
+ 	set rcd.ercd = XERCD.get()
+ 	set rcd.erdesc = XERDESC.get()
+ 	set rcd.reqauthid = ""
+ 	set rcd.reqauthlvl = ""
+	do rcd.save()
+	
+	type RecordZBDRCRF rcf = Db.getRecord("ZBDRCRF","ZTJD,ZAPP,ZFSEQ")
+	set ZBUSDT = rcf.busdt
+	set ZAPPID = rcf.appid
+	
+	if XSTCD.isNull() do {
+		type RecordZMTPOST zmtpost=Db.getRecord("ZMTPOST","TJD=:ZTJD, ITFKEY='BATCHDRCR', TYPE=:ZTYPE, CID=:ZCID, SORT1=:ZSEQ, SORT2=1, SORT3=1",1)
+		set zmtpost.mskey=ZTJD_"|"_ZAPP_"|"_ZFSEQ_"|"_ZSEQ
+		do zmtpost.save()
+	}
+	else  {
+		set ZRQSEQ=Db.nextVal("ZRQLOG1","%CurrentDate,ZRQUID")
+		type RecordZRQLOG1 rclog1=Db.getRecord("ZRQLOG1","%CurrentDate,ZRQUID,ZRQSEQ",1)
+		set rclog1.status = XSTCD.get()
+		set rclog1.appid = ZAPPID
+		set rclog1.FNAME = "RECORDCOMBDRCR"
+		set rclog1.KTRC = ZSUBOPERCODE
+		set rclog1.TIME = %CurrentTime
+		set rclog1.ERRCD = XERCD.get()
+		set rclog1.RQDATE = ZBUSDT
+		set rclog1.TJD = %SystemDate
+		do rclog1.save()
+	}
+	
+	quit
+	
+TAILER	
+	set ZCHKT = "1"
+	
+	set ZTREC1 = ZREC.extract(4,18).trim()
+	if ZTREC1.isNull() set ZER=1,ZRM="TotalRec field is Null" quit
+	set ZTREC1 = +ZTREC1
+	
+	set ZTSUM1 = ZREC.extract(19,36).trim()
+	if ZTSUM1.isNull() set ZER=1,ZRM="TotalSum field is Null" quit
+	set ZTSUM1 = +ZTSUM1
+	set ZTSUM1 = ZTSUM1/100
+	
+ 	set ZTDAMT1 = ZREC.extract(37,54).trim()
+ 	if ZTDAMT1.isNull() set ZER=1,ZRM="TotalDebitSum field is Null" quit
+ 	set ZTDAMT1 = +ZTDAMT1
+ 	set ZTDAMT1 = ZTDAMT1/100
+ 	
+ 	set ZTCAMT1 = ZREC.extract(55,72).trim()
+ 	if ZTCAMT1.isNull() set ZER=1,ZRM="TotalCreditSum field is Null" quit
+ 	set ZTCAMT1 = +ZTCAMT1
+ 	set ZTCAMT1 = ZTCAMT1/100
+ 	
+ 	
+ 	//---------------------------------- Check DEBIT/CREDIT -------------------------------
+ 	if ZTREC1 '= ZRECCNT set ZER=1,ZRM="Total Number of Data Records not equal "_ZTREC1 quit
+	if ZTDAMT1 '= ZTDAMT set ZER=1,ZRM="Total Amount of debit not equal "_ZTDAMT1 quit
+	if ZTCAMT1 '= ZTCAMT set ZER=1,ZRM="Total Amount of credit not equal "_ZTCAMT1 quit
+	if ZTSUM1 '= (ZTDAMT+ZTCAMT) set ZER=1,ZRM="Total Sum of Transaction Amounts not equal "_ZTSUM1 quit
+	
+	set ZSEQ=ZRECCNT
+ 	type RecordZBDRCRF rcf=Db.getRecord("ZBDRCRF","ZTJD,ZAPP,ZFSEQ",1)
+ 	set rcf.trec=ZTREC1
+ 	set rcf.tsum=ZTSUM1
+ 	set rcf.tdrsum=ZTDAMT1
+ 	set rcf.tcrsum=ZTCAMT1
+	do rcf.save()
+	
+	quit
+
+DELTABLE
+ 	do Db.delete("ZBDRCRD","TJD=:ZTJD and APP=:ZAPP and FSEQ=:ZFSEQ and FNAME=:ZFNAME")
+	
+	do Db.delete("ZMTPOST","TJD=:ZTJD and ITFKEY='BATCHDRCR' and TYPE=:ZTYPE")
+	
+ 	type RecordZBDRCRF rcf=Db.getRecord("ZBDRCRF","ZTJD,ZAPP,ZFSEQ",1)
+ 	set rcf.stat = "9"
+	set rcf.cmt = ZRM	
+	do rcf.save()
+ 	
+ 	quit
+	
+ //---------------------------------------------------
+UPDERREC(XSTCD,XERCD)	// update error reccord
+ //---------------------------------------------------
+	type RecordZUTBLITFERCD ercd = Db.getRecord("ZUTBLITFERCD","ERRCD=:XERCD")
+	set XERDESC = ercd.errdesc
+	if ercd.zerrbnk'="1" set XERCD="E9999"
+	
+	type RecordZBDRCRD rcd=Db.getRecord("ZBDRCRD","ZTJD,ZAPP,ZFSEQ,ZSEQ",1)
+	set rcd.statcd = XSTCD.get()
+ 	set rcd.ercd = XERCD.get()
+ 	set rcd.erdesc = XERDESC.get()
+ 	do rcd.save()
+	quit
+	
+ //---------------------------------------------------
+FINDFSEQ(ZAPP,ZFNAME)	// find file sequence
+ //---------------------------------------------------
+ 	do SYSVAR^SCADRV0()
+ 	set ZTJD=%SystemDate
+ 	set ZAPP=+ZAPP
+ 	set ZER=0
+ 	set ZRM=""
+ 	
+	type ResultSet rs = Db.select("FSEQ","ZBDRCRF","TJD=:ZTJD AND APP=:ZAPP AND FNAME=:ZFNAME","FSEQ DESC")
+	if rs.isEmpty() set ZER=1,ZRM="File not Found"
+	else if rs.next() set ZFSEQ = rs.getCol("FSEQ")
+	
+	if ZER quit -1
+	quit ZFSEQ
+
+	
+ //------------------------------------------
+CHKLOCK(ZTJD,ZAPP,ZFNAME) 
+	/*
+	Check file stat
+		return 0 = file can process
+		return 1 = Can't process file
+	*/		  
+ //------------------------------------------
+ 
+ 	set ZRESLOCK=0
+ 	type ResultSet rs = Db.select("STAT","ZBDRCRF","TJD=:ZTJD AND APP=:ZAPP AND FNAME=:ZFNAME","FSEQ DESC")
+ 	if rs.isEmpty() quit ZRESLOCK
+ 	else if rs.next() do { 
+		if (rs.getCol("STAT")'="4") & (rs.getCol("STAT")'="9") & (rs.getCol("STAT")'="") set ZRESLOCK=1
+	}
+ 	
+	quit ZRESLOCK
+
+ //---------------------------------------------	
+FINDGCPSEQ()	// find GCP ADHOC file sequence
+ //---------------------------------------------
+	do SYSVAR^SCADRV0()
+	
+	set ZGCPSEQ = $O(^ZGCPCNT(%SystemDate,""),-1)
+	if ZGCPSEQ.get() = "" do { quit ZGCPSEQ			// begin of day 
+		set ZGCPSEQ = "1"
+		type RecordZGCPCNT crecnt=Db.getRecord("ZGCPCNT","%SystemDate,ZGCPSEQ",1)
+		set crecnt.flg = "0"
+		set crecnt.date = %CurrentDate
+		set crecnt.time = $$TIM^%ZM(%CurrentTime,"24:60:SS")
+		do crecnt.save()
+	}
+	
+	type RecordZGCPCNT cnt=Db.getRecord("ZGCPCNT","%SystemDate,ZGCPSEQ",1)
+	if cnt.flg = "0" quit ZGCPSEQ
+	else if cnt.flg = "1" do { quit ZGCPSEQ
+		set ZGCPSEQ = ZGCPSEQ+1
+		type RecordZGCPCNT crecnt=Db.getRecord("ZGCPCNT","%SystemDate,ZGCPSEQ",1)
+		set crecnt.flg = "0"
+		set crecnt.date = %CurrentDate
+		set crecnt.time = $$TIM^%ZM(%CurrentTime,"24:60:SS")
+		do crecnt.save()
+	}
+	
+	quit -1	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	

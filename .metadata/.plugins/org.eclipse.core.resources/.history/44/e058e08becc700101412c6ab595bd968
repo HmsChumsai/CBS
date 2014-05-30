@@ -1,0 +1,61 @@
+//DO NOT MODIFY  TEST|ZBCHTEST||||||DTJFM|TJD=:ZDATE|10|100|32000|ZDATE|0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	
+	new IOTYP,ZPATH
+	set ZPATH=$$TRNLNM^%ZFUNC("SCAU_SPOOL")
+	type IO io = Class.new("IO")
+	set io.directory=ZPATH
+	set io.fileName="ZMK.txt"
+	set io.openParams="NEWV/WRITE"
+	do io.open()
+	set ext = 0
+	set TEXT1=""
+	set ZMK="ZMK"
+	type ResultSet rs=Db.select("DATA","TMPRPT1","PID=:ZMK")
+	while rs.next() do { 
+		
+		set TEXT1=rs.getCol("DATA")
+		
+	}
+	do io.write(TEXT1)
+	
+	set IOTYP="RMS"
+	do io.close()
+	quit
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	
+	if 'Db.isDefined("DTJFM","TJD,CLS,GRP,TYP,CID,TSEQ") quit
+	
+	type RecordDTJFM zdtjfm = Db.getRecord("DTJFM","TJD,CLS,GRP,TYP,CID,TSEQ")
+	type RecordTMPRPT1 tmp = Class.new("RecordTMPRPT1")
+	type RecordACN acn = Db.getRecord("ACN","CID=:zdtjfm.cid")
+	
+	set tmp.pid = "ZMK"
+	set tmp.key1 = zdtjfm.cid 
+	if Db.isDefined("DTJNA","TJD=:zdtjfm.tjd,CLS,GRP,TYP,CID=:zdtjfm.cid") 
+	set tmp.data = "Case 1  AccNum:"_zdtjfm.cid_" CusNum:"_acn.acn
+	else set tmp.data = "Case 2  AccNum:"_zdtjfm.cid
+	do tmp.bypassSave()
+
+	quit
+ACC(ZDATE)
+	do DRV^UBCHID("ZBCHTEST")
+	quit
+	
+---------- THREXIT ------ Section marker

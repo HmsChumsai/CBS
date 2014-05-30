@@ -1,0 +1,521 @@
+//DO NOT MODIFY  TEST SUSOPRICIOUS|ZMKORN29|||||||1
+MAIN(Number ZREDAYS)
+
+	catch error {          
+		type String ET
+
+		set ET=error.type
+		if ET["%GTM-" do ZE^UTLERR
+		set ET=ET_"-"_error.thrownAt
+		set ET=ET_","_error.description
+
+		do LOG^ZSUREXC($T(+0),"*",%FN.get(),"",%ZTSEQ.get(),ET)
+		}
+
+	type Date DATE
+	type Number EXIT,SEQ,MONTIME
+	type String THRSHAMT
+	
+	// cache rule switch
+	type String ZRULESW()
+	
+	// cache common condition applied
+	type String TMPCAPPL()
+	
+	// cache common condition
+	type String TMPCCIF(),TMPCPRDT(),TMPCCID(),TMPCKCUS()
+
+	// cache detail rule to exclude
+	type String TMPDRULE()
+	
+	// format THR0XX(RULE,SEQ)=VALUE
+	// ZUTBLSUR028A , ZUTBLSUR030A
+	// R028,1 - Limit Amount
+	// R030,1 - Time Interval
+	type Number THR028X(),THR030X()
+	
+	// Common condition of each rule
+	// format1 THR00X(RULE,SEQ)=VALUE for Rule 29
+	type Number THR00X()
+	
+	type Number ZLASTDD
+
+	// Number of days to rerun
+	set ZREDAYS=$G(ZREDAYS)
+	set ZREDAYS=+ZREDAYS
+	
+	do SYSVAR^SCADRV0()
+	
+	lock +^ZMONCTRL("ZTRNCHNL"):5 else  quit
+	
+	type RecordZMONCTRL zsvrmctr=Db.getRecord("ZMONCTRL","PROCESSOR='ZTRNCHNL'",1)
+	set zsvrmctr.pid=$$DECHEX^%ZHEX(%ProcessID)
+	set zsvrmctr.sysdate=%CurrentDate
+	set zsvrmctr.startime=%CurrentTime
+	set zsvrmctr.stopdate=""
+	set zsvrmctr.stoptime=""
+	set zsvrmctr.stop=0
+	do zsvrmctr.bypassSave()
+	
+		
+	set DATE=%SystemDate-ZREDAYS
+		
+	set ZLASTDD=Db.prevKey("ZLKCHNL","TJD=''")
+	
+	if ZLASTDD>DATE set DATE=ZLASTDD
+	
+	
+	//do INIT(.ZRULESW,.TMPCCIF,.TMPCPRDT,.TMPCCID,.TMPCKUS,.TMPCAPPL,.TMPDRULE,.THR028X,.THR030X)
+	do INIT(.ZRULESW,.TMPCCIF,.TMPCPRDT,.TMPCCID,.TMPCKUS,.TMPCAPPL,.TMPDRULE,.THR028X,.THR030X,.THR00X)
+	
+	
+	
+	set EXIT=0
+	for  do { quit:EXIT
+		type RecordZLKCHNL zlkchnl=Db.getRecord("ZLKCHNL","TJD=:DATE",1)
+		
+		// Wait for next time interval 
+                //set X=$$WAIT^%ZFUNC(10)
+		
+		set SEQ=Db.nextKey("ZANLYZTR","TJD=:DATE,SEQ=:zlkchnl.lstseq")
+		if SEQ.isNull() do { quit
+			set EXIT=$$CTRLX 
+			
+			// find next date for ZANLYZTR
+			type ResultSet zrstr=Db.select("TJD","ZANLYZTR","TJD>:DATE")
+			if zrstr.next() set DATE=zrstr.getCol(1)
+			
+			hang MONTIME
+			}
+
+		type RecordZANLYZTR zanlyztr=Db.getRecord("ZANLYZTR","TJD=:DATE,SEQ=:SEQ")
+
+		if zanlyztr.fid="DTJ" do DTJ(DATE,zanlyztr.keys,.ZRULESW,.TMPCCIF,.TMPCPRDT,.TMPCCID,.TMPCKUS,.TMPCAPPL)
+
+		if zanlyztr.fid="DMJ" do DMJ(DATE,zanlyztr.keys)
+			
+		set zlkchnl.lstseq=SEQ
+		do zlkchnl.bypassSave()
+		}
+
+	lock -^ZMONCTRL("ZTRNCHNL")
+	type RecordZMONCTRL zmonctrx=Db.getRecord("ZMONCTRL","PROCESSOR='ZTRNCHNL'")
+	set zmonctrx.stopdate=%CurrentDate
+	set zmonctrx.stoptime=%CurrentTime
+	do zmonctrx.bypassSave()
+	quit
+INIT(String ZRULESW(), 
+      String TMPCCIF(), 
+      String TMPCPRDT(), 
+      String TMPCCID(), 
+      String TMPCKUS(), 
+      String TMPCAPPL(), 
+      String TMPDRULE(),
+      Number THR028X(),
+      Number THR030X(),
+      Number THR00X())
+      
+	// ZUTBLSURUCLS - User Class for Analyze Surveillance
+	type ResultSet zsurucls=Db.select("UCLS","ZUTBLSURUCLS")
+	while zsurucls.next() set THR00X("ZSURUCLS",zsurucls.getCol("UCLS"))=""
+	
+	// ZRULESW - switch for each rule
+	type ResultSet zrssw=Db.select("RULE","ZUTBLSURSW","FLG=1")
+	while zrssw.next() set ZRULESW(zrssw.getCol(1))=""
+	
+	// Load common condition
+	type ResultSet zrscom1=Db.select("ACN","ZUTBLSUCCIF")
+	while zrscom1.next() set TMPCCIF(zrscom1.getCol(1))=""
+	
+	type ResultSet zrscom2=Db.select("PRDT","ZUTBLSUCPRDT")
+	while zrscom2.next() set TMPCPRDT(zrscom2.getCol(1))=""
+	
+	type ResultSet zrscom3=Db.select("CID","ZUTBLSUCCID")
+	while zrscom3.next() set TMPCCID(zrscom3.getCol(1))=""
+
+	type ResultSet zrscom4=Db.select("ZKTBCCODE","ZUTBLSUCKCUS")
+	while zrscom4.next() set TMPCKCUS(zrscom4.getCol(1))=""
+	
+	
+	// Load rule - common condition applied
+	type ResultSet zrscap=Db.select("RULE,FLGC1,FLGC2,FLGC3,FLGC4","ZUTBLSUCOAPP")
+	while zrscap.next() do {
+		set TMPCAPPL(zrscap.getCol(1),1)=+zrscap.getCol(2)
+		set TMPCAPPL(zrscap.getCol(1),2)=+zrscap.getCol(3)
+		set TMPCAPPL(zrscap.getCol(1),3)=+zrscap.getCol(4)
+		set TMPCAPPL(zrscap.getCol(1),4)=+zrscap.getCol(5)		
+		}
+		
+	/*		
+	type ResultSet zrsd1=Db.select("RULE","ZUTBLSUXPRDT")
+	while zrsd1.next() set TMPDRULE("ZUTBLSUXPRDT",zrsd1.getCol(1))=""
+	*/
+	type ResultSet zrsd2=Db.select("RULE","ZUTBLSUXUCLS")
+	while zrsd2.next() set TMPDRULE("ZUTBLSUXUCLS",zrsd2.getCol(1))=""
+	
+	type ResultSet zrsd3=Db.select("RULE","ZUTBLSUXETC")
+	while zrsd3.next() set TMPDRULE("ZUTBLSUXETC",zrsd3.getCol(1))=""
+	
+	type ResultSet zrsd4=Db.select("RULE","ZUTBLSUXKCUS")
+	while zrsd4.next() set TMPDRULE("ZUTBLSUXKCUS",zrsd4.getCol(1))=""
+	/*
+	type ResultSet zrsd5=Db.select("RULE","ZUTBLSUICIF")
+	while zrsd5.next() set TMPDRULE("ZUTBLSUICIF",zrsd5.getCol(1))=""
+	
+	type ResultSet zrsd6=Db.select("RULE","ZUTBLSUXCID")
+	while zrsd6.next() set TMPDRULE("ZUTBLSUXCID",zrsd6.getCol(1))=""
+	*/
+	type ResultSet zrsd7=Db.select("RULE,AMT","ZUTBLSUXMIN")
+	while zrsd7.next() set TMPDRULE("ZUTBLSUXMIN",zrsd7.getCol(1))=zrsd7.getCol(2)
+	
+			
+	//  load criteria to log
+	// R028
+	if Db.isDefined("ZUTBLSUR028A","RULE='R028'") do {
+		type RecordZUTBLSUR028A zcr028=Db.getRecord("ZUTBLSUR028A","RULE='R028'")
+		set THR028X("R028",1)=zcr028.lmamt
+	}
+	// R030
+	if Db.isDefined("ZUTBLSUR030A","RULE='R030'") do {
+		type RecordZUTBLSUR030A zcr030=Db.getRecord("ZUTBLSUR030A","RULE='R030'")
+		set THR030X("R030",1)=zcr030.timeint
+	}
+	
+	// R029
+	type ResultSet zrsd12=Db.select("RULE,TCOUNT","ZUTBLSURTCNT")
+	while zrsd12.next() set THR00X(zrsd12.getCol(1),1)=zrsd12.getCol(2)	
+
+	// R031
+	type ResultSet zrsd13=Db.select("RULE,LAMT","ZUTBLSURLAMT")
+	while zrsd13.next() set THR00X(zrsd13.getCol(1),1)=zrsd13.getCol(2)	
+
+	//***********************Start-Surveillance 52************************************/
+	// All Rule of Sur52 : R049
+	// Channel Type Description of Surveillance(ZUTBLSURCHNL)
+	type ResultSet zrsrchnl=Db.select("CHNL,PRETLO,PRODFLG,DCHNLFLG","ZUTBLSURCHNL")
+	while zrsrchnl.next() set THR00X("ZSURCHNL",zrsrchnl.getCol("CHNL"))=zrsrchnl.getCol("PRETLO")_"|"_zrsrchnl.getCol("PRODFLG")_"|"_zrsrchnl.getCol("DCHNLFLG")
+
+	// R046 - Surveillance Transaction Count(ZUTBLSURTCNT), User Class Included(ZUTBLSUIUCLS)
+	type ResultSet zrstcnt=Db.select("RULE,TCOUNT","ZUTBLSURTCNT")
+	while zrstcnt.next() set THR00X("ZSURTCNT",zrstcnt.getCol("RULE"),"TCOUNT")=zrstcnt.getCol("TCOUNT")
+	type ResultSet zrsucls=Db.select("RULE","ZUTBLSUIUCLS")
+	while zrsucls.next() set TMPDRULE("ZSUIUCLS",zrsucls.getCol("RULE"))=""
+		
+	// R049 - Duration(ZUTBLSURDUR)
+	type ResultSet zrsd10=Db.select("RULE,TIMSTR,TIMEND","ZUTBLSURDUR")
+	while zrsd10.next() set THR00X("ZSURDUR",zrsd10.getCol("RULE"),"TIMSTR")=zrsd10.getCol("TIMSTR") set THR00X("ZSURDUR",zrsd10.getCol("RULE"),"TIMEND")=zrsd10.getCol("TIMEND")	
+	
+	//***********************End-Surveillance 52************************************/	
+	
+	type Number DAYPUR1,DAYKEEP,DATEPUR
+	set DAYPUR1=""
+	set MONTIME=""
+	// general config
+	if Db.isDefined("ZUTBLTRANMOD","CO='KTB'") do {
+		type RecordZUTBLTRANMOD ztrmd=Db.getRecord("ZUTBLTRANMOD","CO='KTB'")
+		set DAYKEEP=ztrmd.daykeep1
+		set MONTIME=ztrmd.montime
+		}
+	if DAYKEEP="" set DAYKEEP=30
+	if MONTIME="" set MONTIME=5
+	
+	//set DATEPUR=^CUVAR(2)-DAYKEEP
+	
+	
+	
+	quit
+
+DTJ(Date DATE, String KEYS, String ZRULESW(), String TMPCCIF(), String TMPCPRDT(), String TMPCCID(), String TMPCKUS(), String TMPCAPPL)
+
+	type public Cache %CACHE()
+
+	type Number CID,DATETIME,TSEQ
+	type String TSO()
+	type Number ZR028FLG,ZR030FLG,ZR031FLG
+	set (ZR028FLG,ZR030FLG,ZR031FLG)=""
+	
+	// Transaction amount (BAHT)
+	type Number ZTRAMT
+	catch error {
+		type String ET
+
+		set ET=error.type
+		if ET["%GTM-" do ZE^UTLERR
+		set ET=ET_"-"_error.thrownAt
+		set ET=ET_","_error.description
+
+		do LOG^ZSUREXC($T(+0),"*",%FN.get(),"",%ZTSEQ.get(),ET)
+		}
+
+	set DATETIME=KEYS.piece(",",1)
+	set CID=KEYS.piece(",",2)
+	set TSEQ=KEYS.piece(",",3)
+
+	type RecordDTJ dtj=Db.getRecord("DTJ","TJD=:DATE,DATETIME=:DATETIME,CID=:CID,TSEQ=:TSEQ")
+			
+	// If Fee Transaction then quit
+	if $$CHKISFEE^ZSURUTL(dtj.etc) quit
+						
+	// set transaction amount in thai baht
+	set ZTRAMT=dtj.tot
+	if (dtj.crcd'="THB"),(+dtj.sysbase'=0) set ZTRAMT=+dtj.sysbase
+	
+	do OUT^UTSO(.TSO,dtj.tso)
+	
+	type RecordTRN trn=%CACHE("TRN").getRecord("TRN","ETC=:dtj.etc")
+	type RecordSCAU scau=Db.getRecord("SCAU","UID=:dtj.uid")
+	type RecordSCAU0 scau0=%CACHE("SCAU0").getRecord("SCAU0","UCLS=:scau.%ucls")
+
+	type RecordACN acn=Db.getRecord("ACN","CID=:dtj.cid")
+	type RecordCIF cif=Db.getRecord("CIF","ACN=:acn.acn")
+
+	// If this transaction don't need to Analyze in Surveillance then quit
+	if '$$CANLYZTR^ZSURUTL(.THR00X,scau.%ucls,scau0.zbatch,dtj.itc7) quit	
+	
+	// check if common condition applied or not
+	// check exclusion condition for each rule
+	set ZR028FLG=$$DETRULE("R028",acn,cif,scau,dtj,ZTRAMT)
+	set ZR030FLG=$$DETRULE("R030",acn,cif,scau,dtj,ZTRAMT)
+				
+	// Any rule need sum hist in a day
+	if ZR028FLG!ZR030FLG do RSUMHIST(.TSO,dtj,trn,scau,scau0,acn,cif,.THR028X,.THR030X)
+	
+	// Check Withdraw ATM in same day over threshold count 
+	if $$DETRULE("R029",acn,cif,scau,dtj,ZTRAMT) do R029(.TSO,dtj,trn,scau,scau0,acn,cif)	
+
+	// Description of value of ZRXXXFLG (R031FLG)
+	// -If ZRXXXFLG=0 is excluded rule by Parameter Configuration
+	// -If ZRXXXFLG=1 is included rule by Parameter configuration but not passed condition of rule detection
+	// -If ZRXXXFLG=2 is included rule by Parameter configuration and passed condition of rule detection
+	set ZR031FLG=$$DETRULE("R031",acn,cif,scau,dtj,ZTRAMT)
+	if ZR031FLG set ZR031FLG=$$R031CHK(acn,dtj)
+	if ZR031FLG do {
+		// Ignore ec. / reversed transaction. 
+		if +dtj.tamt'>0 quit
+		if dtj.histrval'="" quit 
+		
+		do RTIMHIST(.TSO,dtj,scau,acn,cif,.THR00X,0,"R031")
+		//if (ZR031FLG=2) do SUSPECT(.TSO,dtj,trn,scau,scau0,acn,cif,"R031")
+		if (ZR031FLG=2) do {
+			type String ZRFLG
+			set ZRFLG=""
+			do INISUR51^ZSURUTL("R031",.ZRFLG)
+			do SUSDTJ^ZSURUTL(.TSO,dtj,trn,scau,scau0,acn,cif,"R031",.ZRFLG)
+		}
+	}
+	
+	//***********************Start-Surveillance 52************************************/
+	do SURCHNL(.TSO,dtj,trn,scau,scau0,acn,cif,.THR00X)
+	quit
+R029(String TSO(),
+	RecordDTJ dtj,
+	RecordTRN trn,
+	RecordSCAU scau,
+	RecordSCAU0 scau0,
+	RecordACN acn,
+	RecordCIF cif)
+	
+	type Number ZCTIM
+
+	set ZCTIM=0
+	
+	/* check ATM transaction (for this day)
+	 1. check product flag (only ATM  ,AT=ktb bank / PC=other bank)
+	 flag 0 = Not ATM transaction
+	      1 = ATM transaction
+	*/
+	if '$$PRDCHK(dtj.etc)  quit
+			
+	// 2. check Withdraw transaction (1=Credit , 0=Debit)
+	if trn.dc  quit
+			
+	/* 3. check TTX that Debit transaction or not (Dr. from customer a/c and Cr. to G/L a/c)
+	 flag 0 = Transfer Transaction
+	      1 = Withdraw Transaction
+	*/
+	//if '$$TRFCHK(dtj.tjd,dtj.brcd,dtj.uid,dtj.trc) quit
+	
+	// 4. check exclude ec. reversed transaction. 
+	if +dtj.tamt'>0 quit
+	if dtj.histrval'="" quit
+	
+	// Get Card No. from TSO
+	set ZCARDNO=+$G(TSO("ATMC"))
+	
+	if acn.cls="D" do {
+		type Number AMT,ZTHRSH,ZTRF,ZAVR,ZDIF
+		
+		set (ZTHRSH,ZCTIM)=0
+		if THR00X("R029",1).exists() set ZTHRSH=THR00X("R029",1)
+		set ZTHRSH=+ZTHRSH	//threshold count
+		
+		if (acn.grp="DDA")!(acn.grp="SAV") do { quit
+			
+			do RTIMHIST(.TSO,dtj,scau,acn,cif,.THR00X,.ZCTIM,"R029")	
+			//if ZCTIM>ZTHRSH do SUSPECT(.TSO,dtj,trn,scau,scau0,acn,cif,"R029")
+			if ZCTIM>ZTHRSH do {
+				type String ZRFLG
+				set ZRFLG=""
+				do INISUR51^ZSURUTL("R029",.ZRFLG)
+				do SUSDTJ^ZSURUTL(.TSO,dtj,trn,scau,scau0,acn,cif,"R029",.ZRFLG)
+			}
+		}		
+	}	
+	
+	quit
+DETRULE(String RULETYPE,
+	RecordACN acn,
+	RecordCIF cif,
+	RecordSCAU scau,
+	RecordDTJ dtj,
+	String ZTRAMT)
+	
+	/*
+	determine rule check flag by checking 
+	1. Rule Switch is ON/OFF
+	2. Common condition 
+	3. Condition to exclude for each rule
+	*/
+
+	type Number ZRET
+	
+	set ZRET=1
+	
+	// rule switch
+	if '$D(ZRULESW(RULETYPE)) set ZRET=0
+	
+	// common condition
+	if ($G(TMPCAPPL(RULETYPE,1))=1),$D(TMPCCIF(acn.acn)) set ZRET=0
+	if ($G(TMPCAPPL(RULETYPE,2))=1),$D(TMPCPRDT(acn.type)) set ZRET=0
+	if ($G(TMPCAPPL(RULETYPE,3))=1),$D(TMPCCID(acn.cid)) set ZRET=0
+	if ($G(TMPCAPPL(RULETYPE,4))=1),$D(TMPCKCUS(cif.zktbccode)) set ZRET=0
+
+
+	if 'ZRET quit ZRET
+
+	
+	// Condition to exclude for each rule
+	/*
+	if $D(TMPDRULE("ZUTBLSUXPRDT",RULETYPE)),(acn.type'=""),Db.isDefined("ZUTBLSUXPRDT","RULE=:RULETYPE,PRDT=:acn.type") quit 0
+	*/
+	if $D(TMPDRULE("ZUTBLSUXUCLS",RULETYPE)),(scau.%ucls'=""),Db.isDefined("ZUTBLSUXUCLS","RULE=:RULETYPE,UCLS=:scau.%ucls") quit 0	
+	if $D(TMPDRULE("ZUTBLSUXETC",RULETYPE)),(dtj.etc'=""),Db.isDefined("ZUTBLSUXETC","RULE=:RULETYPE,ETC=:dtj.etc") quit 0
+	/*
+	if $D(TMPDRULE("ZUTBLSUXKCUS",RULETYPE)),(cif.zktbccode'=""),Db.isDefined("ZUTBLSUXKCUS","RULE=:RULETYPE,ZKTBCCODE=:cif.zktbccode") do { if ZRET=0 quit 0
+		set ZRET=0
+		if $D(TMPDRULE("ZUTBLSUICIF",RULETYPE)),(acn.acn'=""),Db.isDefined("ZUTBLSUICIF","RULE=:RULETYPE,ACN=:acn.acn") set ZRET=1
+		}
+	if $D(TMPDRULE("ZUTBLSUXCID",RULETYPE)),(acn.cid'=""),Db.isDefined("ZUTBLSUXCID","RULE=:RULETYPE,CID=:acn.cid") quit 0
+	*/
+	if $D(TMPDRULE("ZUTBLSUXMIN",RULETYPE)) do { if ZRET=0 quit 0
+		type RecordZUTBLSUXMIN zsuxmin=Db.getRecord("ZUTBLSUXMIN","RULE=:RULETYPE")
+		if +zsuxmin.amt=0 quit
+		if ZTRAMT<zsuxmin.amt set ZRET=0
+		}
+	
+	
+	quit ZRET
+RTIMHIST(String TSO(),
+	RecordDTJ dtj,
+	RecordSCAU scau,
+	RecordACN acn,
+	RecordCIF cif,
+	Number THR00X(),
+	Number ZDOPER,
+	String RULETYPE)
+	
+	//type Number TPERIOD,MAX,ZDIFF,ZR016FLG,ZR017FLG
+	type Number MAX,ZR031SUM,TSEQ
+	set (MAX,ZR031SUM,TSEQ)=""
+	set MAX=100
+	set TSEQ=dtj.tseq
+	//set (ZR016FLG,ZR017FLG)=0
+	
+	//set TPERIOD=$G(THR00X(RULETYPE,1))
+	//set ZDIFF=(dtj.time)-TPERIOD
+	//type RecordCUVAR cuvar=Db.getRecord("CUVAR")
+	//set XJD=cuvar.tjd-1	
+	set XJD=dtj.tjd-1
+	
+		
+	type ResultSet rs=Db.select("TSEQ","HIST","CID=:CID AND (NOT TSEQ>:TSEQ) AND TJD>:XJD AND NOT ITC1=''","TSEQ DESC")
+	while rs.next() do { quit:MAX=0
+		type String ZHUID,ZHUCLS
+		set ZHUCLS=""
+		
+		set MAX=MAX-1
+		
+		type RecordHIST hist=Db.getRecord("HIST","CID=:CID,TSEQ=rs.getCol(1)")
+		type Number REV,ITC7,TAMT,ZTIME,ZHUID
+		set (REV,ITC7,TAMT,ZTIME,ZHUID)=""
+		set REV=$S(hist.itc6:1,hist.itc12:1,1:0)
+		set ITC7=''hist.itc7
+		//set ITC1=+hist.itc1
+		set TAMT=+hist.tamt
+		set ZTIME=hist.time
+		if hist.crcd'="THB",(+hist.sysbase'=0) set TAMT=+hist.sysbase
+		set ZHUID=hist.uid
+		
+		if ZHUID'="",(Db.isDefined("SCAU","UID=:ZHUID")) do {
+			type RecordSCAU zhscaux=Db.getRecord("SCAU","UID=:ZHUID")
+			set ZHUCLS=zhscaux.%ucls
+			}
+		
+		// exclude ec. reversed transaction.  both reversed and reveral
+		if REV quit
+		if hist.histrflg quit
+
+		if ITC7 quit
+			
+		// If Fee Transaction then quit
+		if $$CHKISFEE^ZSURUTL(hist.etc) quit
+				
+		if RULETYPE="R029" do {
+			// R029 Check only debit(0) transaction
+			if (+hist.itc1) quit
+			if '$$PRDCHK(hist.etc) quit
+			type Number ZCRDNO
+			set ZCRDNO=""
+			// Get Card No. from TSO
+			do OUT^UTSO(.UTSO,hist.tso)
+			set ZCRDNO=+$G(UTSO("ATMC"))
+			
+			if ZCRDNO'=ZCARDNO quit
+			
+			if $D(TMPDRULE("ZUTBLSUXETC","R029")),(hist.etc'=""),Db.isDefined("ZUTBLSUXETC","RULE='R029',ETC=:hist.etc") quit
+			
+			set ZDOPER=ZDOPER+1
+			
+		}
+		
+			
+	}	
+
+	quit
+CTRLX()
+	type RecordZMONCTRL zsvrmctr=Db.getRecord("ZMONCTRL","PROCESSOR='ZTRNCHNL'",1)
+	if zsvrmctr.stop quit 1
+	quit 0
+PRDCHK(String ZETC)
+	
+	/*
+	Return	0 - Not ATM Transaction
+		1 - ATM Transaction
+	*/
+	
+	type Number ZRETURN
+	set ZRETURN=1 
+	
+	if Db.isDefined("ZUTBLTRCD","ETC=:ZETC") do {
+		
+		type RecordZUTBLTRCD trcd=Db.getRecord("ZUTBLTRCD","ETC=:ZETC")
+		if (trcd.prodflg'="AT"),(trcd.prodflg'="PC") set ZRETURN=0
+		if trcd.fee'="" set ZRETURN=0	// ignore Fee transaction
+	}
+	else  set ZRETURN=0
+	
+	quit ZRETURN
+
+	
+	
+	

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<section name="Workbench">
+	<section name="org.eclipse.ui.texteditor.GotoLineAction$GotoLineDialog_dialogBounds">
+		<item key="DIALOG_X_ORIGIN" value="525"/>
+		<item key="DIALOG_Y_ORIGIN" value="332"/>
+	</section>
+	<section name="org.eclipse.ui.texteditor.FindReplaceDialog_dialogBounds">
+		<item key="DIALOG_X_ORIGIN" value="1072"/>
+		<item key="DIALOG_FONT_NAME" value="1|Tahoma|8.25|0|WINDOWS|1|-11|0|0|0|400|0|0|0|1|0|0|0|0|Tahoma"/>
+		<item key="DIALOG_HEIGHT" value="388"/>
+		<item key="DIALOG_Y_ORIGIN" value="190"/>
+		<item key="DIALOG_WIDTH" value="323"/>
+	</section>
+	<section name="org.eclipse.ui.texteditor.FindReplaceDialog">
+		<item key="wholeword" value="false"/>
+		<item key="incremental" value="false"/>
+		<item key="isRegEx" value="false"/>
+		<item key="selection" value="ZREJ"/>
+		<item key="wrap" value="true"/>
+		<item key="casesensitive" value="false"/>
+		<list key="findhistory">
+			<item value="ZREJ"/>
+			<item value="ZCAUSE"/>
+			<item value="set ZOUTPATH"/>
+			<item value="ZAPP"/>
+			<item value="ZHRIS"/>
+			<item value="i"/>
+			<item value="toTalRec"/>
+			<item value="EXIT"/>
+		</list>
+		<list key="replacehistory">
+			<item value=",ZAPP,ZITFKEY"/>
+			<item value="ZAPP,ZITFKEY"/>
+			<item value="ZITFKEY"/>
+			<item value="DEP.ZITD"/>
+			<item value="ZDEP"/>
+			<item value="WAIVE"/>
+			<item value="ZWAIVEFEE"/>
+			<item value="=$$PADDING(DEP"/>
+		</list>
+	</section>
+</section>

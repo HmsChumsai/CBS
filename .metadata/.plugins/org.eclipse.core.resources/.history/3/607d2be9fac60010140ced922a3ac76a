@@ -1,0 +1,52 @@
+//DO NOT MODIFY  DTJNA BATCH|ZBHMK||||||DTJNA|||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+	new %READ,%TAB,VFMQ,ZINPUT,ZTJD,IOTYP
+	set %TAB("ZINPUT1")="/DES=Input Start Date/LEN=10/TYP=D"
+	set %READ="@@%FN/REV/CEN,,,ZINPUT1"
+	do ^UTLREAD
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+	new IOTYP,ZPATH
+	set ZPATH=$$TRNLNM^%ZFUNC("SCAU_SPOOL")
+	
+	type IO io = Class.new("IO")
+	set io.directory=ZPATH
+	set io.fileName="DTJNAMK.txt"
+	set io.openParams="NEWV/WRITE"
+	do io.open()
+	
+	type String TEXT
+	set TEXT = ""
+	set i=1
+	set ext = 0
+	
+	type ResultSet rs=Db.select("KEY1","TMPRPT1")
+	while rs.next() do { quit:ext
+		set TEXT="(New Account"_i_".)"_rs.getCol("KEY1")
+		set i=i+1
+		if (i>300) set ext=1
+		do io.write(TEXT)
+	}
+	
+	set IOTYP="RMS"
+	do io.close()
+	quit
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+	type RecordDTJNA acn=Db.getRecord("DTJNA","TJD =:ZINPUT1,CLS,GRP,TYP,CID")
+	type RecordTMPRPT1 tmp = Class.new("RecordTMPRPT1")
+	set tmp.pid = "NEW Account"
+	set tmp.key1 = acn.cid
+	do tmp.bypassSave()
+	quit
+---------- THREXIT ------ Section marker

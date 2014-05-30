@@ -1,0 +1,60 @@
+//DO NOT MODIFY  Test DTJFM|ZBCHMK||||||DTJFM|||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+	new ZTJD,ZBRCD,ZUID,ZTSEQ
+	set %TAB("ZTJD")="/DES=DATE/REQ/TYP=D/LEN=10"
+	set %READ="@@%FN,,ZTJD"
+	do ^UTLREAD if VFMQ="Q" quit
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+	new IOTYP,ZPATH
+	set ZPATH=$$TRNLNM^%ZFUNC("SCAU_SPOOL")
+	
+	type IO io = Class.new("IO")
+	set io.directory=ZPATH
+	set io.fileName="DTJNAMK.txt"
+	set io.openParams="NEWV/WRITE"
+	do io.open()
+	
+	set (TEXT1,TEXT2,TEXT3,tmp1,tmp2)=""
+	set ext = 0
+	set d="*"
+	type ResultSet rs=Db.select("PID,KEY1,KEY2,KEY3","TMPRPT3","PID=:BATCHMK")
+	while rs.next() do { 
+		set tmp1 =rs.getCol("KEY2")
+		set tmp2 =rs.getCol("KEY3")
+		if '($D(tmp1)) do {
+		set TEXT1="(Non-Financial "_rs.getCol("KEY1")
+		}
+		set TEXT3="Both Condition = "_rs.getCol("KEY1")_":"_rs.getCol("KEY2")
+		
+		do io.write(TEXT1)
+		do io.write(TEXT3)
+	}
+	
+	set IOTYP="RMS"
+	do io.close()
+	quit
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+	if Db.isDefined("DTJFM","TJD=:ZTJD,CLS,GRP,TYP,CID,TSEQ") do {
+	type RecordDTJFM zdtj=Db.getRecord("DTJFM","TJD=:ZTJD,CLS,GRP,TYP,CID,TSEQ")
+	type RecordTMPRPT3 tmp = Class.new("RecordTMPRPT3")
+	set temp1 = zdtj.data
+	set tmp.pid = "BATCHMK"
+	set tmp.key1 = zdtj.cid
+	if zdtj.tseq = "2" set tmp.key2 = temp1.piece(":",4)
+	if zdtj.tseq '= "1",zdtj.tseq '= "2" set tmp.key3 = ""
+	do tmp.bypassSave()
+	}
+	quit
+---------- THREXIT ------ Section marker

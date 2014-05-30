@@ -1,0 +1,249 @@
+//DO NOT MODIFY  TEST|ZSUNTEST|||||||1
+	/*
+	 ORIG: 9999999999 - 20/07/2010
+	 DESC: 
+	
+	 ---- Comments --------------------------------------------------------
+	
+	 ---- Revision History ------------------------------------------------
+	
+	 ****** Consider using setAuditFlag for all objects in this procedure
+	   example :do dep.setAuditFlag(1)
+	
+	*/
+ALLOC(ZCID,ZLCK,ZHCK)
+	
+	if (ZLCK'>0)!(ZHCK'>0) write ZLCK_"<=0" quit
+	if ZHCK<ZLCK write ZHCK_"<="_ZLCK quit
+	
+	set OUT=0
+	set ST=1
+	set ANS="OK"
+	type ResultSet rs1=Db.select("HCHQ,LCHQ","ZCHQALLA","CID=:ZCID","LCHQ")
+	if rs1.isEmpty() while rs1.next() do {
+		if OUT quit
+		set ZHCHQ=rs1.getCol(1)
+		set ZLCHQ=rs1.getCol(2)
+		
+		if (ZLCK<ZLCHQ),(ST=1) set ST=3
+		if (ZLCK'>ZHCHQ),(ZLCK'<ZLCHQ),(ST=1) do {
+			set ANS=""
+			set ST=2
+			set ZOHCK=ZHCHQ
+			if (ZHCK'>ZHCHQ),(ZHCK'<ZLCHQ) do {
+				set OUT=1
+				set ZOHCK=ZHCK
+			}
+			write ZLCK_"|"_ZHCK_"  "
+		}
+		if (ZHCK>=ZLCHQ),(ST=3) do {
+			set ZOHCK=ZHCK
+			if ZHCK>ZHCHQ set ZOHCK=ZHCHQ
+			write ZLCHQ_"|"_ZOHCK_"  "
+			set ANS=""
+		}
+		if ST=2 set ST=3
+	}
+	else  do {
+		write ZLCK_"|"_ZHCK_" "
+	}
+	write ANS
+	quit
+TEST
+        //READ & WRITE  TEXT -----------------------------------------
+        set ZFNAME="/tmp/Test.txt"
+ 
+        type IO io=Class.new("IO")
+        set io.fileName=ZFNAME
+        set io.openParams="READ"
+        do io.open()
+ 
+        type IO ioout=Class.new("IO")
+        set ioout.fileName="TestOUT.txt"
+        set ioout.directory = "/tmp"
+        set ioout.openParams="NEWV/WRITE"
+        set ioout.recordSize=300
+        do ioout.open()
+ 
+         for  set REC=io.read(.ETYP)  quit:+ETYP'=0  do {
+                set CID=+$$TRIM^%ZS($P(REC,"|",1))
+                set CK=+$$TRIM^%ZS($P(REC,"|",2))
+                if 'Db.isDefined("ZARS","CID=:CID,CKNO=:CK") do ioout.write("ERROR") quit
+                type RecordZARS zars=Db.getRecord("ZARS","CID=:CID,CKNO=:CK")
+                set ZSTAT=zars.zstat
+                set ZSTLDTE=zars.zstldte
+                set ZSTLDTE=$$DAT^%ZM(ZSTLDTE,"DD/MM/YEAR")
+ 
+                set REC1=CID_"|"_CK_"|"_ZSTAT_"|"_ZSTLDTE
+		do ioout.write(REC1)
+        }
+ 
+        do io.close()
+        do ioout.close()
+        quit
+TEST4
+        //READ & WRITE  TEXT -----------------------------------------
+        set ZFNAME="/tmp/Test.txt"
+ 
+        type IO io=Class.new("IO")
+        set io.fileName=ZFNAME
+        set io.openParams="READ"
+        do io.open()
+ 
+        type IO ioout=Class.new("IO")
+        set ioout.fileName="TestOUT.txt"
+        set ioout.directory = "/tmp"
+        set ioout.openParams="NEWV/WRITE"
+        set ioout.recordSize=300
+        do ioout.open()
+ 
+         for  set REC=io.read(.ETYP)  quit:+ETYP'=0  do {
+                set CK=+$$TRIM^%ZS($P(REC,"|",1))
+                set CID=+$$TRIM^%ZS($P(REC,"|",2))
+                //if 'Db.isDefined("DTJ","CID=:CID,CKNO=:CK") do ioout.write("ERROR") quit
+                type RecordZARS zars=Db.getRecord("ZARS","CID=:CID,CKNO=:CK")
+                set ZSTAT=zars.zstat
+                set ZSTLDTE=zars.zstldte
+                set ZSTLDTE=$$DAT^%ZM(ZSTLDTE,"DD/MM/YEAR")
+ 
+                set REC1=CID_"|"_CK_"|"_ZSTAT_"|"_ZSTLDTE
+		do ioout.write(REC1)
+        }
+ 
+        do io.close()
+        do ioout.close()
+        quit
+        
+TEST3
+        //READ & WRITE  TEXT -----------------------------------------
+        set ZFNAME="/tmp/Test.txt"
+ 
+        type IO io=Class.new("IO")
+        set io.fileName=ZFNAME
+        set io.openParams="READ"
+        do io.open()
+ 
+        type IO ioout=Class.new("IO")
+        set ioout.fileName="TestOUT.txt"
+        set ioout.directory = "/tmp"
+        set ioout.openParams="NEWV/WRITE"
+        set ioout.recordSize=300
+        do ioout.open()
+ 
+         for  set REC=io.read(.ETYP)  quit:+ETYP'=0  do {
+                set CID=+$$TRIM^%ZS($P(REC,"|",1))
+                if 'Db.isDefined("DEP","CID=:CID") do ioout.write("ERROR") quit
+                type RecordDEP dep=Db.getRecord("DEP","CID=:CID")
+                //set ZSTAT=dep.zstatcd
+ 		set ZSTAT=dep.title1
+                set REC1=CID_"|"_ZSTAT
+		do ioout.write(REC1)
+        }
+ 
+        do io.close()
+        do ioout.close()
+        quit
+TEST2(ZTJD)
+	do SYSVAR^SCADRV0()
+	kill ^ZACHQTMP
+	type ResultSet rs1=Db.select("CHKS,CID,BRCD,HCHQ,LCHQ,USER","ZCHQALLA","ISSDTE=:ZTJD AND CHKS IN ('0','1','2')")
+	if rs1.isEmpty() quit
+		while rs1.next() do {
+			set ZCHKS=rs1.getCol(1)
+			set ZCID=rs1.getCol(2)
+			set ZBRCD=rs1.getCol(3)
+			set ZHCHQ=rs1.getCol(4)
+			set ZLCHQ=rs1.getCol(5)
+			set ZUSER=rs1.getCol(6)
+			set ZICHQ=ZLCHQ-1
+			if Db.isDefined("ZLCHQALL","CHKS=:ZCHKS AND CID=:ZCID") { 
+				type RecordZLCHQALL zlchqall=Db.getRecord("ZLCHQALL","CHKS=:ZCHKS AND CID=:ZCID")
+				set ZICHQ=zlchqall.lstchq
+			}
+			do ZACHQTMP(ZCHKS,ZCID,ZHCHQ,ZLCHQ,ZICHQ,ZBRCD,ZUSER)	
+		}
+	do RUNREP	
+	quit
+ZACHQTMP(P1,P2,P3,P4,P5,P6,P7)
+	type RecordZACHQTMP zachqtmp=Class.new("RecordZACHQTMP")
+	set zachqtmp.chqtyp=P1
+	set zachqtmp.cid=P2
+	set zachqtmp.hchq=P3
+	set zachqtmp.lchq=P4
+	set zachqtmp.ichq=P5
+	set zachqtmp.brcd=P6
+	set zachqtmp.number=(P3-P4)+1
+	set zachqtmp.uid=P7
+	set zachqtmp.remark="Complete"
+	do zachqtmp.bypassSave()		
+
+	quit
+RUNREP
+	new ZFID,RID,IO,ZPATH
+                 
+	//set ZPATH=$$TRNLNM^%ZFUNC("SCAU_SPOOL_ADHOC")
+	set ZPATH="/tmp"    
+	// Submit report file for ZDRACHQ
+	set ZFID="ZDRACHQ.REP"
+	set IO=ZPATH_"/"_ZFID
+               
+	set RID="ZDRACHQ" do ^URID quit:PGM="" 		//report id
+	set %BLK="/,"_IO
+	
+	do ^@PGM
+	
+	quit 
+TEST5
+	type IO ioout=Class.new("IO")
+        set ioout.fileName="CID.txt"
+        set ioout.directory = "/tmp"
+        set ioout.openParams="NEWV/WRITE"
+        set ioout.recordSize=200
+        do ioout.open()
+        
+	type ResultSet rs1=Db.select("CID,TITLE1,TYPE","DEP","TYPE=1001")
+	if 'rs1.isEmpty()  while rs1.next() do {
+			set ZCID=rs1.getCol(1)
+			set ZTITLE1=rs1.getCol(2)
+			set ZTYPE=rs1.getCol(3)
+			type ResultSet rs2=Db.select("CID","RFLG","CID=:ZCID")
+			if 'rs2.isEmpty() quit 
+			set ZREC=ZCID_"|"_ZTITLE1_"|"_ZTYPE
+ 			do ioout.write(ZREC)
+		}
+	do ioout.close()	
+	quit
+	
+TEST6
+	//READ & WRITE  TEXT -----------------------------------------
+        set ZFNAME="/tmp/Test.txt"
+ 
+        type IO io=Class.new("IO")
+        set io.fileName=ZFNAME
+        set io.openParams="READ"
+        do io.open()
+
+	type IO ioout=Class.new("IO")
+        set ioout.fileName="HIST.txt"
+        set ioout.directory = "/tmp"
+        set ioout.openParams="NEWV/WRITE"
+        set ioout.recordSize=700
+        do ioout.open()
+	
+	for  set REC=io.read(.ETYP)  quit:+ETYP'=0  do {
+	set ZCID=+$$TRIM^%ZS($P(REC,"|",1))
+	type ResultSet rs1=Db.select("TJD,TSEQ,ETC,TAMT,TCMT","HIST","CID=:ZCID AND ITC4=1","TSEQ DESC")
+	if 'rs1.isEmpty()  while rs1.next() do {
+			set ZTJD=rs1.getCol(1)
+			set ZTJD=$$DAT^%ZM(ZTJD,"DD/MM/YEAR")
+			set ZTSEQ=rs1.getCol(2)
+			set ZETC=rs1.getCol(3)
+			set ZTAMT=rs1.getCol(4)
+			set ZTCMT=rs1.getCol(5)
+			set ZREC=ZCID_"|"_ZTJD_"|"_ZTSEQ_"|"_ZETC_"|"_ZTAMT_"|"_ZTCMT
+ 			do ioout.write(ZREC)
+		}
+	}	
+	do ioout.close()
+	do io.close()	
+	quit	

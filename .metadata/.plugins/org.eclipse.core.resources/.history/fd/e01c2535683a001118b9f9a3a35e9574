@@ -1,0 +1,1441 @@
+//DO NOT MODIFY  IBank Family Member|ZIFM|||||||1
+ZIFM
+	/*
+	 ORIG: 1 - 29/12/2010
+	 DESC: 
+	
+	 ---- Comments --------------------------------------------------------
+	
+	 ---- Revision History ------------------------------------------------
+	 
+	 29/07/2011 - Soungtam
+	 	      Modified CIFINQ for CUSIDTYP ='CR' 
+	
+	 ****** Consider using setAuditFlag for all objects in this procedure
+	   example :do dep.setAuditFlag(1)
+	
+	*/
+	
+	
+	quit
+
+CIFINQ(IM)
+	
+	new HEADER, CIFNUM, CUSIDTYP, CUSIDNUM, OM, ZDOB, RSPCD, ZDATE, ZTIM, ER, RM, INTRFACE, REJTIME 
+	new REFID, ARG1
+	set ER=0
+	set (OM,HEADER,RM,ARG1)=""
+	
+	set INTRFACE="ZIFM"
+	
+	do SYSVAR^SCADRV0()
+	
+	//set ZDATE=$$DAT^%ZM(%SystemDate,"YEAR-MM-DD")
+	//set ZTIM=$$TIM^%ZM(%CurrentTime,"24:60:SS")
+	set ZDATE=%CurrentDate
+	set ZTIM=%CurrentTime
+	set REJTIME=$$TIM^%ZM(%CurrentTime,"2460SS")
+	
+	for I=1:1:10 do {
+		set HEADER=HEADER_IM.piece("|",I)_"|"
+	}
+	
+	set REFID = IM.piece("|",9)
+	set CIFNUM = IM.piece("|",11)
+	set CUSIDTYP = IM.piece("|",12)
+	set CUSIDNUM = IM.piece("|",13)
+	
+	//if CIFNUM.isNull() set RSPCD=1295 quit $$RSPMSG(RSPCD,,,,24)
+	if 'CIFNUM.isNull() do {
+		if 'Db.isDefined("CIF", "ACN=:CIFNUM") set ER=1,RSPCD=1295 quit
+		
+		new ZCUSTYP,ZCUSNUM
+		set (ZCUSTYP,ZCUSNUM)=""
+		if (CUSIDTYP="")!(CUSIDNUM="") do {				
+			type RecordCIF zcif = Db.getRecord("CIF", "ACN=:CIFNUM")
+			if zcif.zcizid'="" set ZCUSTYP="IC",ZCUSNUM=zcif.zcizid quit
+			if zcif.pasnum'="" set ZCUSTYP="PP",ZCUSNUM=zcif.pasnum quit
+			if zcif.dlnum'="" set ZCUSTYP="DL",ZCUSNUM=zcif.dlnum quit
+			if zcif.taxid'="" set ZCUSTYP="TI",ZCUSNUM=zcif.taxid quit
+			//Soungtam 29/07/2011
+			if zcif.zjin'="" set ZCUSTYP="CR",ZCUSNUM=zcif.zjin quit
+			
+			type ResultSet rsIFMID=Db.select("CODE","ZUTBLIFMID","TDTYP=:zcif.oit")
+			if rsIFMID.isEmpty() set ZCUSTYP="OT"
+			if rsIFMID.next() do {
+				set ZCUSTYP=rsIFMID.getCol("CODE")
+			}
+			//set ZCUSTYP=zcif.oit
+			set ZCUSNUM=zcif.oin 
+		}
+		if CUSIDTYP="" set CUSIDTYP=ZCUSTYP
+		if CUSIDNUM="" set CUSIDNUM=ZCUSNUM
+		
+	}
+	else  do {
+		if CUSIDTYP.isNull() set ER=1,RSPCD=1514,ARG1="Customer Id" quit
+		if CUSIDNUM.isNull() set ER=1,RSPCD=1515,ARG1="Customer Id Number" quit
+		
+		if CUSIDTYP="IC" do {
+			type ResultSet rsCIF=Db.select("ACN","CIF","ZCIZID=:CUSIDNUM")
+			if rsCIF.isEmpty() set CIFNUM=""
+			if rsCIF.next() do {
+				set CIFNUM=rsCIF.getCol("ACN")
+			}
+		}
+		if CUSIDTYP="PP" do {
+			type ResultSet rsCIF=Db.select("ACN","CIF","PASNUM=:CUSIDNUM")
+			if rsCIF.isEmpty() set CIFNUM=""
+			if rsCIF.next() do {
+				set CIFNUM=rsCIF.getCol("ACN")
+			}
+		}
+		if CUSIDTYP="DL" do {
+			type ResultSet rsCIF=Db.select("ACN","CIF","DLNUM=:CUSIDNUM")
+			if rsCIF.isEmpty() set CIFNUM=""
+			if rsCIF.next() do {
+				set CIFNUM=rsCIF.getCol("ACN")
+			}
+		}
+		if CUSIDTYP="TI" do {
+			type ResultSet rsCIF=Db.select("ACN","CIF","TAXID=:CUSIDNUM")
+			if rsCIF.isEmpty() set CIFNUM=""
+			if rsCIF.next() do {
+				set CIFNUM=rsCIF.getCol("ACN")
+			}
+		}
+		//Soungtam start 29/07/2011
+		if CUSIDTYP="CR" do {
+			type ResultSet rsCIF=Db.select("ACN","CIF","ZJIN=:CUSIDNUM")
+			if rsCIF.isEmpty() set CIFNUM=""
+			if rsCIF.next() do {
+				set CIFNUM=rsCIF.getCol("ACN")
+			}
+		}
+		//Soungtam end 29/07/2011
+		
+		if CIFNUM'="" quit
+		
+		if Db.isDefined("ZUTBLIFMID", "CODE=:CUSIDTYP") do {
+			type RecordZUTBLIFMID ifmid = Db.getRecord("ZUTBLIFMID", "CODE=:CUSIDTYP")
+			
+			type ResultSet rsCIF=Db.select("ACN","CIF","OIN=:CUSIDNUM AND OIT=:ifmid.tdtyp")
+			if rsCIF.isEmpty() set CIFNUM=""
+			if rsCIF.next() do {
+				set CIFNUM=rsCIF.getCol("ACN")
+			}
+		}
+		else  do {
+			
+			type ResultSet rsCIF=Db.select("ACN","CIF","OIN=:CUSIDNUM")
+			if rsCIF.isEmpty() set CIFNUM=""
+			if rsCIF.next() do {
+				set CIFNUM=rsCIF.getCol("ACN")
+			}
+		}
+		
+		if CIFNUM="" set ER=1,RSPCD=1295	
+		
+	}
+	
+	if ER.get() quit $$RSPMSG(RSPCD,RM,ARG1,,24)
+	
+	//if CUSIDTYP.isNull() set RSPCD=1514 quit $$RSPMSG(RSPCD,RM,"Customer Id",,24)
+	//if CUSIDNUM.isNull() set RSPCD=1515 quit $$RSPMSG(RSPCD,RM,"Customer Id Number",,24)
+	
+	type RecordCIF cif = Db.getRecord("CIF", "ACN=:CIFNUM")
+	
+	new ZBSTCD,ZDIS,ZPROV,ZPCSZ
+	set (ZBSTCD,ZDIS,ZPROV,ZPCSZ)=""
+	
+	//if (cif.zempid="N")!(cif.zempid="") set ZBSTCD="Non-Staff"
+	//else  set ZBSTCD="Staff"
+	set ZBSTCD=cif.zempid
+	
+	//set ZDOB=$$DAT^%ZM(cif.dob,"YEARMMDD")  
+	set ZDOB=$$DAT^%ZM(cif.dob,"DD/MM/YEAR")
+	
+	
+	
+	// District
+	if cif.PCITY=99 set ZDIS=""
+	else  do {
+		type ResultSet rsZDIS=Db.select("DES","ZUTBLDIST","CNTRY=:cif.PCNTRY AND STATE=:cif.PSTATE AND DIST=:cif.PCITY")
+		if rsZDIS.isEmpty() set ZDIS=""
+		if rsZDIS.next() do {
+			set ZDIS=rsZDIS.getCol("DES")
+		}
+	}
+	
+	// Province Code
+	if cif.PSTATE=99 set ZPROV=""
+	else  do {
+		type ResultSet rsZPROV=Db.select("DESC","STBLCNTRY1","CNTRY=:cif.PCNTRY AND STATE=:cif.PSTATE")
+		if rsZPROV.isEmpty() set ZPROV=""
+		if rsZPROV.next() do {
+			set ZPROV=rsZPROV.getCol("DESC")
+		}
+	}
+	
+	set ZPCSZ=ZDIS_", "_ZPROV_" "_cif.pzip
+	
+	set OM=HEADER_ZDATE_":"_ZTIM_"|"_""_"|"_""_"|"_0_"|"_""_"|"_CIFNUM_"|"_CUSIDTYP_"|"_CUSIDNUM_"|"_cif.nam_"|"_cif.sex_"|"_ZDOB_"|"
+	set OM=OM_cif.nation_"|"_cif.ztitle_"|"_cif.email_"|"_cif.pad1_"|"_cif.pad2_"|"_cif.pad3_"|"_cif.pad4_"|"_ZPCSZ_"|"_cif.pcity_"|"
+	set OM=OM_cif.pstate_"|"_cif.pzip_"|"_cif.pcntry_"|"_$$DAT^%ZM(cif.zciupddat,"DD/MM/YEAR")_"|"_cif.zciby_"|"_cif.hph_"|"_cif.bph_"|"_cif.aph_"|"_ZBSTCD
+	
+	quit OM
+	
+ACLIST(IM)
+
+	new HEADER, CIFNUM, OM, RSPCD, ZDATE, ZTIM, ER, RM, INTRFACE, REJTIME, REFID 
+	set ER=0
+	set (OM,HEADER,RM,REFID)=""
+	
+	set INTRFACE="ZIFM"
+	
+	do SYSVAR^SCADRV0()
+	
+	//set ZDATE=$$DAT^%ZM(%SystemDate,"YEAR-MM-DD")
+	//set ZTIM=$$TIM^%ZM(%CurrentTime,"24:60:SS")
+	set ZDATE=%CurrentDate
+	set ZTIM=%CurrentTime
+	set REJTIME=$$TIM^%ZM(%CurrentTime,"2460SS")
+	
+	
+	set REFID = IM.piece("|",9)
+	set CIFNUM = IM.piece("|",11)
+	
+	if CIFNUM.isNull() set RSPCD=1295 quit $$RSPMSG(RSPCD,RM,,,5)
+	
+	if 'CIFNUM.isNull() do {
+		if 'Db.isDefined("CIF", "ACN=:CIFNUM") set ER=1,RSPCD=1295
+	}
+	
+	if ER.get() quit $$RSPMSG(RSPCD,RM,,,5)
+	
+	//set OM=HEADER_ZDATE_"T"_ZTIM_(IM.piece("|",2)).extract(20,IM.piece("|",2).length())_"|||"_0_"||"_CIFNUM
+	
+	new COUNT,QFLG,ACLM
+	set (COUNT,QFLG)=0
+	set ACLM=""
+	
+	if (+IM.piece("|",7))'=0 do {
+		type ResultSet rsACN=Db.select("CID,TYPE,BOO,CRCD,BALAVAIL","ACN","ACN=:CIFNUM")
+		while rsACN.next() do { quit:QFLG
+			
+			if COUNT>(+IM.piece("|",7)) set QFLG=1 quit
+			set ACLM=ACLM_"|"_rsACN.getCol("CID")_"|"_rsACN.getCol("TYPE")_"|"_rsACN.getCol("BOO")_"|"_rsACN.getCol("CRCD")_"|"_(rsACN.getCol("BALAVAIL")).zero(0,2,0,0)
+			set COUNT = COUNT+1
+							
+		}
+	}
+	else  do {
+		type ResultSet rsACN=Db.select("CID,TYPE,BOO,CRCD,BALAVAIL","ACN","ACN=:CIFNUM")
+		while rsACN.next() do { quit:QFLG
+			
+			set ACLM=ACLM_"|"_rsACN.getCol("CID")_"|"_rsACN.getCol("TYPE")_"|"_rsACN.getCol("BOO")_"|"_rsACN.getCol("CRCD")_"|"_(rsACN.getCol("BALAVAIL")).zero(0,2,0,0)
+			set COUNT = COUNT+1				
+		}
+	}
+	
+	for I=1:1:10 do {
+		if I=7 set IM.piece("|",I)=COUNT
+		set HEADER=HEADER_IM.piece("|",I)_"|"
+	}
+	
+	new ZCUSTYP,ZCUSNUM
+	set (ZCUSTYP,ZCUSNUM)=""
+	type RecordCIF zcif = Db.getRecord("CIF", "ACN=:CIFNUM")
+	do {			
+		if zcif.zcizid'="" set ZCUSTYP="IC",ZCUSNUM=zcif.zcizid quit
+		if zcif.pasnum'="" set ZCUSTYP="PP",ZCUSNUM=zcif.pasnum quit
+		if zcif.dlnum'="" set ZCUSTYP="DL",ZCUSNUM=zcif.dlnum quit
+		if zcif.taxid'="" set ZCUSTYP="TI",ZCUSNUM=zcif.taxid quit
+		
+		type ResultSet rsIFMID=Db.select("CODE","ZUTBLIFMID","TDTYP=:zcif.oit")
+		if rsIFMID.isEmpty() set ZCUSTYP="OT"
+		if rsIFMID.next() do {
+			set ZCUSTYP=rsIFMID.getCol("CODE")
+		}
+		//set ZCUSTYP=zcif.oit
+		set ZCUSNUM=zcif.oin 
+	}
+	
+	//set OM=HEADER_ZDATE_"T"_ZTIM_(IM.piece("|",2)).extract(20,IM.piece("|",2).length())_"|||"_0_"||"_CIFNUM_ACLM
+	set OM=HEADER_ZDATE_":"_ZTIM_"|||"_0_"||"_CIFNUM_"|"_ZCUSTYP_"|"_ZCUSNUM_"|"
+	set OM=OM_zcif.fname_"|"_zcif.lnm_"|"_zcif.zenam_"|"_zcif.pad1_"|"_zcif.pad2_ACLM
+	
+	quit OM
+	
+DEBITAC(IM)
+	
+	new HEADER, CID, OM, RSPCD, ZDATE, ZTIM
+	new CIDTYP, BRCD, TAMT, CRCD, TRNCD, TRCD, TRTYP, PRDGRP, ETCDR, ETCCR, %UserID, ZGLCID, %UserStation
+	new TCMT, REFID, ZCC, TPD, %UserClass, REJTIME, REV, AUTCODE, PSTDYS, INTRFACE, SVTYPE
+	new UTSO,TSO,FUTURE,ZGLCC,ZGLETC
+	new ER,RM
+	set (ER,RSPCD,REV,FUTURE)=0
+	set (OM,HEADER,RM,CRCD,TRNCD,TRCD,TRTYP,PRDGRP,ETCDR,ETCCR,UTSO,TSO,REFID,AUTCODE,PSTDYS,TCMT,SVTYPE,ZGLCC)=""
+	
+	type String RJ(),SPV(),OVR(,,)
+ 	//type RecordTTX ttx()
+ 	type Number TRNINP()
+	
+	set INTRFACE="ZIFM"
+	
+	do SYSVAR^SCADRV0()
+	
+	//set ZDATE=$$DAT^%ZM(%SystemDate,"YEAR-MM-DD")
+	//set ZTIM=$$TIM^%ZM(%CurrentTime,"24:60:SS")
+	set ZDATE=%CurrentDate
+	set ZTIM=%CurrentTime
+	set REJTIME=$$TIM^%ZM(%CurrentTime,"2460SS")
+	
+	for I=1:1:10 do {
+		set HEADER=HEADER_IM.piece("|",I)_"|"
+	}
+	
+	set REFID = IM.piece("|",9)
+	
+	set CID = IM.piece("|",11)
+	set CIDTYP = +IM.piece("|",12)
+	set BRCD = IM.piece("|",13)
+	set TAMT = +IM.piece("|",14)
+	
+	set CRCD = IM.piece("|",15)
+	if CRCD.isNull() set CRCD="THB"
+	
+	new ZPDAT,ZYEAR
+	set ZPDAT=IM.piece("|",20)
+	
+	//set TPD=$$FDAT^%ZM(ZPDAT,"YEARMMDD")
+	set TPD=$$FDAT^%ZM(ZPDAT,"DD/MM/YEAR")
+	
+	set REV= +IM.piece("|",21)
+	set SVTYPE=IM.piece("|",22)
+	
+	if (TPD<%SystemDate) set RSPCD=1806 quit $$RSPMSG(RSPCD,RM,,,6)
+	if TPD>(%SystemDate+1) set RSPCD=1151 quit $$RSPMSG(RSPCD,RM,,,6)
+	
+	// Turn on Split Day if Settlement Date in the future
+	if (TPD>%SystemDate) set FUTURE=1
+	else  set FUTURE=0
+	
+	if 'REV,Db.isDefined("ZIFMMSG", "PDT=:TPD,REFID=:REFID") quit $$RSPMSG(4976,.RM,,,6)
+	
+	if CID.isNull() set RSPCD=1259 quit $$RSPMSG(RSPCD,RM,,,6)
+	
+	
+	if 'CID.isNull() do {
+		if 'Db.isDefined("ACN", "CID=:CID") set ER=1,RSPCD=1259
+	}
+	
+	if ER.get() quit $$RSPMSG(RSPCD,RM,,,6)
+		
+	type RecordUTBLSRC zsrc=Db.getRecord("UTBLSRC","SRCTYP='ZIFM',KEY='IFMFEE'")
+	set BRCD=zsrc.brcd
+	set %UserID=zsrc.uid
+	//set %UserClass="IBATCH"
+	set %UserStation="BATCH"
+	
+	if %UserID.isNull() set RSPCD=2849 quit $$RSPMSG(RSPCD,RM,,,6)
+	if 'Db.isDefined("SCAU","UID=:%UserID") set RSPCD=2858 quit $$RSPMSG(RSPCD,RM,,,6)
+	
+	type RecordSCAU zscau=Db.getRecord("SCAU","UID=:%UserID") 
+	set %UserClass=zscau.%ucls
+	set REJMET=zscau.batrej
+		
+	type RecordDEP dep=Db.getRecord("DEP","CID=:CID")
+	set PRDGRP=dep.grp
+
+	//set EXTCODE=SVTYPE_PRDGRP
+	set EXTCODE=SVTYPE_(PRDGRP.extract(1,2))	
+	
+	set TRCD=$$GETTRN^ATMUTL(INTRFACE,EXTCODE,0)
+	if ER set RSPCD=1498 quit $$RSPMSG(RSPCD,RM,EXTCODE,,6)
+
+	// Define TRTYP from UTBLEXTTRN1
+	set TRTYP=$P(TRCD,$C(9),1)
+	
+	//Reversal
+	if REV set OM=$$FINREV(TAMT,dep,6) quit OM
+	
+	// Debit and Credit transaction codes
+	set ETCDR=$P(TRCD,$C(9),2)
+	set ETCCR=$P(TRCD,$C(9),3)
+	
+	set ZGLETC=$S(TRTYP="DEBIT":ETCCR,1:ETCDR)
+	 
+	//type RecordTRN ztrn=Db.getRecord("TRN","ETC=:ETCCR")
+	type RecordTRN ztrn=Db.getRecord("TRN","ETC=:ZGLETC")
+	if ztrn.acn'="" set ZGLCID=ztrn.acn
+	
+	if ZGLCID="" set RSPCD=1268 quit $$RSPMSG(RSPCD,RM,,,6)
+	
+	set UTSO("REFID")=REFID
+	set UTSO("CID")=CID
+	set UTSO("TDAT")=TPD
+	set UTSO("ZIFM")=1
+	
+	do IN^UTSO(.UTSO,.TSO)
+	
+	set TCMT="IBank Family Member"
+	
+	do Runtime.start("CS")
+	
+	//Soungtam 05/08/2011
+	type RecordTTX ttx()
+	
+	set ZGLCC=ztrn.dftcc
+	if ZGLCC="" set ZGLCC=dep.cc
+	
+	if TRTYP="DEBIT" do {
+		do TTX^ATMUTL(.ttx,CID,ETCDR,TAMT,TPD,TSO,TCMT,"",CRCD,dep.cc)	
+		do TTX^ATMUTL(.ttx,ZGLCID,ETCCR,TAMT,TPD,TSO,TCMT,"",CRCD,ZGLCC)
+	}
+	else  do {
+		do TTX^ATMUTL(.ttx,ZGLCID,ETCDR,TAMT,TPD,TSO,TCMT,"",CRCD,ZGLCC)	
+		do TTX^ATMUTL(.ttx,CID,ETCCR,TAMT,TPD,TSO,TCMT,"",CRCD,dep.cc)
+	}
+	
+	// Process the transactions
+	do POST(.ttx,CID,CRCD,TCMT,"","",6)
+	
+	if ER.get() do POSTER(6)
+	
+	do Runtime.commit()
+	
+	if ER.get() quit OM 
+		
+	set OM=$$OUTMSG(dep)
+	
+	quit OM
+
+	
+RSPMSG(CODE,RM,ARG1,ARG2,PITE)
+	
+	new RSPCD2
+	set RSPCD2=""
+	set ER=1
+	
+	set RM=$$^MSG(CODE,$G(ARG1),$G(ARG2))
+	
+	set RSPCD2=Db.getOneRow("RESPCDE1","UTBLEXTRSP1","INTRFACE,CODE")
+	
+	new Y,W
+	set W=""
+	for Y=1:1:PITE do {
+		set W=W_"|"
+	}
+	
+	if ZTRPYMFLG.get()=1 do {
+		set W.piece("|",19)=RSPCD2
+		set W.piece("|",20)=RSPCD2
+	}
+	
+	//Soungtam 02/08/2011
+	if HEADER.get()="" do {
+		for I=1:1:10 do {
+			set HEADER=HEADER_IM.piece("|",I)_"|"
+		}
+	}
+	
+	//set OM=HEADER_"|||"_CODE_"|"_RM
+	//set OM=HEADER_ZDATE_"T"_ZTIM_(IM.piece("|",2)).extract(20,IM.piece("|",2).length())_"|||"_RSPCD2_"|"_RM_W
+	set OM=HEADER_ZDATE_":"_ZTIM_"|||"_RSPCD2_"|"_RM_W
+	
+	do {
+		type RecordZIFMREJ ifmrej=Class.new("RecordZIFMREJ")
+		set ifmrej.trnd=%CurrentDate
+		set ifmrej.trnt=REJTIME		
+		set ifmrej.spr=REFID
+		if $D(CID) set ifmrej.cid=CID
+		if $D(TAMT) set ifmrej.tamt=TAMT
+		if $D(CODE) set ifmrej.resp1=CODE
+		if $D(RM) set ifmrej.rm=RM
+		set ifmrej.resp2=RSPCD2
+		set ifmrej.uuid=HEADER.piece("|",8)
+		
+		do ifmrej.bypassSave()    
+	} 
+	
+	quit OM
+	
+RSPMSG2(CODE,RM,ARG1,ARG2,PITE)
+
+	//Error from Post
+	
+	new RSPCD2
+	set RSPCD2=""
+	set ER=1
+	
+	
+	//set RSPCD2=Db.getOneRow("RESPCDE1","UTBLEXTRSP1","INTRFACE,CODE")
+	set RSPCD2=CODE
+	
+	new Y,W
+	set W=""
+	for Y=1:1:PITE do {
+		set W=W_"|"
+	}
+	
+	if ZTRPYMFLG.get()=1 do {
+		set W.piece("|",19)=RSPCD2
+		set W.piece("|",20)=RSPCD2
+	}
+	
+	set OM=HEADER_ZDATE_":"_ZTIM_"|||"_RSPCD2_"|"_RM_W
+	
+	do {
+		type RecordZIFMREJ ifmrej=Class.new("RecordZIFMREJ")
+		set ifmrej.trnd=%CurrentDate
+		set ifmrej.trnt=REJTIME		
+		set ifmrej.spr=REFID
+		if $D(CID) set ifmrej.cid=CID
+		if $D(TAMT) set ifmrej.tamt=TAMT
+		if $D(CODE) set ifmrej.resp1=CODE
+		if $D(RM) set ifmrej.rm=RM
+		set ifmrej.resp2=RSPCD2
+		set ifmrej.uuid=HEADER.piece("|",8)
+		
+		do ifmrej.bypassSave()    
+	} 
+	
+	quit OM
+	
+POST(RecordTTX ttx(),CID,CRCD,TCMT,SPR,AUTCODE,ZNPITE)
+
+	/*
+	 Messages coming in as ADVICES have already been processed by the
+	 ATM switch and must be processed as store and forward transactions
+	 on PROFILE. This means that store and forward transactions MUST be
+	 successfully processed on PROFILE since the transaction has already
+	 been approved by the ATM switch. The supervisory override array,
+	 TSPV, is set up so the PROFILE ATM teller has authorization over
+	 all generated transactions. Also, bit 10 of ITC for each transaction
+	 is turned on indicating that the transaction is off-line.
+	 ARGUMENTS:
+		CID	- PROFILE account number
+		CRCD	- Transaction currency code
+		TCMT	- Transaction comment
+		SPR	- Spray value
+		AUTCODE	- Authorization code
+	 INPUTS:
+		ATMM	- Unique message sequence
+		BCAL	- Business day calendar
+		BRCD	- Branch code
+		FINPRE	- POS preauthorized debit flag
+		PHC	- Permanent hold code
+		PHDAYS	- Permanent hold days
+		PRE	- Preauthorization flag
+		PSTDYS	- Number of days to search into an account's history
+		REV	- Reversal flag
+		STF	- ATM switch store and forward flag
+		TPD	- Teller posting date
+		TSO	- Transaction source of funds
+	*/
+	
+	do UPDTTX(.ttx)
+	
+	new TSPV,DELIMIT
+	// Piece Delimiter
+	set DELIMIT="|"
+
+	set TSPV("*")=%UserID_DELIMIT_%UserClass
+	
+	new par,seq,x,CRT,LPSEQ,TNSEQ,UID
+	
+	set UID=%UserID
+	
+	// wiphak 08/06/2009
+	// User EFD to get LPSEQ for FDT transaction
+	// if $G(EFD)'>%SystemDate set LPSEQ=Db.getOneRow("LPSEQ","TTXUID","TPD,BRCD,UID")
+	// else  set LPSEQ=Db.getOneRow("ENDSEQ","TTXFDTUID","TPD,BRCD,UID")
+	if $G(TPD)'>%SystemDate set LPSEQ=Db.getOneRow("LPSEQ","TTXUID","TPD,BRCD,UID")
+	else  set LPSEQ=Db.getOneRow("ENDSEQ","TTXFDTUID","TPD,BRCD,UID")
+	
+	set LPSEQ=(LPSEQ+1)*1000
+
+	// *** Customization - Chris Rickards - Start ***
+	// Build transaction set object
+	//set seq=1
+	//while Class.isValid(ttx(seq)) do {
+	//	set ttx(seq).trc=LPSEQ+seq	// Transaction trace
+	//	set x=ts.copyTran(ttx(seq))
+	//	set seq=seq+1
+	//	}
+	set seq=""
+	for  set seq=$O(ttx(seq)) quit:seq=""  do {
+		set ttx(seq).trc=LPSEQ+seq
+		//set x=ts.copyTran(ttx(seq))
+		
+		
+		// Wiphak 15/06/2009
+		// remove SPR from TSO because TSO is too big
+		// Wiphak 08/06/2009
+		// SPR is set to null because SPR length is over field size
+		// so SPR will be saved to  TSO in stead
+		// if ttx(seq).tso["ATM#" set ttx(seq).tso=ttx(seq).tso_"~SPR#"_SPR.get()
+		
+	}
+	
+	// future-dated transaction
+	// to check balance and override
+	if FUTURE,'REV do { quit:ER
+		type String RJ(),SPV(),OVR()
+		type Number ZSEQ,ZSAVEFD(),ZSEFD,ZSTPD
+		
+		// clear ttx.efd to try to post transaction
+		set ZSEQ=""
+		for  set ZSEQ=$O(ttx(ZSEQ)) quit:ZSEQ=""  do {
+			set ZSAVEFD(ZSEQ)=ttx(ZSEQ).efd
+			set ttx(ZSEQ).efd=""	
+		}
+		
+		// save EFD TPD
+		set ZSEFD=EFD.get()
+		set ZSTPD=TPD.get()
+		
+		set (EFD,TPD)=%SystemDate
+		set ZSAVSPR=SPR.get()
+		
+		// Wiphak 15/06/2009
+		// set SPR=""
+				
+		set ER=$$EXEC^ZTRNANL(.ttx(),.TPD,BRCD,.RJ,.SPV,.OVR)
+		
+		// Wiphak 15/06/2009
+		//set SPR=ZSAVSPR
+		
+		set EFD=ZSEFD
+		set TPD=ZSTPD
+		
+		if RJ.data() set ER=1
+		
+		// clear ttx.efd to try to post transaction
+		set ZSEQ=""
+		for  set ZSEQ=$O(ttx(ZSEQ)) quit:ZSEQ=""  do {
+			set ttx(ZSEQ).efd=ZSAVEFD(ZSEQ)	
+		}
+		
+		if ER.get() do POSTER(ZNPITE) 
+		
+	}
+	
+	if ER.get() quit 
+	
+	new TRNINP
+	set TRNINP("updTTX")=1
+	// 1 - online - STF
+	do TRNSET^TRNDRV(.ttx(),TPD,BRCD,1,,.RJ,.SPV,.OVR,.OM,REJMET.get(),.TRNINP)	
+	
+	/*
+	set TNSEQ="" 
+	set seq=""
+	
+	for  set seq=ttx(seq).order() quit:seq=""  do { quit:('TNSEQ.isNull())
+		if (TNSEQ=""),ttx(seq).cid=CID do {
+			if '$D(OM(seq)) quit
+			else  set TNSEQ=OM(seq).piece("|",6)
+		}
+	}*/
+
+	if ER quit
+	
+	// Create entry in ZIFMMSG 
+	type RecordZIFMMSG ifmmsg=Class.new("RecordZIFMMSG")
+	
+	set ifmmsg.pdt=TPD
+	set ifmmsg.cid=CID
+	set ifmmsg.refid=REFID.get()
+	//set ifmmsg.recseq=ttx(1).tseq
+	set ifmmsg.recseq=LPSEQ
+	
+
+	do ifmmsg.bypassSave()
+	
+	// Update hold in this procedure.
+	if 'ER.get() do UPDPHLD(.ttx)
+
+	quit
+
+UPDTTX(RecordTTX ttx())
+
+	
+	if 'FUTURE quit
+	
+	new CID,phldseq,seq,trn,ztso
+	
+	// 09-March-2009 INF0081 - Wiphak
+	new ZHLDCID
+        
+	type RecordACN acn
+       
+	set seq=""
+	set phldseq=0
+	for  set seq=ttx(seq).order() quit:seq.isNull()  do { 
+		new UTSO,TSO
+		
+		set CID=ttx(seq).cid
+		if (+EFD.get()'=0) set ttx(seq).efd=EFD	
+		
+
+		type RecordTRN trn=Db.getRecord("TRN","ETC=:ttx(seq).etc")
+		
+		/* Determine cost center */
+		do {
+		
+			if REV,'PARTIAL set ttx(seq).tcmt="Reversal"
+			
+			//if 'REV,'ZTCMT.piece("|",seq).isNull() set ttx(seq).tcmt=ZTCMT.piece("|",seq)
+			
+			//if '%EffectiveDate.isNull(),(trn.cls="D") do 
+			if FUTURE,(trn.cls="D") do {
+				set phldseq=0
+				
+				if 'REV,ZHLDCID(CID).data() do {
+					//Soungtam 23/09/2010 if transaction amount is 0, don't place hold
+					if +ttx(seq).tamt=0 quit
+					
+					set phldseq=ZHLDCID(CID)+1
+					set ZHLDCID(CID)=phldseq
+				}
+				
+				if 'REV,'ZHLDCID(CID).data() do {
+					//Soungtam 23/09/2010 if transaction amount is 0, don't place hold
+					if +ttx(seq).tamt=0 quit
+	
+					set phldseq=Db.nextVal("PHLD","CID")
+					set ZHLDCID(CID)=phldseq
+				}
+				
+				// Need to insert TSO fields for new partial transactions
+				if REV,PARTIAL,ttx(seq).hldseq'=0 set phldseq=ttx(seq).hldseq
+				if phldseq=0 quit
+
+				if 'UTSO.data() do OUT^UTSO(.UTSO,ttx(seq).tso)
+				set UTSO("HLDSEQ")=phldseq
+				set UTSO("REAPPLY")=0
+				
+				// Remove hold when posted
+				set ttx(seq).itc=$$ITC^TTXEXT(ttx(seq).itc,13,1)
+			}
+		}
+	
+		// Update TSO if fields changed
+		if UTSO.data() do {
+			new TSO
+			do IN^UTSO(.UTSO,.TSO)
+			set ttx(seq).tso=TSO
+		}
+	}
+	//Soungtam End 13/09/2010
+	
+        quit
+        
+UPDPHLD(RecordTTX ttx())
+	
+	new seq,phld,hldamt,HLDSEQ,HLDCID,SETDATE
+	
+	type RecordACN acn
+	
+	if ER quit
+	if +TPD.get()'>%SystemDate quit
+	
+	set hldamt=0
+	set HLDSEQ=0
+	set HLDCID=0
+	set BCAL=""
+	set PHC="92"
+	set PHDAYS=""
+	set %STFHOST=$G(%STFHOST)
+	
+	if 'REV do {
+		set seq=""
+		for  set seq=$O(ttx(seq)) quit:seq=""  do {
+			
+			if (ttx(seq).cls="D") do {
+				// INF0081 Phak
+				// seperate hold for each transaction 
+				set HLDCID=ttx(seq).cid
+				set HLDSEQ=ttx(seq).hldseq
+				set TTSO=ttx(seq).tso				
+				set hldamt=ttx(seq).tamt
+				if ttx(seq).itc1=1 set hldamt=-hldamt
+				
+				// 09-Mar-2009 Wiphak
+				// if hold amount is zero, don't add hold
+				// do ADDPHLD(HLDCID,hldamt,TCMT,SPR,AUTCODE,TTSO,BCAL,PHC,PHDAYS,CUTOFF)
+				if hldamt'=0 do ADDPHLD(HLDCID,hldamt,TCMT,SPR,AUTCODE,TTSO,BCAL,PHC,PHDAYS,"")
+			}
+		}
+	}
+	
+	if REV do {
+		set seq=""
+		for  set seq=$O(ttx(seq)) quit:seq=""  do {
+			if (ttx(seq).cls="D") do {
+				set HLDCID=ttx(seq).cid
+				set HLDSEQ=ttx(seq).hldseq
+				//Soungtam 23/09/2010
+				//if HLDSEQ'=0 do {
+				if (HLDSEQ'=0),(HLDSEQ'="") do {
+					type RecordPHLD phld=Db.getRecord("PHLD","CID=:HLDCID,SEQ=:HLDSEQ")
+					do phld.setAuditFlag(0)
+					set phld.amt=0
+					do phld.bypassSave()		
+				}
+			}
+		}
+	}
+	
+	//Soungtam End 08/09/2010
+	
+	quit
+	
+public ADDPHLD(CID,AMT,TCMT,SPR,AUTCODE,TSO,BCAL,PHC,PHDAYS,CUTOFF)
+
+	/*
+	 Insert entry into PHLD.
+	 
+	 The expiration date is set to one day after
+	 the next BCAL business date. Today's date is considered the next
+	 business date.
+	 ARGUMENTS:
+		CID	- PROFILE account number
+		AMT	- Hold amount
+		TCMT	- Teller comment
+		SPR	- Spray value
+		AUTCODE	- Authorization code
+		TSO	- Transaction source of funds
+		BCAL	- Business day calendar
+		PHC	- Permanent hold code
+		PHDAYS	- Permanent hold days
+		CUTOFF	- Hold Cutoff Time
+	 RETURNS:
+		RSPCD	- Response code
+	*/
+
+	new DATE
+
+	set DATE=%SystemDate
+	if CUTOFF'="",(%CurrentTime'<CUTOFF)!(%SystemDate<%CurrentDate) set DATE=DATE+1
+	
+	type RecordPHLD recPHLD
+	set recPHLD=Class.new("RecordPHLD")
+
+	set recPHLD.cid=CID
+	set recPHLD.seq=Db.nextVal("PHLD","CID")
+	set recPHLD.stdt=%SystemDate
+	set recPHLD.expdt=$$NBD^UNBD(DATE,PHDAYS,0,BCAL)+2
+	set recPHLD.amt=AMT
+	set recPHLD.phc=PHC
+	// 25-Sep-2007 Kunvadee V.: Modified section ADDPHLD to change to set comment that not exceed 40 bytes.
+	//set recPHLD.tcmt=TCMT_"-"_SPR.extract(SPR.length()-4,SPR.length())
+	set recPHLD.tcmt=TCMT.blank(40)
+	// End 25-Sep-2007
+	set recPHLD.tlo=%UserStation
+	set recPHLD.autcode=AUTCODE
+	set recPHLD.stfhost=$S(%STFHOST:1,1:0)
+	set recPHLD.tso=TSO
+
+	do recPHLD.setAuditFlag(0)	
+	do recPHLD.save("/NOVALDD")	
+
+	quit
+
+POSTER(ZNPITE)
+	/*
+	 BLDOM section pre-processor
+
+	 This section is used to add/modify the bits used to build outgoing
+	 B24ATM response messages.
+	*/
+
+	// Possible duplicate message
+	if $P($G(%MSGID),"|",1)="4976" quit $$RSPMSG(4976,.RM,,,ZNPITE)	
+	
+	// set Profile's response code in BIT63
+	if ER.get() do {
+		
+		set ER=0	
+		set idx=""
+		
+		type RecordZIFMREJ1 ifmrej1=Class.new("RecordZIFMREJ1")
+		new ZX0,ZX1,ZX2,ZX3,ZZREC
+		set (ZX0,ZX1,ZX2,ZX3,ZZREC)="" 
+		for  set ZX0=$O(SPV(ZX0)) quit:ZX0=""  do {
+			set ZX1=""
+			for  set ZX1=$O(SPV(ZX0,ZX1)) quit:ZX1=""  do {
+				set ZX2=""
+				for  set ZX2=$O(SPV(ZX0,ZX1,ZX2)) quit:ZX2=""  do {
+					set ZX3=""
+					for  set ZX3=$O(SPV(ZX0,ZX1,ZX2,ZX3)) quit:ZX3=""  do {								
+						set ZZREC=SPV(ZX0,ZX1,ZX2,ZX3)						
+						
+						set ifmrej1.trnd=%CurrentDate
+						set ifmrej1.trnt=REJTIME
+						set ifmrej1.spr=REFID
+						set ifmrej1.seq=ZX0
+						set ifmrej1.cid=ZX1
+						set ifmrej1.ovr=ZX2
+						set ifmrej1.ovrlit=ZX3
+						set ifmrej1.spv=ZZREC.piece("|",1)_"/"_ZZREC.piece("|",2)_"/"_ZZREC.piece("|",3)_"/"_ZZREC.piece("|",4)_"/"_ZZREC.piece("|",5)
+						
+						//set ifmrej1.spv=ZX0_","_X1_","_X2_","_X3_"="_ZREC.piece("|",1)_"-"_ZREC.piece("|",2)_"-"_ZREC.piece("|",3)_"-"_ZREC.piece("|",4)_"-"_ZREC.piece("|",5)
+						do ifmrej1.bypassSave()
+						 							
+					}	
+				}
+			}
+		}
+		
+		//Soungtam start 05/07/2011
+		/*for idx=$O(RJ(idx)) quit:ER!(idx="")  do { quit:ER
+			if $P(RJ(idx),"|",2)="Account closed" set CID=CID set OM=$$RSPMSG(8449,.RM,,,ZNPITE) quit
+			// Deposits not allowed after maturity date has expired
+			if $P(RJ(idx),"|",2)["after maturity date has expired" set OM=$$RSPMSG(4657,.RM,,,ZNPITE) quit
+			// Transfer to SPA not equal to the first deposit
+			if $P(RJ(idx),"|",2)["not equal to the first deposit" set OM=$$RSPMSG(4658,.RM,,,ZNPITE) quit
+			
+			if $P(RJ(idx),"|",2)="Override required" do { quit:ER
+				
+				new X1,X2,X3,ZREC					
+				set (X1,X2,X3,ZREC)="" 
+				for  set X1=$O(SPV(idx,X1)) quit:X1=""  do {
+					set X2=""
+					for  set X2=$O(SPV(idx,X1,X2)) quit:X2=""  do {
+						set X3=""
+						for  set X3=$O(SPV(idx,X1,X2,X3)) quit:X3=""  do {								
+							set ZREC=SPV(idx,X1,X2,X3)								
+							if ZREC.piece("|",1)'="*" kill SPV(idx,X1,X2,X3) 
+														
+						}	
+					}
+				}
+				
+				// Account Restriction
+				if $D(SPV(idx,CID,"RFLG")) set CID=CID set OM=$$RSPMSG(2413,.RM,,,ZNPITE) quit
+				// Insufficient Funds 
+				if "-AVLBAL-BAL-BALAVL-BALCOL-ODUNAMT-RSKAVL-"[("-"_$O(SPV(idx,CID,"OVR",""))_"-") set CID=CID set OM=$$RSPMSG(1244,.RM,,,ZNPITE) quit
+				
+				// Minimum deposit is greater than the maximum deposit
+				if $D(SPV(idx,CID,"OVR","MAXNUM")) set OM=$$RSPMSG(1733,.RM,,,ZNPITE) quit                                   
+                                // Deposit amount is less than minimum of $<MINCR>
+                                if $D(SPV(idx,CID,"OVR","MINCR")) set OM=$$RSPMSG(1733,.RM,,,ZNPITE) quit
+			}	
+		}
+		
+		if 'ER do {				
+			
+			//Soungtam start 05/07/2011
+			//if $P($G(%MSGID),"|",1)'="" set OM=$$RSPMSG($P($G(%MSGID),"|",1),.RM,,,ZNPITE)
+			//else  set OM=$$RSPMSG(3764,.RM)
+			
+			
+			
+			set OM=$$RSPMSG(3764,.RM,,,ZNPITE)
+		}*/
+		
+		if RJ.data() do { quit 
+			new DCFLG,ZCODE,ZRM
+			set (ZCODE,ZRM)=""
+			set DCFLG=$$FINDSEQ^ZSPVFIND(.RJ)
+				
+			new ZREJCODE
+			set ZREJCODE=$$SPV^ZSPVFIND("ZIFM",.SPV,DCFLG,RJ(DCFLG).piece("|",2)) //keep error why can't post transection
+			
+			set ZCODE=ZREJCODE.piece("|",1)
+			set ZRM=ZREJCODE.piece("|",3)
+			
+			set OM=$$RSPMSG2(ZCODE,.ZRM,,,ZNPITE) 			
+		}		
+		//Soungtam end 05/07/2011
+	
+	}	
+	
+	quit
+
+FINREV(TAMT,RecordDEP dep,ZNPITE)
+
+	/*
+	 Reversal transactions
+	 Reverse the original transaction. If the original amount was
+	 incorrect, then process the transaction with the correct amount
+	 after the original is reversed.
+	 INPUTS:
+		AMT2	- Correction amount
+		AUTCODE	- Authorization code
+		BCAL	- Business day calendar
+		CRCD	- Transaction currency code
+		DELDUP	- Delete ATMDUP flag
+		PCID    - PROFILE account number
+		PHC     - Permanent hold code
+		PHDAYS  - Permanent hold days
+		PRE     - Preauthorization flag
+		SPR     - Spray value
+		TAMT    - Transaction amount (converted)
+		TCMT    - Transaction comment
+		TSO	- Transaction source of funds
+	*/
+
+	new PARTIAL
+
+	// Determine if it's a partial reversal
+	set PARTIAL=0
+	
+	type RecordTTX ttx()
+	
+	
+	do REV(.ttx,CID,TAMT,REFID,AUTCODE,BRCD,PSTDYS,PARTIAL,TRTYP,ZNPITE)
+	
+	// Specified error detail when doing reversal is not successful.
+	if ER quit OM
+	
+	// Process the transactions
+	do POST(.ttx,CID,CRCD,TCMT,"","",ZNPITE)
+	
+	if ER.get() do POSTER(ZNPITE) quit OM
+	
+	if ZTRPYMFLG.get()=1 quit $$OUTMSG2(dep) 
+	
+	quit $$OUTMSG(dep)
+	
+REV(RecordTTX ttx(),PCID,AMT,REFID,AUTCODE,BRCD,PSTDYS,PARTIAL,TRTYP,ZNPITE)
+	
+	new DATE,XTRC,TSEQ,TRC,REVTSO,RECTYP
+	type ResultSet rs1,rs3
+	type RecordTTXFDT ttxfdt
+	type RecordTRN trn
+	set DATE=%SystemDate
+	
+	set RECTYP="HIST"
+	if FUTURE.get() set RECTYP="TTXFDT"
+	
+	// Unable to locate transaction in account history
+	if 'Db.isDefined("ZIFMMSG","PDT=:TPD,REFID=:REFID") set OM=$$RSPMSG(2793,RM,,,ZNPITE) quit
+	
+	type RecordZIFMMSG ifmmsg=Db.getRecord("ZIFMMSG","PDT=:TPD,REFID=:REFID")
+	set XTRC=ifmmsg.recseq
+	
+	// Delete ZIFMMSG entry
+	do Db.fastDelete("ZIFMMSG",":TPD,:REFID")
+	
+	set UID=%UserID
+	
+	if RECTYP="HIST" do {
+		// Retrieve TTX transactions
+		set SCREEN=XTRC\1000*1000
+		set rs1=Db.select("TSEQ","TTX","TJD=:TPD AND BRCD=:BRCD AND UID=:%UserID AND TSEQ BETWEEN :SCREEN AND (:SCREEN+1000)")
+		if rs1.isEmpty() set ER=1 quit
+		while rs1.next() do { quit:ER
+			set TRC=rs1.getCol(1)
+	
+			// Determine array sequence
+			set seq=TRC#1000
+	
+			// Retrieve transaction information
+			set ttx(seq)=Db.getRecord("TTX","TPD,BRCD,UID,TRC")
+	
+			// Retrieve transaction code information
+			set ETC=ttx(seq).etc
+			if ETC="" set OM=$$RSPMSG(1498,RM,,,ZNPITE) quit
+			if 'Db.isDefined("TRN","ETC") set OM=$$RSPMSG(1498,RM,ETC,,ZNPITE) quit
+			set trn=Db.getRecord("TRN","ETC")
+	
+			// Determine Profile account history sequence
+			set CID=ttx(seq).cid
+			set TSEQ=""
+			if trn.cls'="M" do {
+				
+				// **********************************
+				// *** Start optimized search *******
+				// **********************************
+	
+				type Number HIT
+				set HIT=0
+				
+				type RecordACN acn=Db.getRecord("ACN","CID=:CID")
+	
+				if acn.cls="D" do {
+					type RecordDEP dep={RecordACN}acn
+					//03/07/09 - Anchalee Ch. (03JUL09)
+					//Passed TTX record to FIND^ZHISTFND instead of TRAN
+					//if dep.zxhist set HIT=$$FIND^ZHISTFND(CID,TRAN,.TSEQ)
+					if dep.zxhist set HIT=$$FIND^ZHISTFND(CID,ttx(seq),.TSEQ)
+					//End of 03/07/09
+					}
+	
+				if HIT quit
+	
+				// **********************************
+				// *** End optimized search *********
+				// **********************************
+					
+				set TAMT=ttx(seq).tamt
+					
+				
+			}
+	
+			// Store history sequence and transaction sequence number
+			set TRN(CID,TRC)=TSEQ_"|"_TRC
+		}
+	}
+	
+	// Transaction was found in TTXFDT
+	if RECTYP="TTXFDT" do {
+
+		// Retrieve TTXFDT transactions
+		set SCREEN=XTRC\1000*1000
+		set rs3=Db.select("TSEQ","TTXFDT","TJD=:TPD AND BRCD=:BRCD AND UID=:UID AND TSEQ BETWEEN :SCREEN AND (:SCREEN+1000)")
+		if rs3.isEmpty() set ER=1 quit
+		while rs3.next() do { quit:ER
+			set TRC=rs3.getCol(1)
+
+			// Determine array sequence
+			set seq=TRC#1000
+
+			// Retrieve transaction information
+			set ttxfdt=Db.getRecord("TTXFDT","TPD,BRCD,UID,TRC")
+
+			// Translate TTXFDT object to a TTX object
+			do ttxfdt.toArray("TRAN")
+			set ttx(seq)=Class.new("RecordTTX")
+			set ttx(seq).tjd=ttxfdt.tjd
+			set ttx(seq).brcd=ttxfdt.brcd
+			set ttx(seq).uid=ttxfdt.uid
+			set ttx(seq).tseq=ttxfdt.tseq
+			do ttx(seq).fromArray("TRAN")
+
+			// Store history sequence and transaction sequence number
+			set CID=ttx(seq).cid
+			set TRN(CID,TRC)=""
+			
+			
+		}
+	}
+	
+	// Save TSO for partial reversal transactions
+	set SAVTSO=TSO
+
+	// Modify original transactions with reversal information
+	set seq=""
+	for  set seq=$O(ttx(seq)) quit:seq=""  do { quit:ER
+		
+		// INF0081 - Phak
+		// use tso of each transaction seq
+		new ZXTSO
+		set ZXTSO=ttx(seq).tso
+		
+		// Verify transaction has not already been reversed
+		if ttx(seq).itc6!ttx(seq).itc12 set OM=$$RSPMSG(2678,RM,,,ZNPITE) quit
+		
+		// Determine error-correct/reversal flag		
+		// Split Day transaction in TTXFDT considered error-corrects
+		//set FLG=$S(ttx(seq).tjd=%SystemDate:6,1:12)
+		set FLG=$S(RECTYP'="HIST":6,ttx(seq).tjd=%SystemDate:6,1:12)
+		
+		set ttx(seq).itc=$$ITC^TTXEXT(ttx(seq).itc,FLG,1)
+
+		// Add reversal fields to TSO
+		set CID=ttx(seq).cid
+		set TRC=ttx(seq).tseq
+		if RECTYP="HIST",$D(TRN(CID)) do {
+			if ttx(seq).tjd=%SystemDate do {
+				
+				// 08/07/2008 - Anchalee Ch.
+				// Added FLG condition to specify TSO 'EC' or 'REV'
+				if FLG=6 set REVTSO("EC")=$P(TRN(CID,TRC),"|",2) quit
+				if FLG=12 set REVTSO("REV")=+$P(TRN(CID,TRC),"|",1)
+				// End of 08/07/2008
+				
+				set REVTSO("REFID")=REFID.get()
+			}
+			else  set REVTSO("REV")=+$P(TRN(CID,TRC),"|",1)
+			set ttx(seq).tcmt="IFM Reversal of "_+$P(TRN(CID,TRC),"|",1)
+			}
+			
+		if RECTYP="TTXFDT" do {
+			
+			set REVTSO("FDTSEQ")=TRC
+			set REVTSO("EC")=TRC
+			
+			}
+		
+		do IN^UTSO(.REVTSO,.ZXTSO)
+
+		// Reverse transaction amount
+		set ttx(seq).tamt=$$TAMT^TRNUTL(ttx(seq).tamt)
+		set ttx(seq).tso=ZXTSO
+		
+	}
+
+	quit
+	
+OUTMSG(RecordDEP dep)
+	
+	type RecordCIF zcif=Db.getRecord("CIF","ACN=:dep.acn")
+	
+	//set OM=HEADER_ZDATE_"T"_ZTIM_(IM.piece("|",2)).extract(20,IM.piece("|",2).length())_"|"_""_"|"_""_"|"_0_"|"_""_"|"_IM.piece("|",11)_"|"
+	set OM=HEADER_ZDATE_":"_ZTIM_"|"_""_"|"_""_"|"_0_"|"_""_"|"_IM.piece("|",11)_"|"
+	set OM=OM_IM.piece("|",12)_"|"_IM.piece("|",13)_"|"_IM.piece("|",14)_"|"_IM.piece("|",15)_"|"_zcif.nam
+	
+	quit OM
+	
+ACBALINQ(IM)
+	
+	new HEADER, ACCNUM, ACCTYP, CUSIDNUM, OM, ZDOB, RSPCD, ZDATE, ZTIM, ER, RM, INTRFACE, REJTIME 
+	new REFID, ARG1
+	set ER=0
+	set (OM,HEADER,RM,ARG1)=""
+	
+	set INTRFACE="ZIFM"
+	
+	do SYSVAR^SCADRV0()
+	
+	//set ZDATE=$$DAT^%ZM(%SystemDate,"YEAR-MM-DD")
+	//set ZTIM=$$TIM^%ZM(%CurrentTime,"24:60:SS")
+	set ZDATE=%CurrentDate
+	set ZTIM=%CurrentTime
+	set REJTIME=$$TIM^%ZM(%CurrentTime,"2460SS")
+	
+	for I=1:1:10 do {
+		set HEADER=HEADER_IM.piece("|",I)_"|"
+	}
+	
+	set REFID = IM.piece("|",9)
+	set ACCNUM = IM.piece("|",11)
+	set ACCTYP = IM.piece("|",12)
+	
+	if ACCNUM.isNull() set RSPCD=1259 quit $$RSPMSG(RSPCD,RM,,,13)
+	
+	
+	if 'ACCNUM.isNull() do {
+		if 'Db.isDefined("ACN", "CID=:ACCNUM") set ER=1,RSPCD=1259
+	}
+	
+	if ER.get() quit $$RSPMSG(RSPCD,RM,,,13)
+	
+	type RecordACN acn = Db.getRecord("ACN", "CID=:ACCNUM")
+	
+	set OM=HEADER_ZDATE_":"_ZTIM_"|"_""_"|"_""_"|"_0_"|"_""_"|"_ACCNUM_"|"_ACCTYP_"|"_acn.stat_"|"_acn.acn_"|"_(acn.bal).zero(0,2,0,0)_"|"_acn.crcd_"|"
+	set OM=OM_acn.acctname_"|"_acn.boo_"|"_$$DAT^%ZM(acn.odt,"DD/MM/YEAR")_"|"_(acn.zodlim).zero(0,2,0,0)_"|"_$$DAT^%ZM(acn.tld,"DD/MM/YEAR")_"|"_(acn.zacrln).zero(0,2,0,0)_"|"
+	set OM=OM_(acn.balavail).zero(0,2,0,0)
+	
+	quit OM
+	
+DEBREVFLG(IM)
+	new REVFLG
+	
+	set REVFLG=+IM.piece("|",21)
+
+	quit REVFLG
+	
+	
+TRFPYM(IM)
+	
+	new HEADER, FCID, TCID, OM, RSPCD, ZDATE, ZTIM
+	new FCIDTYP, FBRCD, TAMT, CRCD, TRNCD, TRCD, TRTYP, FPRDGRP, TPRDGRP, ETCDR, ETCCR, %UserID, ZGLCID, %UserStation
+	new TCMT, REFID, ZCC, TPD, %UserClass, REJTIME, REV, AUTCODE, PSTDYS, INTRFACE, SVTYPE
+	new UTSO,TSO,FUTURE,ZGLCC,ZGLETC,TCID,TCIDTYP,TBRCD,TRTCD,FEEAMT,FCRCD,FTRNCD,GLREF,GLCC,GLPDCD,ZTRPYMFLG
+	new ER,RM,ARG1
+	set (ER,RSPCD,REV,FUTURE)=0
+	set (OM,HEADER,RM,CRCD,TRNCD,TRCD,TRTYP,PRDGRP,ETCDR,ETCCR,UTSO,TSO,REFID,AUTCODE,PSTDYS,TCMT,SVTYPE,ZGLCC)=""
+	set (FCRCD,FTRNCD,GLREF,GLCC,GLPDCD,ARG1)=""
+	set ZTRPYMFLG=1
+	
+	type String RJ(),SPV(),OVR(,,)
+ 	//type RecordTTX ttx()
+ 	type Number TRNINP()
+	
+	set INTRFACE="ZIFM"
+	
+	do SYSVAR^SCADRV0()
+	
+	//set ZDATE=$$DAT^%ZM(%SystemDate,"YEAR-MM-DD")
+	//set ZTIM=$$TIM^%ZM(%CurrentTime,"24:60:SS")
+	set ZDATE=%CurrentDate
+	set ZTIM=%CurrentTime
+	set REJTIME=$$TIM^%ZM(%CurrentTime,"2460SS")
+	
+	for I=1:1:10 do {
+		set HEADER=HEADER_IM.piece("|",I)_"|"
+	}
+	
+	set REFID = IM.piece("|",9)
+	
+	set FCID = IM.piece("|",11)
+	set FCIDTYP = +IM.piece("|",12)
+	set FBRCD = IM.piece("|",13)
+	set TAMT = +IM.piece("|",14)
+	
+	set CRCD = IM.piece("|",15)
+	if CRCD.isNull() set CRCD="THB"
+	
+	set TCID = IM.piece("|",16)
+	set TCIDTYP = IM.piece("|",17)
+	set TBRCD = IM.piece("|",18)
+	set TRTCD = IM.piece("|",19)
+	set FEEAMT = +IM.piece("|",20)
+	set FCRCD = IM.piece("|",21)
+	set FTRNCD = IM.piece("|",22)
+	set GLREF = IM.piece("|",23)
+	set GLCC = IM.piece("|",24)
+	set GLPDCD = IM.piece("|",25)
+	
+	new ZPDAT,ZYEAR
+	set ZPDAT=IM.piece("|",26)
+	
+	//set TPD=$$FDAT^%ZM(ZPDAT,"YEARMMDD")
+	set TPD=$$FDAT^%ZM(ZPDAT,"DD/MM/YEAR")
+	
+	set REV= +IM.piece("|",27)
+	set SVTYPE=IM.piece("|",28)
+	
+	if (TPD<%SystemDate) set RSPCD=1806 quit $$RSPMSG(RSPCD,RM,,,20)
+	if TPD>(%SystemDate+1) set RSPCD=1151 quit $$RSPMSG(RSPCD,RM,,,20)
+	
+	// Turn on Split Day if Settlement Date in the future
+	if (TPD>%SystemDate) set FUTURE=1
+	else  set FUTURE=0
+	
+	if 'REV,Db.isDefined("ZIFMMSG", "PDT=:TPD,REFID=:REFID") quit $$RSPMSG(4976,.RM,,,20)
+	
+	if FCID.isNull() set RSPCD=2095 quit $$RSPMSG(RSPCD,RM,,,20)
+	if TCID.isNull() set RSPCD=2096 quit $$RSPMSG(RSPCD,RM,,,20)
+	
+	if ('FCID.isNull())!('TCID.isNull()) do {
+		if 'Db.isDefined("ACN", "CID=:FCID") set ER=1,RSPCD=2095
+		if 'Db.isDefined("ACN", "CID=:TCID") set ER=1,RSPCD=2096
+	}
+	
+	if ER.get() quit $$RSPMSG(RSPCD,RM,,,20)
+		
+	type RecordUTBLSRC zsrc=Db.getRecord("UTBLSRC","SRCTYP='ZIFM',KEY='HUJ'")
+	set BRCD=zsrc.brcd
+	set %UserID=zsrc.uid
+	//set %UserClass="IBATCH"
+	set %UserStation="BATCH"
+	
+	if %UserID.isNull() set RSPCD=2849 quit $$RSPMSG(RSPCD,RM,,,20)
+	if 'Db.isDefined("SCAU","UID=:%UserID") set RSPCD=2858 quit $$RSPMSG(RSPCD,RM,,,20)
+	
+	type RecordSCAU zscau=Db.getRecord("SCAU","UID=:%UserID") 
+	set %UserClass=zscau.%ucls
+	set REJMET=zscau.batrej
+		
+	type RecordDEP dep1=Db.getRecord("DEP","CID=:FCID")
+	set FPRDGRP=dep1.grp
+	
+	type RecordDEP dep2=Db.getRecord("DEP","CID=:TCID")
+	set TPRDGRP=dep2.grp
+
+	set EXTCODE=SVTYPE_(FPRDGRP.extract(1,2))_(TPRDGRP.extract(1,2))	
+	
+	set TRCD=$$GETTRN^ATMUTL(INTRFACE,EXTCODE,0)
+	if ER set RSPCD=1498 quit $$RSPMSG(RSPCD,RM,EXTCODE,,20)
+
+	// Define TRTYP from UTBLEXTTRN1
+	set TRTYP=$P(TRCD,$C(9),1)
+	
+	// Set CID to the customer's account number
+	set CID=$S(TRTYP="DEBIT":FCID,1:TCID)
+	
+	type RecordDEP dep=Db.getRecord("DEP","CID=:CID")
+	
+	//Reversal
+	if REV set OM=$$FINREV(TAMT,dep,20) quit OM
+	
+	// Debit and Credit transaction codes
+	set ETCDR=$P(TRCD,$C(9),2)
+	set ETCCR=$P(TRCD,$C(9),3)
+	
+	//set ZGLETC=$S(TRTYP="DEBIT":ETCCR,1:ETCDR)
+	 
+	set UTSO("REFID")=REFID
+	set UTSO("FCID")=FCID
+	set UTSO("TCID")=TCID
+	set UTSO("TDAT")=TPD
+	set UTSO("ZTRFPYMT")=1
+	set UTSO("ZIFM")=1
+	
+	do IN^UTSO(.UTSO,.TSO)
+	
+	//Soungtam 06/07/2011
+	set TCMT="Haj Transfer Payment"
+	
+	do Runtime.start("CS")
+	
+	//Soungtam 05/08/2011
+	type RecordTTX ttx()
+	
+	do TTX^ATMUTL(.ttx,FCID,ETCDR,TAMT,TPD,TSO,TCMT,"",CRCD,dep1.cc)	
+	do TTX^ATMUTL(.ttx,TCID,ETCCR,TAMT,TPD,TSO,TCMT,"",CRCD,dep2.cc)
+	
+	if FEEAMT>0 do {
+		
+		new FEXTCD,FTRCD,FTRTYP,FETCDR,FETCCR,FGLETC,FEGLCID
+		set (FEXTCD,FTRCD,FTRTYP,FETCDR,FETCCR,FGLETC,FEGLCID)=""
+		
+		set FEXTCD=SVTYPE_"FE"_(FPRDGRP.extract(1,2))	
+	
+		set FTRCD=$$GETTRN^ATMUTL(INTRFACE,FEXTCD,0)
+		if ER set ER=1,RSPCD=1498,ARG1=FEXTCD quit 
+	
+		// Define TRTYP from UTBLEXTTRN1
+		set FTRTYP=$P(FTRCD,$C(9),1)
+		
+		// Debit and Credit transaction codes
+		set FETCDR=$P(FTRCD,$C(9),2)
+		set FETCCR=$P(FTRCD,$C(9),3)
+		
+		set FGLETC=$S(TRTYP="DEBIT":FETCCR,1:FETCDR)
+		 
+		type RecordTRN ftrn=Db.getRecord("TRN","ETC=:FGLETC")
+		if ftrn.acn'="" set FEGLCID=ftrn.acn
+		
+		if FEGLCID="" set ER=1,RSPCD=1268 quit 
+		
+		set ZGLCC=ftrn.dftcc
+		if ZGLCC="" set ZGLCC=dep1.cc
+		
+		do TTX^ATMUTL(.ttx,FCID,FETCDR,FEEAMT,TPD,TSO,TCMT,"",CRCD,dep1.cc)	
+		do TTX^ATMUTL(.ttx,FEGLCID,FETCCR,FEEAMT,TPD,TSO,TCMT,"",CRCD,ZGLCC)
+		
+	}
+	
+	//if ER.get() quit $$RSPMSG(RSPCD,RM,ARG1,,20)
+	if ER.get() set OM=$$RSPMSG(RSPCD,RM,ARG1,,20)
+	
+	// Process the transactions
+	do POST(.ttx,FCID,CRCD,TCMT,"","",20)
+	
+	//if ER.get() do POSTER(20) quit OM
+	if ER.get(),(OM="") do POSTER(20)
+	
+	do Runtime.commit()
+	
+	if ER.get() quit OM
+		
+	set OM=$$OUTMSG2(dep)
+	
+	quit OM
+	
+PYMREVFLG(IM)
+	new REVFLG
+	
+	set REVFLG=+IM.piece("|",27)
+
+	quit REVFLG
+	
+OUTMSG2(RecordDEP dep)
+	
+	type RecordCIF zcif=Db.getRecord("CIF","ACN=:dep.acn")
+	
+	//set OM=HEADER_ZDATE_":"_ZTIM_"|"_""_"|"_""_"|"_0_"|"_""_"|"_IM.piece("|",11)_"|"
+	//set OM=OM_IM.piece("|",12)_"|"_IM.piece("|",13)_"|"_IM.piece("|",14)_"|"_IM.piece("|",15)_"|"_zcif.nam
+	
+	set OM = HEADER_ZDATE_":"_ZTIM_"|"_""_"|"_""_"|"_0_"|"_""_"|"_IM.piece("|",11,26)_"|"_zcif.nam_"|"_0_"|"_0_"|"_(dep.balavl).zero(0,2,0,0)
+	
+	quit OM
+	

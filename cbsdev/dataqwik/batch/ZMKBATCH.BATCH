@@ -1,0 +1,52 @@
+//DO NOT MODIFY  TEST|ZMKBATCH||||||ACN|||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+	
+	new IOTYP,ZPATH
+	set ZPATH=$$TRNLNM^%ZFUNC("SCAU_SPOOL")
+	
+	type IO io = Class.new("IO")
+	set io.directory=ZPATH
+	set io.fileName="TESTBATCH2.txt"
+	set io.openParams="NEWV/WRITE"
+	do io.open()
+	
+	type String TEXT
+	set TEXT = ""
+	set i=1
+	set ext = 0
+	
+	type ResultSet rs=Db.select("KEY1","TMPRPT1")
+	while rs.next() do { quit:ext
+		set TEXT="(ZBMK"_i_".)"_rs.getCol("KEY1")
+		set i=i+1
+		if (i>300) set ext=1
+		do io.write(TEXT)
+	}
+	
+	set IOTYP="RMS"
+	do io.close()
+	quit
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	type RecordACN acn=Db.getRecord("ACN","CID")
+	type RecordTMPRPT1 tmp = Class.new("RecordTMPRPT1")
+	set tmp.pid = "ZBMK"
+	set tmp.key1 = acn.cid
+	do tmp.bypassSave()
+	quit
+---------- THREXIT ------ Section marker

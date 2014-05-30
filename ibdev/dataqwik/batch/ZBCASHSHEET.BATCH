@@ -1,0 +1,40 @@
+//DO NOT MODIFY  Batch For Bank Cash Sheet Report|ZBCASHSH||||||DMJ|||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+	
+	type RecordDMJ dmj = Db.getRecord("DMJ","TJD,DATETIME,CID,TSEQ")
+	set BRCD	= dmj.brcd
+	
+	if dmj.etc'="CI" do {	//Cash In Trns.
+	type RecordZCASHSHEET cs = Db.getRecord("ZCASHSHEET","TJD,BRCD",1)
+		
+		set cs.sumci	= cs.sumci+dmj.TAMT
+		set cs.ci	= cs.ci+1
+		do cs.save()
+	}
+	
+	if dmj.etc'="CO" do {	//Cash Out Trns.
+	type RecordZCASHSHEET cs = Db.getRecord("ZCASHSHEET","TJD,BRCD",1)
+		set cs.sumco	= cs.sumco+dmj.TAMT
+		set cs.co	= cs.co+1
+		do cs.save()
+	}
+	
+	quit
+	
+---------- THREXIT ------ Section marker

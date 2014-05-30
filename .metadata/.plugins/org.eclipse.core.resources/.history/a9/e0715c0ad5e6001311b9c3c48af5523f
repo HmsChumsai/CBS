@@ -1,0 +1,202 @@
+//DO NOT MODIFY  All bank branch number in Cheque Clearin|ZBCHBKBR||||||ZBKBRCH|||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	do Runtime.rollback()
+	type Number ZBK,ZBRCD
+	set ZSEQ	=SEQ
+	set ZBK		=BK
+	set ZBRCD	=BRCD
+	do PROC(ZSEQ,ZBK,ZBRCD)
+
+	quit
+
+PROC(ZSEQ,ZBK,ZBRCD)
+
+	do SYSVAR^SCADRV0()
+	type String ZDATA,ClearingHouseCodeI,ClearingHouseCodeII,ActiveStatus
+	type ResultSet rs = Db.select("DATA","ZBKBRCH","SEQ=:ZSEQ and BK=:ZBK and BRCD=:ZBRCD")
+
+	while rs.next() do {
+		set ZDATA=rs.getCol(1)
+		/*
+		set ClearingHouseCodeI	=ZDATA.piece("|",1)
+		set ClearingHouseCodeII	=ZDATA.piece("|",2)
+		set ActiveStatus	=ZDATA.piece("|",3)
+		*/
+		set ClearingHouseCodeI=$E(ZDATA,1,5)
+		set ClearingHouseCodeII=$E(ZDATA,6,10)
+		set ActiveStatus=$E(ZDATA,11)
+
+		type RecordZUTBLBKBRCH ZBKBRCH = Db.getRecord("ZUTBLBKBRCH","BK=:ZBK,BRCD=:ZBRCD",1)
+		if ZBKBRCH.getMode()'=1 do {
+			set ZDATA=ZBKBRCH.CHCD1_"|"_ZBKBRCH.CHCD2_"|"_ZBKBRCH.ACTIVE_"|"_ZBKBRCH.UPDDT
+			do LOG("NEW RECORD",ZSEQ,ZBK,ZBRCD,ZDATA)
+		}
+		else do {
+			do LOG("RECORD EXISTED",ZSEQ,ZBK,ZBRCD,ZDATA_%SystemDate)
+		}
+		set ZBKBRCH.BK=ZBK
+		set ZBKBRCH.BRCD=ZBRCD
+		set ZBKBRCH.CHCD1=ClearingHouseCodeI
+		set ZBKBRCH.CHCD2=ClearingHouseCodeII
+		set ZBKBRCH.ACTIVE=ActiveStatus
+		set ZBKBRCH.UPDDT = %SystemDate
+		//do ZBKBRCH.setAuditFlag(1)
+		do ZBKBRCH.save()
+		if ER.get() do LOG("RECORD EXISTED",ZSEQ,ZBK,ZBRCD,ZDATA_%SystemDate)
+	}
+
+	quit
+
+LOG(COMMENT,ZSEQ,ZBK,ZBRCD,ZDATA)
+
+	set ^TMP("ZBKBRCHLOG",ZSEQ,ZBK,ZBRCD)="NEW RECORD|"_ZDATA
+
+	quit
+
+READ(ZAPP,ZITFKEY)
+
+	/*
+	do SYSVAR^SCADRV0()
+	set ZDATE=%SystemDate.toString("YEARMMDD")
+	type Date zvalidDt=%SystemDate.toString("YEAR-MM-DD")
+	type IO in =Class.new("IO")
+	set in.fileName =$$TRNLNM^%ZFUNC("$SCAU_SPOOL")_"/CMBNKBRNCH_"_ZDATE
+	set in.openParams ="READ"
+	set in.recordSize =1024
+	do in.open()
+	*/
+
+	//----------------
+	do SYSVAR^SCADRV0()
+	type Number i,EXIT,ZHEADERFLG,ZTAILFLG
+
+	type Date ZDATE
+	type Date zvalidDt=%SystemDate.toString("YEAR-MM-DD")
+	type String ZFNM,REC
+	new ETYP
+
+	set (ZHEADERFLG,ZTAILFLG)=0
+	set ETYP=""
+	set REC=""
+	set ZPFDIR = $$TRNLNM^%ZFUNC("PROFILE_DIR")
+	type RecordZUTBLITFFTP itf = Db.getRecord("ZUTBLITFFTP","ZPFDIR,ZAPP,ZITFKEY",1)
+	set ZFNAME = itf.inlf
+	set ZFNAME = $$CFTPFUNC^ZITFUTL(ZFNAME)
+	set ZINLPATH = itf.inlp
+	set ZINLPATH = $$CFTPPATH^ZITFUTL(ZINLPATH)
+	type IO in =Class.new("IO")
+	set in.directory =ZINLPATH
+	set in.fileName =ZFNAME
+	set in.openParams ="READ"
+	set in.recordSize =1024
+	catch iox {
+
+		// if device has been opened, close it
+
+		if in.device'="" do in.close()
+
+		// if not an IO exception, it's not for us
+
+		if iox'["%PSL-E-IO" throw iox
+
+		// handle the IO exceptions
+
+		if iox["IOOPEN" write "Open failed", ! quit
+
+		if iox["IOEOF"  write "Reached end of file", ! quit
+
+		write "unexpected IO error '", iox.type, "'", !
+
+	}
+	do in.open()
+	kill ^TMP("ZBKBRCH")
+
+	type Number i,hvHeader,hvTailer
+	set (i,hvHeader,hvTailer)=0
+
+	type Number EXIT
+	set EXIT=0
+
+	//for  set REC=in.read(.ETYP) quit:+ETYP'=0  do {
+	for  set REC=in.read(.ETYP) quit:+ETYP'=0  do {
+		if REC="" set ETYP=1 quit
+		type Number BankNumber,BranchNumber
+		type Number ClearingHouseCodeI,ClearingHouseCodeII,ActiveStatus
+		type String output
+		set output=""
+		if REC["H01" do { quit
+			set BusinessDt=$E(REC,37,46)
+			if zvalidDt'=BusinessDt set ^TMP("ZBKBRCHLOG","HEADER")="Invalid BusinessDt",EXIT=1
+			set ZHEADERFLG=1
+			//set ^TMP("ZBKBRCH","LOG","HEADER"
+		}
+		if REC["T01" do { quit
+			set EXIT=1
+			set ZTAILFLG=1
+		}
+		set i=i+1
+		if ($L(REC)>72) do { quit
+
+			set ^TMP("ZBKBRCHLOG2","FAILED",i)="RECORD LENGHT EXCEED 72"_"|"_REC
+			write !,i_","_"RECORD LENGHT EXCEED 72"_"|"_REC
+		}
+		if ($L(+REC)=1) do { quit
+			set ^TMP("ZBKBRCHLOG2","FAILED",i)="RECORD NOT VALID"_"|"_REC
+			write !,i_","_"RECORD NOT VALID"_"|"_REC
+		}
+
+		set BankNumber=$E(REC,1,3)
+		set BranchNumber=$E(REC,4,7)
+		if ($$isNum^UCGM(BranchNumber)=0)!($$isNum^UCGM(BankNumber)=0) do { quit
+			set ^TMP("ZBKBRCHLOG2","FAILED",i)="KEY NOT VALID"_"|"_REC
+			write !,i_","_"KEY NOT VALID"_"|"_REC
+		}
+		else do {
+			set BankNumber=+BankNumber
+			set BranchNumber=+BranchNumber
+			set ClearingHouseCodeI=+$E(REC,8,12)
+			set ClearingHouseCodeII=+$E(REC,13,17)
+			set ActiveStatus=+$E(REC,18,18)
+			set output=ClearingHouseCodeI
+			set output=output_ClearingHouseCodeII
+			set output=output_ActiveStatus
+			set ^TMP("ZBKBRCHLOG2","SUCCESS",i)=REC
+			set ^TMP("ZBKBRCH",i,BankNumber,BranchNumber)=output
+
+		}
+
+	}
+
+	do in.close()
+	if (ZHEADERFLG'=1)!(ZTAILFLG'=1) do {
+		set ER=1
+		if (ZHEADERFLG'=1) set RM="Invalid format:No Header"
+		else set RM="Invalid format:No Tailer"
+		kill ^TMP("ZRINQBS",ZAPP,ZITFKEY,"IN")
+	}
+	else do {
+		write !,"SUCCESS"
+		set ER=0
+	}
+
+	quit
+
+
+---------- THREXIT ------ Section marker

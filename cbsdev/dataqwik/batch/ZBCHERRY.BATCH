@@ -1,0 +1,30 @@
+//DO NOT MODIFY  TEST|ZBCHERRY||||||ACN|||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+	set ^ZCHERRY("ZBECVACN")=^ZCHERRY("ZBECVACN")_"|"_$H
+	do CALTIME^ZEXTUTL("ZBECVACN")
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+// TP not required; disabled for performance reasons
+	trollback
+	
+	type RecordACN acn=Db.getRecord("ACN","CID")
+	// If account is not included in missing payment account
+	//if '(Db.isDefined("ZDCMLCID","CID=acn.cid")) quit	
+	// Golive Date:  62287           62287  07-15-2011 Friday     Business Date
+	do GRECTRCHA^ZDCMX(ZFTJD,ZTJD,ZTJD,acn.cid,$C(0))
+	quit
+
+---------- THREXIT ------ Section marker

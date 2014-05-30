@@ -1,0 +1,1119 @@
+//DO NOT MODIFY  To inquiry limit of sight deposit accoun|ZINQBSS|||||||1
+ZINQBSS
+	/*
+	 ORIG: 1 - 15/11/2013
+	 DESC: 
+
+	 ---- Comments --------------------------------------------------------
+
+	 ---- Revision History ------------------------------------------------
+	 23 Jan 2014 Ravipong Chumsaiset 
+	  Consider using setAuditFlag for all objects in this procedure
+	   example :do dep.setAuditFlag(1)
+
+	*/
+
+MAIN(FLG,IM,OM,ERRCD,ERRDESC)
+
+	type String ZIM,ZOM,ZERRDESC,ZARRIN,ZARROUT,RM
+	type Number ZERRCD,ZFLG,ER,IsAsterisk,ZSEQ,ZINDX,ZNUMREC,ZMAXOCC,ZTOTAL
+	set ER=0
+	set ZSEQ=0
+	set (ZIM,ZOM,ZERRDESC,RM)=""
+	set (ZERRCD,ZFLG)=""
+	set ZIM=IM
+	set ZFLG=FLG
+	set IsAsterisk=0
+	set ZTOTAL=0
+
+	do {
+
+		catch ZINQBTS {
+			set ER = 1
+			set RM = ZINQBTS.description
+			set ZERRCD="E9999"
+			//set ZERRDESC="UNABLE TO PROCESS - OTHER ERROR"
+			set ZARROUT("StatusCode")="10"
+			set ZARROUT("ErrorAppId")=ZARRIN("RqAppId")
+			set ZARROUT("ErrorAppAbbrv")="PCB"
+			set ZARROUT("ErrorCode")=ZERRCD
+			type ResultSet zerdesc = Db.select("ERRDESC","ZUTBLITFERCD","ERRCD=:ZERRCD")
+			while zerdesc.next() do {
+				set ZARROUT("ErrorDesc")=zerdesc.getCol(1)
+			}
+			//set ZARROUT("ErrorDesc")=ZARRIN("ErrorDesc").get()
+			set ZARROUT("ErrorSeverity")="02"
+			do FAPOUT(ZFLG,.ZOM,.ZERRCD,.ZERRDESC)
+
+		}
+
+		do FAPIN(ZFLG,.ZIM,.ZOM,.ZERRCD,.ZERRDESC)
+		do PROC
+		do FAPOUT(ZFLG,.ZOM,.ZERRCD,.ZERRDESC)
+		//write !,"ZOM "_ZOM
+	}
+
+	set OM=ZOM
+	set ERRCD=ZERRCD
+	set ERRDESC=ZERRDESC
+
+
+	quit ""
+
+FAPIN(ZFLG,ZIM,ZOM,ZERRCD,ZERRDESC)
+
+	if ZFLG=1 do DELIMIN(ZFLG,.ZIM,.ZOM,.ZERRCD,.ZERRDESC)
+	if ZFLG=2 do FIXIN(ZFLG,.ZIM,.ZOM,.ZERRCD,.ZERRDESC)
+
+	quit
+
+FAPOUT(ZFLG,ZOM,ZERRCD,ZERRDESC)
+
+	if ZFLG=1 do DELIMOUT(.ZOM,.ZERRCD,.ZERRDESC)
+	if ZFLG=2 do FIXOUT(.ZOM,.ZERRCD,.ZERRDESC)
+	set ZERRDESC=ZARROUT("ErrorDesc").get()
+	//set ZERRCD=
+
+	quit
+
+DELIMOUT(ZOM,ZERRCD,ZERRDESC)
+
+	type Number ZCOUNT,ZCNT
+	set ZCOUNT=0	//Count Record Sent
+	set ZCNT=0	//Count Record Sequence
+
+
+	//Error Segment
+	type String ZERSEG,ZSEGOM
+	set ZSEGOM=""
+	set ZERSEG="["_ZARROUT("ErrorAppId").get()_";;"_ZARROUT("ErrorAppAbbrv").get()_";;"_ZARROUT("ErrorCode").get()
+	set ZERSEG=ZERSEG_";;"_ZARROUT("ErrorDesc").get()_";;"_ZARROUT("ErrorSeverity").get()_"]"
+
+	if '(ZERRCD.get()).isNull() do {
+		set ZOM.piece(":;",1)=ZARROUT("FuncNm").get()
+		set ZOM.piece(":;",2)=ZARROUT("RqUID").get()
+		set ZOM.piece(":;",3)=ZARROUT("RsAppId").get()
+		set ZOM.piece(":;",4)=ZARROUT("RsUID").get()
+		set ZOM.piece(":;",5)=ZARROUT("RsDt").get()
+		set ZOM.piece(":;",6)=ZARROUT("StatusCode").get()
+		set ZOM.piece(":;",7)=ZERSEG
+		set ZOM=ZOM_":;"_ZARROUT("CorrID").get()
+		set ZOM=ZOM_":;"_ZARROUT("ReqAuthUserId").get()
+		set ZOM=ZOM_":;"_ZARROUT("ReqAuthLevel").get()
+		//set ZOM.piece(":;",8)=ZARROUT("CorrID").get()
+		set ZOM=ZOM_":;"
+
+
+	}
+	else do {
+		set ZEND=ZINDX.get()+ZMAXOCC
+		//for i=ZINDX.get()+1:1:ZEND do {
+			set i=$O(ZARROUT(""))
+			if 'i.isNumber() set i=""
+			while (i'="") do {
+				set ZQUIT=0
+				set ZCNT=ZCNT+1
+				//if ZCNT'<ZEND set ZARROUT("MoreDataInd")="Y" quit
+				if ZINDX.get()>0 do {
+					if ZCNT'>ZINDX.get() do {
+						set i=$O(ZARROUT(i))
+						set ZQUIT=1
+						if 'i.isNumber() set i=""
+					}
+				}
+				if ZQUIT quit
+				//if i=1 set ZSEGOM=ZARROUT("IndexingSeq").get()
+				//set ZARROUT(ZSEQ,"LimitSeq")=ZSEQ
+				set ZSEGOM=ZSEGOM_$$PADDING(ZCNT,2,3)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"LimitType").get(),1,10)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"KBankProductCode").get(),1,9)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"KBankProductCodeDesc").get(),1,255)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"LimitAcctId").get(),2,10)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"AcctLimitAmt").get(),4,18)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"LimitAcctStatus").get(),1,1)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"LimitAcctStatusDesc").get(),1,15)
+				//set ZSEGOM=ZSEGOM_";;"_"9999-12-31"
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"LimitAcctOpenDt").get(),5,10)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"DueDate").get(),5,10)
+				//set ZSEGOM=ZSEGOM_";;"_"9999-12-31"
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"ClassifiedLevel").get(),1,1)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"RevAccru").get(),4,18)
+				//set ZSEGOM=ZSEGOM_";;"_"9999-12-31"
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"RevDt").get(),5,10)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"MemoAccru").get(),4,18)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"DiffDay").get(),2,3)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"RevDesc").get(),1,20)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"SubFreezeInd").get(),1,1)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"ODType").get(),1,2)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"IntRateType").get(),1,10)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"IntRateSign").get(),1,1)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"SpreadRate").get(),6,11)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"IntRate").get(),6,11)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"FreezeAmt").get(),4,18)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"LimitUsed").get(),4,18)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"AvailLimit").get(),4,18)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"ENCDerivedLimit").get(),4,18)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"Filler**").get(),1,29)
+				/*
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"TotalLimitAmt",i).get(),4,18)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"TotalLimitUsed",i).get(),4,18)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"TotalENCDerivedLimit",i).get(),4,18)
+				set ZSEGOM=ZSEGOM_";;"_$$PADDING(ZARROUT(i,"TotalFreezeAmt",i).get(),4,18)
+				*/
+				set ZSEGOM=ZSEGOM_"#;"
+				//set ZSEGOM=ZSEGOM_";;"
+				//set (ZFILLER20,ZFILLER=""
+				//set ZSEGOM=ZSEGOM_";;;;"
+				set ZCOUNT=ZCOUNT+1
+				if ZCOUNT+1>ZMAXOCC do {
+					set ZSEGOM=ZSEGOM_"#;"
+					set i=""
+					set ZARROUT("MoreDataInd")="Y"
+				}
+				else set i=$O(ZARROUT(i))
+				if 'i.isNumber() set i=""
+				//set ZCNT=ZCNT+1
+
+				//if i<ZSEQ set ZSEGOM=ZSEGOM_"#;"
+				//else set ZSEGOM=
+			}
+			set ZARROUT("NumRec")=$$PADDING(ZCOUNT.get(),2,2)
+			set ZOM.piece(":;",1)=ZARROUT("FuncNm").get()
+			set ZOM.piece(":;",2)=ZARROUT("RqUID").get()
+			set ZOM.piece(":;",3)=ZARROUT("RsAppId").get()
+			set ZOM.piece(":;",4)=ZARROUT("RsUID").get()
+			set ZOM.piece(":;",5)=ZARROUT("RsDt").get()
+			set ZOM.piece(":;",6)=ZARROUT("StatusCode").get()
+			set ZOM.piece(":;",7)="[]"
+			set ZOM=ZOM_":;"_ZARROUT("CorrID").get()
+			set ZOM=ZOM_":;"_ZARROUT("ReqAuthUserId").get()
+			set ZOM=ZOM_":;"_ZARROUT("ReqAuthLevel").get()
+			//set ZOM.piece(":;",8)=ZARROUT("CorrID").get()
+			set ZOM=ZOM_":;"
+			//set ZOM.piece(":;",12)=ZARROUT("AcctId").get()
+			set ZOM.piece(":;",12)=$$PADDING(ZARROUT("TotalNumOfLimit").get(),2,3)
+			set ZOM.piece(":;",13)=$$PADDING(ZARROUT("NumRec").get(),2,2)
+			set ZOM.piece(":;",14)=ZARROUT("MoreDataInd")
+			set ZOM.piece(":;",15)="["_ZSEGOM_"]"
+			set ZOM.piece(":;",16)=$$PADDING(ZARROUT("TotalLimitAmt").get(),4,18)
+			set ZOM.piece(":;",17)=$$PADDING(ZARROUT("TotalLimitUsed").get(),4,18)
+			set ZOM.piece(":;",18)=$$PADDING(ZARROUT("TotalENCDerivedLimit").get(),4,18)
+			set ZOM.piece(":;",19)=$$PADDING(ZARROUT("TotalFreezeAmt").get(),4,18)
+			set ZOM.piece(":;",20)=""
+
+		}
+
+		quit
+
+DELIMIN(ZFLG,ZIM,ZOM,ZERRCD,ZERRDESC)
+
+	//type String ZFUNCNM,ZRQUID,ZRQDT,ZRQAPPID,ZUSERID,ZTERMID,ZULANG,ZCORRID,ZAUTHUID,ZAUTHLV,ZCID
+	set ZARRIN("FuncNm")=ZIM.piece(":;",1)
+	set ZARRIN("RqUID")=ZIM.piece(":;",2)
+	set ZARRIN("RqDt")=ZIM.piece(":;",3)
+	set ZARRIN("RqAppId")=ZIM.piece(":;",4)
+	set ZARRIN("UserId")=ZIM.piece(":;",5)
+	set ZARRIN("TerminalId")=ZIM.piece(":;",6)
+	set ZARRIN("UserLangPref")=ZIM.piece(":;",7)
+	set ZARRIN("CorrID")=ZIM.piece(":;",8)
+	set ZARRIN("AuthUserId")=ZIM.piece(":;",9)
+	set ZARRIN("AuthLevel")=ZIM.piece(":;",10)
+	set ZARRIN("Filler")=ZIM.piece(":;",11)
+	set ZARRIN("AcctId")=ZIM.piece(":;",12)
+	set ZARRIN("MaxRows")=ZIM.piece(":;",13)
+	set ZARRIN("StartInd")=ZIM.piece(":;",14)
+	set ZARRIN("StatusSearchCriteria")=ZIM.piece(":;",15)
+
+
+
+	quit
+
+PROC
+	//***Init***
+	// Time Stamp
+	// Ex. ZDATE=$$DTSTAMP()
+	// ZDATE >> 2013-12-02T17:37:57.45+07:00
+
+	do SYSVAR^SCADRV0()
+	type RecordCUVAR cuvar=Db.getRecord("CUVAR")
+
+
+	type String ZSTAMP,ZTIM,ZDAT,ZLangPref
+	set ZLangPref=""
+	set (ZSTAMP,ZTIM,ZDAT)=""
+
+	type Number MICSEC,isTh,ZSKIP,ZACTIVE
+	set ZACTIVE=0
+	set ZSKIP=0
+	set ZMAXOCC=0
+	set isTh=1
+	set MICSEC=""
+
+	set MICSEC=$$GETTIM^%ZFUNC()
+	set MICSEC=MICSEC.extract(MICSEC.length()-6,MICSEC.length()-5)
+
+	set ZDAT=$$DAT^%ZM(%CurrentDate,"YEAR-MM-DD")
+	set ZTIM=$$TIM^%ZM(%CurrentTime,"24:60:SS")
+	set ZSTAMP=ZDAT_"T"_ZTIM_"."_MICSEC_"+07:00"
+	//
+
+	//Header
+	set ZARROUT("FuncNm")=ZARRIN("FuncNm").get()
+	set ZARROUT("RqUID")=ZARRIN("RqUID").get()
+	set ZARROUT("RsAppId")=cuvar.zappid
+
+	//p'new
+	set ZARROUT("RsUID")=ZARRIN("RqUID").get()
+
+	set ZARROUT("RsDt")=ZDAT_"T"_ZTIM_"."_MICSEC_"+07:00"
+
+	set ZARROUT("CorrID")=ZARRIN("CorrID").get()
+	//
+	//Validate Common Header
+	//if ZARRIN("FuncNm ").get().isNull() set ZERRCD="E9999",ZERRDESC="FuncNm field is Null"
+	//if (ZARRIN("FuncNm").get()'="RetrieveComSightAcctSubBal")!(ZARRIN("FuncNm").get().isNull()) set ZERRCD="E9999",ZERRDESC="Invalid FuncNm"
+	if $G(ZARRIN("RqUID")).isNull() set ZERRCD="E0014"
+	if $G(ZARRIN("RqDt")).isNull() set ZERRCD="E0016"
+	if ($G(ZARRIN("RqAppId")).isNull()) set ZERRCD="E0038"
+	if $G(ZARRIN("UserId")).isNull() set ZERRCD="E0017"
+	if ($G(ZARRIN("AcctId")).length()'=10) set ZERRCD="E0002"
+	set ZARROUT("MoreDataInd")="N"
+
+
+
+	set ZLangPref=$G(ZARRIN("UserLangPref")).upperCase()
+	if ZLangPref'="TH" do {
+		if ZLangPref="EN" set isTh=0
+		else if ZLangPref="" quit
+		else set ZERRCD="E0011"
+	}
+
+	type Number ZCRITERIA=0
+	if '($G(ZARRIN("StatusSearchCriteria"))).isNull() do {
+		//2014/04/29 Ravipong.ch
+		//Add criterai 7( no active, expire)
+		if '("2,4,6,7"[ZARRIN("StatusSearchCriteria").get()) set ZERRCD="E0127"
+		set ZCRITERIA=ZARRIN("StatusSearchCriteria").get()
+	}
+
+	if '(ZERRCD.get()).isNull() set ZSKIP=1
+
+	if ($G(ZARRIN("StartInd")).isNull()) set ZINDX=0
+	else set ZINDX=+ZARRIN("StartInd").get()
+
+
+
+
+	//set ZLangPref=ZLangPref.upperCase()
+	type ResultSet srv = Db.select("MAXOCC","ZUTBLEXTSRV","FCD='RETRIEVECOMSIGHTACCTSUBBAL'")
+	while srv.next() do {
+		set ZMAXOCC=srv.getCol(1)
+	}
+	//2014/02/27
+	//Defualt MaxRows Value
+	//---------------------------------------------------------------------
+	if (ZARRIN("MaxRows").get()=0)!(ZARRIN("MaxRows").get()="") set ZARRIN("MaxRows")=ZMAXOCC
+	//---------------------------------------------------------------------
+	if ZMAXOCC'<ZARRIN("MaxRows").get() set ZMAXOCC=ZARRIN("MaxRows").get()
+	else set ZERRCD="E0012"
+
+	if $G(ZARRIN("AcctId")).isNull() set ZERRCD="E0002",ZSKIP=1
+	set AcctId = +ZARRIN("AcctId").get()
+	set ZARROUT("AcctId")=ZARRIN("AcctId").get()
+	set ZARROUT("MoreDataInd")="N"
+
+	if '(ZERRCD.get()).isNull() set ZSKIP=1
+
+
+
+
+	if 'ZSKIP do {
+		if 'Db.isDefined("DEP","CID=:AcctId") do {
+			set ZERRCD="E0002"
+			//error
+
+		}
+		else do {
+
+			set ZSEQ=0
+			set ZNUMREC=0
+
+			type ResultSet zseq=Db.select("GRP,STAT,ZENCFLG,ZITDFLG","DEP","CID=:AcctId")
+			while zseq.next() do {
+				type String ZGRP
+				type Number ZSTAT,ZENCFLG,ZITDFLG,ZODSEQ
+				set ZGRP=zseq.getCol(1)
+				set ZSTAT=zseq.getCol(2)
+				set ZENCFLG=zseq.getCol(3)
+				set ZITDFLG=zseq.getCol(4)
+				write !,"ZGRP="_ZGRP
+				if ZGRP'="DDA" set ZERRCD="E0030" quit
+				//Case OD
+				type ResultSet ZOD = Db.select("SEQ","ZODTIER","CID=:AcctId")
+				while ZOD.next() do {
+					type String ZODTYPE
+					type Number ZODSEG,ZIRDIFF
+					set ZODSEQ=ZOD.getCol(1)
+					set ZSEQ=ZSEQ+1
+					//if (ZSEQ>ZINDX),(ZMAXOCC'<(ZSEQ-ZINDX)) do {
+						do OD(AcctId,ZODSEQ,ZSEQ)
+						//set ZNUMREC=ZNUMREC+1
+					//}
+
+				}
+				//Case ENC
+				if ZENCFLG=1 do {
+					set ZSEQ=ZSEQ+1
+					//if (ZSEQ>ZINDX),(ZMAXOCC'<(ZSEQ-ZINDX)) do {
+						do ENC(AcctId,ZSEQ)
+						//set ZNUMREC=ZNUMREC+1
+					//}
+				}
+
+				//Case ITD
+				if ZITDFLG=1 do {
+					set ZSEQ=ZSEQ+1
+					//if (ZSEQ>ZINDX),(ZMAXOCC'<(ZSEQ-ZINDX)) do {
+						do ITD(AcctId,ZSEQ)
+						//set ZNUMREC=ZNUMREC+1
+					//}
+				}
+
+			}
+
+
+		}
+		//if '(ZERRCD.get()).isNull()
+		//write !,"ZSEQ="_ZSEQ
+		set ZARROUT("TotalNumOfLimit")=ZSEQ
+		//set ZARROUT("NumRec")=$$PADDING(ZNUMREC.get(),2,2)
+
+		//if '(ZERRCD.get()).isNull() quit
+		if $G(ZARRIN("StartInd"))'=0 set ZARROUT("TotalNumOfLimit")=0
+
+	}
+
+
+
+	//set ZARROUT("RsAppId")=$$PADDING(ZARROUT("RsAppId").get(),1,5)
+	if (ZERRCD.get()).isNull() do {
+		set ZARROUT("StatusCode")="00"
+
+
+	}
+
+	else do {
+		set ZARROUT("StatusCode")="10"
+		set ZARROUT("ErrorAppId")=cuvar.zappid
+		set ZARROUT("ErrorAppAbbrv")="PCB"
+		set ZARROUT("ErrorCode")=ZERRCD
+		type ResultSet zerdesc = Db.select("ERRDESC","ZUTBLITFERCD","ERRCD=:ZERRCD")
+		while zerdesc.next() do {
+			set ZARROUT("ErrorDesc")=zerdesc.getCol(1)
+			set ZERRDESC=zerdesc.getCol(1)
+			write !,"ZERRDESC="_ZERRDESC
+
+		}
+		set ZARROUT("ErrorSeverity")="02"
+	}
+
+	quit
+
+
+FIXIN(ZFLG,ZIM,ZOM,ZERRCD,ZERRDESC)
+
+
+	set ZARRIN("FuncNm")=ZIM.extract(1,30).trim()
+	set ZARRIN("RqUID")=ZIM.extract(31,77).trim()
+	set ZARRIN("RqDt")=ZIM.extract(78,110).trim()
+	set ZARRIN("RqAppId")=ZIM.extract(111,115).trim()
+	set ZARRIN("UserId")=ZIM.extract(116,147).trim()
+	set ZARRIN("TerminalId")=ZIM.extract(148,155).trim()
+	set ZARRIN("UserLangPref")=ZIM.extract(156,157).trim()
+	set ZARRIN("CorrID")=ZIM.extract(158,189).trim()
+	set ZARRIN("AuthUserId")=ZIM.extract(190,204).trim()
+	set ZARRIN("AuthLevel")=ZIM.extract(205,207).trim()
+	set ZARRIN("Filler")=ZIM.extract(208,239).trim()
+	set ZARRIN("AcctId")=ZIM.extract(240,249).trim()
+
+
+
+	quit
+
+FIXOUT(ZOM,ZERRCD,ZERRDESC)
+
+	if '(ZERRCD.get()).isNull() do {
+		type String ZERRSEG
+		set ZERRSEG=""
+		set ZERRSEG=ZERRSEG_$$PADDING(ZARROUT("ErrorAppId").get(),1,5)
+		set ZERRSEG=ZERRSEG_$$PADDING(ZARROUT("ErrorAppAbbrv").get(),1,5)
+		set ZERRSEG=ZERRSEG_$$PADDING(ZARROUT("ErrorCode").get(),1,30)
+		set ZERRSEG=ZERRSEG_$$PADDING(ZARROUT("ErrorDesc").get(),1,256)
+		set ZERRSEG=ZERRSEG_$$PADDING(ZARROUT("ErrorSeverity").get(),1,2)
+		set ZERRSEG=ZERRSEG_$J("",2682)
+	}
+	else do {
+		type String ZERRSEG
+		set ZERRSEG=$J("",2980)
+		set ZOM=ZOM_$$PADDING(ZARROUT("FuncNm").get(),1,30)
+		set ZOM=ZOM_$$PADDING(ZARROUT("RqUID").get(),1,47)
+		set ZOM=ZOM_$$PADDING(ZARROUT("RsAppId").get(),1,5)
+		set ZOM=ZOM_$$PADDING(ZARROUT("RsUID").get(),1,47)
+		set ZOM=ZOM_$$PADDING(ZARROUT("RsDt").get(),1,33)
+		set ZOM=ZOM_$$PADDING(ZARROUT("StatusCode").get(),1,2)
+		set ZOM=ZOM_$$PADDING(ZERRSEG.get(),1,298)
+
+		set ZOM=ZOM_$$PADDING(ZARROUT("ErrorAppId").get(),1,5)
+		set ZOM=ZOM_$$PADDING(ZARROUT("ErrorAppAbbrv").get(),1,5)
+		set ZOM=ZOM_$$PADDING(ZARROUT("ErrorCode").get(),1,30)
+		set ZOM=ZOM_$$PADDING(ZARROUT("ErrorDesc").get(),1,256)
+		set ZOM=ZOM_$$PADDING(ZARROUT("ErrorSeverity").get(),1,2)
+		set ZOM=ZOM_$$PADDING(ZARROUT("CorrID").get(),1,32)
+		set ZOM=ZOM_$$PADDING(ZARROUT("Filler").get(),1,50)
+		//Translate to MainFrame
+
+		set ZARROUT("AvailLimitAmt")=$$PADDING(ZARROUT("AvailLimitAmt").get(),3,"")
+		set ZARROUT("AvailENCLimitAmt")=$$PADDING(ZARROUT("AvailENCLimitAmt").get(),3,"")
+		set ZARROUT("AvailODLimitAmt")=$$PADDING(ZARROUT("AvailODLimitAmt").get(),3,"")
+		set ZARROUT("IntradayLimitUsed")=$$PADDING(ZARROUT("IntradayLimitUsed").get(),3,"")
+		set ZARROUT("ENCLimitUsed")=$$PADDING(ZARROUT("ENCLimitUsed").get(),3,"")
+		set ZARROUT("LimitUsed")=$$PADDING(ZARROUT("LimitUsed").get(),3,"")
+		set ZARROUT("ODLimitUsed")=$$PADDING(ZARROUT("ODLimitUsed").get(),3,"")
+		set ZARROUT("AccrueIntAmt")=$$PADDING(ZARROUT("AccrueIntAmt").get(),3,"")
+		set ZARROUT("ENCLimitAmt")=$$PADDING(ZARROUT("ENCLimitAmt").get(),3,"")
+		set ZARROUT("ODLimitAmt")=$$PADDING(ZARROUT("ODLimitAmt").get(),3,"")
+		set ZARROUT("LimitAmt")=$$PADDING(ZARROUT("LimitAmt").get(),3,"")
+		set ZARROUT("ClearingAmt")=$$PADDING(ZARROUT("ClearingAmt").get(),3,"")
+		set ZARROUT("RetentionAmt")=$$PADDING(ZARROUT("RetentionAmt").get(),3,"")
+
+		if 'IsAsterisk do {
+			set ZARROUT("RefAcctBal")=$$PADDING(ZARROUT("RefAcctBal").get(),3,"")
+			set ZARROUT("AvailBal")=$$PADDING(ZARROUT("AvailBal").get(),3,"")
+			set ZARROUT("AcctBal")=$$PADDING(ZARROUT("AcctBal").get(),3,"")
+
+		}
+
+		set ZOM=ZOM_$$PADDING(ZARROUT("AcctId").get(),2,10)
+		set ZOM=ZOM_$$PADDING(ZARROUT("AcctNameTh").get(),1,180)
+		set ZOM=ZOM_$$PADDING(ZARROUT("AcctNameEn").get(),1,180)
+		set ZOM=ZOM_$$PADDING(ZARROUT("AcctStatus").get(),1,1)
+		set ZOM=ZOM_$$PADDING(ZARROUT("AcctStatusDesc").get(),1,15)
+		set ZOM=ZOM_$$PADDING(ZARROUT("Curcode").get(),1,3)
+		set ZOM=ZOM_$$PADDING(ZARROUT("DomBranchId").get(),1,4)
+		set ZOM=ZOM_$$PADDING(ZARROUT("BranchName").get(),1,50)
+		set ZOM=ZOM_$$PADDING(ZARROUT("KBankProductCode").get(),1,9)
+		set ZOM=ZOM_$$PADDING(ZARROUT("KBankProductCodeDesc").get(),1,255)
+		set ZOM=ZOM_$$PADDING(ZARROUT("TCBTrfName").get(),1,60)
+		set ZOM=ZOM_ZARROUT("RetentionAmt").get()
+		set ZOM=ZOM_ZARROUT("ClearingAmt").get()
+		set ZOM=ZOM_ZARROUT("HoldAmt").get()
+		set ZOM=ZOM_$$PADDING(ZARROUT("AllowFlag").get(),1,1)
+		set ZOM=ZOM_$$PADDING(ZARROUT("BlockInd").get(),1,1)
+		set ZOM=ZOM_ZARROUT("LimitAmt").get()
+		set ZOM=ZOM_ZARROUT("ODLimitAmt").get()
+		set ZOM=ZOM_ZARROUT("ENCLimitAmt").get()
+		set ZOM=ZOM_ZARROUT("IntradayLimitAmt").get()
+		set ZOM=ZOM_ZARROUT("AppntBalPassbk").get()
+		set ZOM=ZOM_$$PADDING(ZARROUT("AcctBal").get(),1,18)
+		set ZOM=ZOM_$$PADDING(ZARROUT("AvailBal").get(),1,18)
+		set ZOM=ZOM_$$PADDING(ZARROUT("RefAcctId").get(),2,10)
+		set ZOM=ZOM_$$PADDING(ZARROUT("RefAcctBal").get(),1,18)
+		set ZOM=ZOM_$$PADDING(ZARROUT("LastFncDt").get(),1,10)
+		set ZOM=ZOM_$$PADDING(ZARROUT("ClosedDt").get(),1,10)
+		set ZOM=ZOM_ZARROUT("AccrueIntAmt").get()
+		set ZOM=ZOM_$$PADDING(ZARROUT("RefBranchId").get(),1,4)
+		set ZOM=ZOM_$$PADDING(ZARROUT("RefBranchName").get(),1,50)
+		set ZOM=ZOM_$$PADDING(ZARROUT("RefProductId").get(),1,9)
+		set ZOM=ZOM_$$PADDING(ZARROUT("RefProductName").get(),1,255)
+		set ZOM=ZOM_ZARROUT("LimitUsed").get()
+		set ZOM=ZOM_ZARROUT("ODLimitUsed").get()
+		set ZOM=ZOM_ZARROUT("ENCLimitUsed").get()
+		set ZOM=ZOM_ZARROUT("IntradayLimitUsed").get()
+		set ZOM=ZOM_ZARROUT("AvailLimitAmt").get()
+		set ZOM=ZOM_ZARROUT("AvailODLimitAmt").get()
+		set ZOM=ZOM_ZARROUT("AvailENCLimitAmt").get()
+		set ZOM=ZOM_ZARROUT("AvailIntradayLimitAmt").get()
+
+		quit
+
+PADDING(array,flg,fixL)
+
+	type String out
+	type Number zlength
+	set out=""
+
+	//Blank padding
+	if flg=1 do {
+		type String in
+		set in=array.get()
+		set zlength=in.length()
+		set out=in_$J("",fixL-zlength)
+		//set out=in_$J("""",fixL-zlength)
+
+	}
+	//Zero padding
+	if flg=2 do {
+		type Number in
+		set in=array.get()
+		set zlength=in.length()
+		set out=in.zero(fixL)
+	}
+	//MainFrame
+	if flg=3 do {
+		type Number in,ZER
+		type String ZRM
+		set ZER=0
+		set ZRM=""
+		set in=array.get()*100
+		do CONVENC^ZITFUTL(1,in,.out,.ZER,.ZRM)
+	}
+	//Balance
+	if flg=4 do {
+		type Number in
+		set in=array.get()
+		set out=in.zero(fixL,2,0,0)
+	}
+	//Default value for mandatory date
+	if flg=5 do {
+
+		set out="9999-12-31"
+
+	}
+	if flg=6 do {
+		//No decimal,sign representation,Right zero justify
+
+		type Number in,zlength
+		type String pre,suf,ZERO
+		set ZERO=""
+		set in=array.get()
+		if in<0 set in=-in
+		set pre=$P(in,".",1)
+		set pre=pre.zero(3)
+		set suf=$P(in,".",2)
+		set in=pre_"."_suf
+		//set zlength=in.length()
+		//set ZERO=ZERO.zero(fixL-zlength)
+		set zlength=suf.length()
+		set ZERO=ZERO.zero(8-zlength)
+		set out=in_ZERO
+
+
+		//set out=in_$J("0",fixL-zlength)
+	}
+	quit out
+
+
+OD(CID,ZODSEQ,ZSEQ)
+
+	type RecordZODTIER ZODTIER = Db.getRecord("ZODTIER","CID=:CID,SEQ=:ZODSEQ")
+
+	/*
+	if ZODTIER.ACTIVATE=0 do {
+		if ZODTIER.EXPDT>%SystemDate do {
+			set ZSTATUS=2
+			set ZSTATUSDESC="INACTIVE"
+		}
+		else do {
+			set ZSTATUS=7
+			set ZSTATUSDESC="CANCELLED"
+		}
+	}
+	//ZODTIER.ACTIVATE=1
+	else do {
+		if ZODTIER.ACTIVE=1 do {
+			set ZSTATUS=4
+			set ZSTATUSDESC="ACTIVE"
+		}
+		else if ZODTIER.EXPDT<%SystemDate do {
+			set ZSTATUS=6
+			set ZSTATUSDESC="MATURED"
+		}
+
+
+	}
+	*/
+
+
+	//2014/04/29 Change Status Condition
+	if (ZODTIER.ACTIVATE=1) do {
+		if (ZODTIER.ACTIVE=1) do {
+			set ZSTATUS=4
+			set ZSTATUSDESC="ACTIVE"
+		}
+		else if ZODTIER.EXPDT<%SystemDate do {
+			set ZSTATUS=6
+			set ZSTATUSDESC="MATURED"
+		}
+	}
+
+	else if (ZODTIER.ACTIVATE=0),(ZODTIER.EXPDT>%SystemDate) do {
+
+		set ZSTATUS=2
+		set ZSTATUSDESC="INACTIVE"
+
+	}
+	else set ZSTATUS=7,ZSTATUSDESC="CANCELLED"
+
+
+
+	if ZCRITERIA'=0,ZSTATUS'=ZCRITERIA  quit
+	//set ZSEQ=ZSEQ+1
+	set ZTOTAL=ZTOTAL+1
+
+	set ZARROUT(ZSEQ,"LimitAcctStatus")=ZSTATUS
+	set ZARROUT(ZSEQ,"LimitAcctStatusDesc")=ZSTATUSDESC
+	set ZARROUT(ZSEQ,"LimitType")="OD"
+
+	set ZARROUT(ZSEQ,"LimitAcctId")=ZODTIER.SEQ
+	set ZARROUT(ZSEQ,"AcctLimitAmt")=ZODTIER.CLAMT
+	
+	
+	
+	type RecordDEP DEP = Db.getRecord("DEP","CID=:CID")
+	set ZPRODCD=DEP.ZPRODCD
+	set ZARROUT(ZSEQ,"KBankProductCode")=ZPRODCD
+	if DEP.BAL<0,'DEP.ZPRODCDNEG=""  do {
+	
+		//set ZARROUT(ZSEQ,"KBankProductCode")=DEP.ZPRODCDNEG
+		type ResultSet KBDES = Db.select("DES,EDES","ZUTBLKBDES","CD=:ZPRODCD")
+		while KBDES.next() do {
+			if isTh=0 set ZARROUT(ZSEQ,"KBankProductCodeDesc")=KBDES.getCol(2)
+			else set ZARROUT(ZSEQ,"KBankProductCodeDesc")=KBDES.getCol(1)
+
+
+		}
+	}
+
+	else do {
+		//set ZARROUT(ZSEQ,"KBankProductCode")=DEP.ZPRODCD
+		type ResultSet KBDES = Db.select("DES,EDES","ZUTBLKBDES","CD=:ZPRODCD")
+		while KBDES.next() do {
+			if isTh=0 set ZARROUT(ZSEQ,"KBankProductCodeDesc")=KBDES.getCol(2)
+			else set ZARROUT(ZSEQ,"KBankProductCodeDesc")=KBDES.getCol(1)
+		}
+	}
+
+
+
+	set ZARROUT(ZSEQ,"LimitAcctOpenDt")=ZODTIER.CTRCDATE.toString("YEAR-MM-DD")
+	set ZARROUT(ZSEQ,"DueDate")=ZODTIER.EXPDT.toString("YEAR-MM-DD")
+	set ZARROUT(ZSEQ,"ClassifiedLevel")=DEP.DARCLS
+	set ZARROUT(ZSEQ,"RevAccru")=DEP.ZRINT
+	set ZARROUT(ZSEQ,"RevDt")=DEP.ZREVDT.toString("YEAR-MM-DD")
+	set ZARROUT(ZSEQ,"MemoAccru")=DEP.ZASINT
+	set ZARROUT(ZSEQ,"DiffDay")=DEP.ZAGEDAY
+	set ZARROUT(ZSEQ,"RevDesc")=DEP.ZREVFLG
+	set ZARROUT(ZSEQ,"SubFreezeInd")="N"
+	//2014/02/28
+	//---------------------------------------
+	//Send Default For ODTYPE
+	//set ZARROUT(ZSEQ,"ODType")=""
+	//2014/04/29
+	set ZODTYPE=ZODTIER.ODTYPE
+	type ResultSet zdescth = Db.select("DESCTH","ZUTBLODTYPE","TYPE=:ZODTYPE")
+	if zdescth.next() set ZARROUT(ZSEQ,"ODType")=zdescth.getCol(1)
+
+	/*
+	type ResultSet odtype = Db.select("DESCTH","ZUTBLODTYPE","TYPE=:ZODTIER.ODTYPE")
+	if odtype.next() set ZARROUT(ZSEQ,"ODType")=odtype.getCol(1)
+	*/
+	//---------------------------------------
+
+	type ResultSet index = Db.select("DES","INDEX","INDEX=:ZODTIER.RATE")
+	if index.next() do {
+		set ZINDEX=index.getCol(1)
+		set ZARROUT(ZSEQ,"IntRateType")=$E(ZINDEX,7,$L(ZINDEX))
+	}
+
+	//set ZARROUT(ZSEQ,"IntRateType")=ZODTIER.RATE
+	//set ZARROUT(ZSEQ,"IntRateSign")=0
+	if ZODTIER.IRDIF<0 set ZARROUT(ZSEQ,"IntRateSign")="-"
+	else set ZARROUT(ZSEQ,"IntRateSign")="+"
+	set ZARROUT(ZSEQ,"SpreadRate")=ZODTIER.IRDIF
+	set ZARROUT(ZSEQ,"IntRate")=ZODTIER.RATECMP
+	if ZITDFLG=0 set ZARROUT(ZSEQ,"FreezeAmt")=0
+	if ZITDFLG=1 do {
+		if DEP.ZITDFREEZE=0 set ZARROUT(ZSEQ,"FreezeAmt")=0
+		else set ZARROUT(ZSEQ,"FreezeAmt")=DEP.ZITDLIM
+	}
+	if DEP.BAL - DEP.CHKHLD < 0 do {
+		if DEP.BAL - DEP.CHKHLD > (0 - DEP.ODLIM) set ZARROUT(ZSEQ,"LimitUsed")= -(DEP.BAL-DEP.CHKHLD)
+		if DEP.BAL - DEP.CHKHLD < (0 - DEP.ODLIM) set ZARROUT(ZSEQ,"LimitUsed")= DEP.ODLIM
+	}
+	else set ZARROUT(ZSEQ,"LimitUsed")= 0
+
+	set ZARROUT(ZSEQ,"AvailLimit")=DEP.ZODBAVL
+	set ZARROUT("ENCDerivedLimit")=0
+	set ZARROUT("TotalLimitAmt")=ZARROUT("TotalLimitAmt").get()+(DEP.ODLIM + DEP.ZENCDLIM + DEP.ZITDLIM)
+	type Number ODLimitUsed,ENCLimitedUsed,IntradayLimitUsed
+
+	if DEP.BAL - DEP.CHKHLD < 0 do {
+		if DEP.BAL-DEP.CHKHLD > (0 - DEP.ODLIM) set ODLimitUsed=-(DEP.BAL - DEP.CHKHLD)
+		if DEP.BAL-DEP.CHKHLD < (0 - DEP.ODLIM) set ODLimitUsed=DEP.ODLIM
+	}
+	else set ODLimitUsed=0
+	set ENCLimitedUsed=DEP.ZENCBAL
+	set IntradayLimitUsed=DEP.ZITDBAL
+
+	set ZARROUT("TotalLimitUsed")=ZARROUT("TotalLimitUsed").get()+ODLimitUsed + ENCLimitedUsed + IntradayLimitUsed
+	set ZARROUT("TotalENCDerivedLimit")=ZARROUT("TotalENCDerivedLimit").get()+DEP.ZENCDLIM
+	if ZITDFLG=0 set ZARROUT(ZSEQ,"TotalFreezeAmt")= 0
+
+	if ZITDFLG=1 do {
+		if DEP.ZITDFREEZE<>0 set ZARROUT("TotalFreezeAmt")=ZARROUT("TotalFreezeAmt").get()+DEP.ZITDLIM
+	}
+
+	set ZNUMREC=ZNUMREC+1
+
+	quit
+
+ENC(CID,ZSEQ)
+
+
+	type RecordDEP DEP = Db.getRecord("DEP","CID=:CID")
+
+	/*
+	if DEP.ZENCFLG=1 do {
+
+		if DEP.ZENCACTIVATE=1 do {
+
+			if DEP.ZENCACTIVE=1 do {
+				set ZSTATUS=4
+				set ZSTATUSDESC="ACTIVE"
+
+			}
+			else do {
+				if DEP.ZENCEXPDT<%SystemDate do {
+					set ZSTATUS=6
+					set ZSTATUSDESC="MATURED"
+				}
+				else do {
+					set ZSTATUS=7
+					set ZSTATUSDESC="CANCELLED"
+
+				}
+			}
+		}
+		// DEP.ZENCACTIVATE=0
+		else do {
+			if DEP.ZENCEXPDT>%SystemDate do {
+				set ZSTATUS=2
+				set ZSTATUSDESC="INACTIVE"
+			}
+
+		}
+	}
+	*/
+	if DEP.ZENCFLG=1 do {
+		if (DEP.ZENCACTIVATE=0),(DEP.ZENCEXPDT>%SystemDate) set ZSTATUS=2,ZSTATUSDESC="INACTIVE"
+		else if (DEP.ZENCACTIVE=1),(DEP.ZENCACTIVATE=1) set ZSTATUS=4,ZSTATUSDESC="ACTIVE"
+		else if (DEP.ZENCACTIVATE=1),(DEP.ZENCEXPDT<%SystemDate) set ZSTATUS=6,ZSTATUSDESC="MATURED"
+		else set ZSTATUS=7,ZSTATUSDESC="CANCELLED"
+	}
+
+
+
+	if ZCRITERIA'=0,ZSTATUS'=ZCRITERIA quit
+	//set ZSEQ=ZSEQ+1
+	set ZTOTAL=ZTOTAL+1
+	set ZARROUT(ZSEQ,"LimitType")="ENC"
+	set ZARROUT(ZSEQ,"LimitAcctStatus")=ZSTATUS
+	set ZARROUT(ZSEQ,"LimitAcctStatusDesc")=ZSTATUSDESC
+
+
+
+	if DEP.BAL<0,DEP.ZPRODCDNEG'=""  do {
+
+		set ZARROUT(ZSEQ,"KBankProductCode")=DEP.ZPRODCDNEG
+		type ResultSet KBDES = Db.select("DES,EDES","ZUTBLKBDES","CD=:DEP.ZPRODCDNEG")
+		while KBDES.next() do {
+			if isTh=0 set ZARROUT(ZSEQ,"KBankProductCodeDesc")=KBDES.getCol(2)
+			else set ZARROUT(ZSEQ,"KBankProductCodeDesc")=KBDES.getCol(1)
+
+
+		}
+	}
+
+	else do {
+		set ZARROUT(ZSEQ,"KBankProductCode")=DEP.ZPRODCD
+		type ResultSet KBDES = Db.select("DES,EDES","ZUTBLKBDES","CD=:DEP.ZPRODCD")
+		while KBDES.next() do {
+			if isTh=0 set ZARROUT(ZSEQ,"KBankProductCodeDesc")=KBDES.getCol(2)
+			else set ZARROUT(ZSEQ,"KBankProductCodeDesc")=KBDES.getCol(1)
+		}
+	}
+	set ZARROUT(ZSEQ,"LimitAcctId")=0
+	set ZARROUT(ZSEQ,"AcctLimitAmt")=DEP.ZENCLIM
+
+
+
+	set ZARROUT(ZSEQ,"LimitAcctOpenDt")=DEP.ZENCCTRCTDT.toString("YEAR-MM-DD")
+	set ZARROUT(ZSEQ,"DueDate")=DEP.ZENCEXPDT.toString("YEAR-MM-DD")
+	set ZARROUT(ZSEQ,"ClassifiedLevel")=DEP.DARCLS
+	set ZARROUT(ZSEQ,"RevAccru")=DEP.ZRINT
+	set ZARROUT(ZSEQ,"RevDt")=DEP.ZREVDT.toString("YEAR-MM-DD")
+	set ZARROUT(ZSEQ,"MemoAccru")=DEP.ZASINT
+	set ZARROUT(ZSEQ,"DiffDay")=DEP.ZAGEDAY
+	set ZARROUT(ZSEQ,"RevDesc")=DEP.ZREVFLG
+	set ZARROUT(ZSEQ,"SubFreezeInd")="N"
+	set ZARROUT(ZSEQ,"ODType")=""
+	set ZARROUT(ZSEQ,"IntRateType")=""
+	set ZARROUT(ZSEQ,"IntRateSign")=""
+	set ZARROUT(ZSEQ,"SpreadRate")=""
+	set ZARROUT(ZSEQ,"IntRate")=""
+	if ZITDFLG=0 set ZARROUT(ZSEQ,"FreezeAmt")=0
+	if ZITDFLG=1 do {
+		if DEP.ZITDFREEZE=0 set ZARROUT(ZSEQ,"FreezeAmt")=0
+		else set ZARROUT(ZSEQ,"FreezeAmt")=DEP.ZITDLIM
+	}
+	if DEP.BAL - DEP.CHKHLD < 0 do {
+		if DEP.BAL - DEP.CHKHLD > (0 - DEP.ODLIM) set ZARROUT(ZSEQ,"LimitUsed")= -(DEP.BAL-DEP.CHKHLD)
+		if DEP.BAL - DEP.CHKHLD < (0 - DEP.ODLIM) set ZARROUT(ZSEQ,"LimitUsed")= DEP.ODLIM
+	}
+	else set ZARROUT(ZSEQ,"LimitUsed")= DEP.ZENCBAL
+
+	set ZARROUT(ZSEQ,"AvailLimit")=DEP.ZENCBAVL
+	set ZARROUT(ZSEQ,"ENCDerivedLimit")=DEP.ZENCDLIM
+	//set ZARROUT(ZSEQ,"Filler**")=
+	set ZARROUT("TotalLimitAmt")=ZARROUT("TotalLimitAmt").get()+DEP.ODLIM + DEP.ZENCDLIM + DEP.ZITDLIM
+
+	type Number ODLimitUsed,ENCLimitedUsed,IntradayLimitUsed
+
+	if DEP.BAL - DEP.CHKHLD < 0 do {
+		if DEP.BAL-DEP.CHKHLD > (0 - DEP.ODLIM) set ODLimitUsed=-(DEP.BAL - DEP.CHKHLD)
+		if DEP.BAL-DEP.CHKHLD < (0 - DEP.ODLIM) set ODLimitUsed=DEP.ODLIM
+	}
+	else set ODLimitUsed=0
+	set ENCLimitedUsed=DEP.ZENCBAL
+	set IntradayLimitUsed=DEP.ZITDBAL
+
+	set ZARROUT("TotalLimitUsed")=ZARROUT("TotalLimitUsed").get()+ODLimitUsed + ENCLimitedUsed + IntradayLimitUsed
+	set ZARROUT("TotalENCDerivedLimit")=ZARROUT("TotalENCDerivedLimit").get()+DEP.ZENCDLIM
+	//if ZITDFLG=0 set ZARROUT("TotalFreezeAmt")= 0
+	if ZITDFLG=1 do {
+		//if DEP.ZITDFREEZE = 0 set ZARROUT(ZSEQ,"TotalFreezeAmt")=0
+		//else set ZARROUT(ZSEQ,"TotalFreezeAmt")=DEP.ZITDLIM
+		if DEP.ZITDFREEZE<>0 set ZARROUT("TotalFreezeAmt")=ZARROUT("TotalFreezeAmt").get()+DEP.ZITDLIM
+	}
+
+	set ZNUMREC=ZNUMREC+1
+
+
+	quit
+
+ITD(CID,ZSEQ)
+
+	set ZARROUT(ZSEQ,"LimitType")="ITD"
+	type RecordDEP DEP = Db.getRecord("DEP","CID=:CID")
+	/*
+	if DEP.ZITDFLG=1 do {
+
+		if DEP.ZITDACTIVATE=1 do {
+			if DEP.ZITDACTIVE=1 do {
+				set ZSTATUS=4
+				set ZSTATUSDESC="ACTIVE"
+
+			}
+			else do {
+				if DEP.ZITDEXPDT<%SystemDate do {
+					set ZSTATUS=6
+					set ZSTATUSDESC="MATURED"
+				}
+				else do {
+					set ZSTATUS=7
+					set ZSTATUSDESC= "CANCELLED"
+				}
+
+
+
+			}
+		}
+		else do {
+			if DEP.ZITDEXPDT>%SystemDate do {
+				set ZSTATUS=2
+				set ZSTATUSDESC="INACTIVE"
+			}
+		}
+	}
+	*/
+	//2014/04/29 Change Status Condition
+	if DEP.ZITDFLG=1 do {
+		if (DEP.ZITDACTIVATE=0),(DEP.ZITDEXPDT>%SystemDate) set ZSTATUS=2,ZSTATUSDESC="INACTIVE"
+		else if (DEP.ZITDACTIVE=1),(DEP.ZITDACTIVATE=1) set ZSTATUS=4,ZSTATUSDESC="ACTIVE"
+		else if (DEP.ZITDACTIVATE=1),(DEP.ZITDEXPDT<%SystemDate) set ZSTATUS=6,ZSTATUSDESC="MATURED"
+		else set ZSTATUS=7,ZSTATUSDESC="CANCELLED"
+	}
+
+	if ZCRITERIA'=0,ZSTATUS'=ZCRITERIA quit
+	set ZTOTAL=ZTOTAL+1
+
+	set ZARROUT(ZSEQ,"LimitAcctStatus")=ZSTATUS
+	set ZARROUT(ZSEQ,"LimitAcctStatusDesc")=ZSTATUSDESC
+
+
+	if DEP.BAL<0,'DEP.ZPRODCDNEG=""  do {
+
+		//set ZARROUT("KBankProductCode")= DEP.ZPRODCDNEG
+		/*
+		type ResultSet KBDES = Db.select("DES,EDES","ZUTBLKBDES","CD=:DEP.ZPRODCDNEG")
+		while KBDES.next() do {
+		if isTh=0 set ZARROUT("KBankProductCodeDesc")=KBDES.getCol(1)
+		else set ZARROUT("KBankProductCodeDesc")=KBDES.getCol(2)
+		}
+		*/
+
+		set ZARROUT("KBankProductCode")=DEP.ZPRODCDNEG
+		type ResultSet KBDES = Db.select("DES,EDES","ZUTBLKBDES","CD=:DEP.ZPRODCDNEG")
+		while KBDES.next() do {
+			if isTh=0 set ZARROUT(ZSEQ,"KBankProductCodeDesc")=KBDES.getCol(2)
+			else set ZARROUT(ZSEQ,"KBankProductCodeDesc")=KBDES.getCol(1)
+
+
+		}
+	}
+
+	else do {
+		set ZARROUT(ZSEQ,"KBankProductCode")=DEP.ZPRODCD
+		type ResultSet KBDES = Db.select("DES,EDES","ZUTBLKBDES","CD=:DEP.ZPRODCD")
+		while KBDES.next() do {
+			if isTh=0 set ZARROUT(ZSEQ,"KBankProductCodeDesc")=KBDES.getCol(2)
+			else set ZARROUT(ZSEQ,"KBankProductCodeDesc")=KBDES.getCol(1)
+		}
+	}
+	//type RecordZODTIER ZODTIER = Db.getRecord("ZODTIER","CID=:CID,SEQ=:ZODSEQ")
+
+	set ZARROUT(ZSEQ,"LimitAcctId")=0
+	set ZARROUT(ZSEQ,"AcctLimitAmt")=DEP.ZENCLIM
+
+
+	set ZARROUT(ZSEQ,"LimitAcctOpenDt")=DEP.ZITDCTRCTDT.toString("YEAR-MM-DD")
+	set ZARROUT(ZSEQ,"DueDate")=DEP.ZITDEXPDT.toString("YEAR-MM-DD")
+	set ZARROUT(ZSEQ,"ClassifiedLevel")=DEP.DARCLS
+	set ZARROUT(ZSEQ,"RevAccru")=DEP.ZRINT
+	set ZARROUT(ZSEQ,"RevDt")=DEP.ZREVDT.toString("YEAR-MM-DD")
+	set ZARROUT(ZSEQ,"MemoAccru")=DEP.ZASINT
+	set ZARROUT(ZSEQ,"DiffDay")=DEP.ZAGEDAY
+	set ZARROUT(ZSEQ,"RevDesc")=DEP.ZREVFLG
+	set ZARROUT(ZSEQ,"SubFreezeInd")="N"
+	set ZARROUT(ZSEQ,"ODType")=""
+	set ZARROUT(ZSEQ,"IntRateType")=""
+	set ZARROUT(ZSEQ,"IntRateSign")=""
+	set ZARROUT(ZSEQ,"SpreadRate")=""
+	set ZARROUT(ZSEQ,"IntRate")=""
+	if ZITDFLG=0 set ZARROUT(ZSEQ,"FreezeAmt")=0
+	if ZITDFLG=1 do {
+		if DEP.ZITDFREEZE=0 set ZARROUT(ZSEQ,"FreezeAmt")=0
+		else set ZARROUT(ZSEQ,"FreezeAmt")=DEP.ZITDLIM
+	}
+	set ZARROUT(ZSEQ,"LimitUsed")= DEP.ZITDBAL
+
+	set ZARROUT(ZSEQ,"AvailLimit")=DEP.ZITDBAVL
+	set ZARROUT(ZSEQ,"ENCDerivedLimit")=0
+	//set ZARROUT(ZSEQ,"Filler**")=
+	set ZARROUT("TotalLimitAmt")=ZARROUT("TotalLimitAmt").get()+DEP.ODLIM + DEP.ZENCDLIM + DEP.ZITDLIM
+
+	type Number ODLimitUsed,ENCLimitedUsed,IntradayLimitUsed
+
+	if DEP.BAL - DEP.CHKHLD < 0 do {
+		if DEP.BAL-DEP.CHKHLD > (0 - DEP.ODLIM) set ODLimitUsed=-(DEP.BAL - DEP.CHKHLD)
+		if DEP.BAL-DEP.CHKHLD < (0 - DEP.ODLIM) set ODLimitUsed=DEP.ODLIM
+	}
+	else set ODLimitUsed=0
+	set ENCLimitedUsed=DEP.ZENCBAL
+	set IntradayLimitUsed=DEP.ZITDBAL
+
+	set ZARROUT("TotalLimitUsed")=ZARROUT("TotalLimitUsed").get()+ODLimitUsed + ENCLimitedUsed + IntradayLimitUsed
+	set ZARROUT(ZSEQ,"TotalENCDerivedLimit")=ZARROUT(ZSEQ,"TotalENCDerivedLimit").get()+DEP.ZENCDLIM
+	if ZITDFLG=1 do {
+		//if DEP.ZITDFREEZE = 0 set ZARROUT(ZSEQ,"TotalFreezeAmt")=0
+		//else set ZARROUT(ZSEQ,"TotalFreezeAmt")=DEP.ZITDLIM
+		if DEP.ZITDFREEZE<>0 set ZARROUT("TotalFreezeAmt")=ZARROUT("TotalFreezeAmt").get()+DEP.ZITDLIM
+	}
+
+	set ZNUMREC=ZNUMREC+1
+	//set ZSEQ=ZSEQ+1
+	quit
+
+
+ZCREJMSG(ZFLG,ZIM,ZOM,ZSTATCD,ZERRCD)
+
+	do SYSVAR^SCADRV0()
+
+
+	type String ZSTAMP,ZTIM,ZDAT
+	set (ZSTAMP,ZTIM,ZDAT)=""
+
+	type Number MICSEC
+
+	set MICSEC=""
+
+	set MICSEC=$$GETTIM^%ZFUNC()
+	set MICSEC=MICSEC.extract(MICSEC.length()-6,MICSEC.length()-5)
+
+	set ZDAT=$$DAT^%ZM(%CurrentDate,"YEAR-MM-DD")
+	set ZTIM=$$TIM^%ZM(%CurrentTime,"24:60:SS")
+	set ZSTAMP=ZDAT_"T"_ZTIM_"."_MICSEC_"+07:00"
+
+	type RecordCUVAR cuvar=Db.getRecord("CUVAR")
+
+	set ZARRIN("FuncNm")=ZIM.piece(":;",1)
+	set ZARRIN("RqUID")=ZIM.piece(":;",2)
+	set ZARRIN("RqDt")=ZIM.piece(":;",3)
+	set ZARRIN("RqAppId")=ZIM.piece(":;",4)
+	set ZARRIN("UserId")=ZIM.piece(":;",5)
+	set ZARRIN("TerminalId")=ZIM.piece(":;",6)
+	set ZARRIN("UserLangPref")=ZIM.piece(":;",7)
+	set ZARRIN("CorrID")=ZIM.piece(":;",8)
+	set ZARRIN("AuthUserId")=ZIM.piece(":;",9)
+	set ZARRIN("AuthLevel")=ZIM.piece(":;",10)
+	set ZARRIN("Filler")=ZIM.piece(":;",11)
+	set ZARRIN("AcctId")=ZIM.piece(":;",12)
+
+	set ZARROUT("FuncNm")=ZARRIN("FuncNm").get()
+	set ZARROUT("RqUID")=ZARRIN("RqUID").get()
+	set ZARROUT("RsAppId")=cuvar.zappid
+
+	//p'new
+	set ZARROUT("RsUID")=ZARRIN("RqUID").get()
+
+	set ZARROUT("RsDt")=ZDAT_"T"_ZTIM_"."_MICSEC_"+07:00"
+
+	set ZARROUT("CorrID")=ZARRIN("CorrID").get()
+
+	set ZARROUT("StatusCode")=ZSTATCD
+	set ZARROUT("ErrorAppId")=cuvar.zappid
+	set ZARROUT("ErrorAppAbbrv")="PCB"
+	set ZARROUT("ErrorCode")=ZERRCD
+	type ResultSet zerdesc = Db.select("ERRDESC","ZUTBLITFERCD","ERRCD=:ZERRCD")
+	while zerdesc.next() do {
+		set ZERRDESC=zerdesc.getCol(1)
+		set ZARROUT("ErrorDesc")=zerdesc.getCol(1)
+	}
+	//set ZARROUT("ErrorDesc")=ZARRIN("ErrorDesc").get()
+	set ZARROUT("ErrorSeverity")="02"
+
+	//Error Segment
+	type String ZERSEG
+	set ZERSEG="["_ZARROUT("ErrorAppId").get()_";;"_ZARROUT("ErrorAppAbbrv").get()_";;"_ZERRCD.get()
+	set ZERSEG=ZERSEG_";;"_ZARROUT("ErrorDesc").get()_";;"_ZARROUT("ErrorSeverity").get()_"]"
+
+	if (ZERRCD.get())'="" do {
+
+		set ZOM.piece(":;",1)=ZARROUT("FuncNm").get()
+		set ZOM.piece(":;",2)=ZARROUT("RqUID").get()
+		set ZOM.piece(":;",3)=ZARROUT("RsAppId").get()
+		set ZOM.piece(":;",4)=ZARROUT("RsUID").get()
+		set ZOM.piece(":;",5)=ZARROUT("RsDt").get()
+		if ZSTATCD.get()="" set ZSTATCD="10"
+		set ZOM.piece(":;",6)=ZSTATCD
+		set ZOM.piece(":;",7)=ZERSEG
+		set ZOM=ZOM_":;"_ZARROUT("CorrID").get()
+		set ZOM=ZOM_":;"_ZARROUT("ReqAuthUserId").get()
+		set ZOM=ZOM_":;"_ZARROUT("ReqAuthLevel").get()
+		//set ZOM.piece(":;",8)=ZARROUT("CorrID").get()
+		set ZOM=ZOM_":;"
+
+	}
+	set ^TESTMK("ZOM")=ZOM
+
+	quit

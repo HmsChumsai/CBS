@@ -1,0 +1,363 @@
+//DO NOT MODIFY  Batch for retrieveComBAcctBalRslt|ZBCHRINQ||||||ZRINQBS|||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+	21/04/2014 - Anchalee Ch.
+	Modified BALSIGN, replaced "+" with " ".
+	Modified PROC, calculated amount signs from the new variables.
+
+---------- OPEN    ------ Section marker
+
+	kill ^TMP("ZRINQBS")
+
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	do EXTRACT
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	do Runtime.rollback()
+	new ZARROUT
+	if BOUND="OUT"	quit
+	do PROC(SEQ,ZCID)
+	quit
+
+EXT(IO out)
+	type Number SEQ
+	set SEQ=$O(^TMP("ZRINQBS","OUT",""))
+	while 'SEQ.isNull() do {
+		set ZCID=$O(^TMP("ZRINQBS","OUT",SEQ,""))
+		while 'ZCID.isNull() do {
+			type String ZDATA
+			set ZDATA = ^TMP("ZRINQBS","OUT",SEQ,ZCID)
+			do out.write(ZDATA)
+			set ZCID=$O(^TMP("ZRINQBS","OUT",SEQ,ZCID))
+			set toTalRec=toTalRec+1
+		}
+		set SEQ=$O(^TMP("ZRINQBS","OUT",SEQ))
+	}
+
+
+	quit
+
+EXTRACT
+
+	type Number toTalRec
+	set toTalRec=0
+	do SYSVAR^SCADRV0()
+	set ZEXTDAT=%SystemDate.toString("YEARMMDD")
+	type IO out =Class.new("IO")
+	set out.fileName =$$TRNLNM^%ZFUNC("SCAU_SPOOL_ITF")_"/SHARE.ORDER.INQBAL.RS_"_ZEXTDAT
+	set out.openParams ="NEWV/WRITE"
+	set out.recordSize =1024
+	do out.open()
+	do HEADER(.out)
+	do EXT(.out)
+	do FOOTER(.out,toTalRec)
+	do out.close()
+
+	quit
+
+FOOTER(IO out,i)
+
+
+	set ZARROUT("RecType")="T01"
+	set ZARROUT("TotalRec")=$$PADDING(i,2,15)
+	set ZARROUT("Filler")=$J("",842)
+
+	set ZOM=ZARROUT("RecType")_ZARROUT("TotalRec")_ZARROUT("Filler")
+	do out.write(ZOM)
+
+	quit
+
+
+HEADER(IO out)
+
+	type RecordCUVAR cuvar=Db.getRecord("CUVAR")
+	type String ZSTAMP,ZTIM,ZDAT,ZOM
+	set (ZSTAMP,ZTIM,ZDAT,ZOM)=""
+	type Number MICSEC
+	set MICSEC=""
+	set MICSEC=$$GETTIM^%ZFUNC()
+	set MICSEC=MICSEC.extract(MICSEC.length()-6,MICSEC.length()-5)
+
+	set ZDAT=$$DAT^%ZM(%SystemDate,"YEAR-MM-DD")
+	set ZTIM=$$TIM^%ZM(%SystemDate,"24:60:SS")
+	set ZSTAMP=ZDAT_"T"_ZTIM
+
+	set ZARROUT("RecType")="H01"
+	set ZARROUT("SysDt")=$$PADDING(ZSTAMP,1,33)
+	set ZARROUT("BusinessDt")=%CurrentDate.toString("YYYY-MM-DD")
+	set ZARROUT("SrcAppId")=$$PADDING(cuvar.zappid,1,5)
+	set ZARROUT("FileType")="AcctInf "
+	set ZARROUT("FileSeqNum")="000001"
+	//set ZARROUT("Filler")=$J("",795)
+
+	set ZOM=ZOM_ZARROUT("RecType")
+	set ZOM=ZOM_ZARROUT("SysDt")
+	set ZOM=ZOM_ZARROUT("BusinessDt")
+	set ZOM=ZOM_ZARROUT("SrcAppId")
+	set ZOM=ZOM_ZARROUT("FileType")
+	set ZOM=ZOM_ZARROUT("FileSeqNum")
+	set ZOM=ZOM_$J("",795)
+
+	do out.write(ZOM)
+
+	quit
+
+ZREJ(ZSEQ,ZCID,ZCAUSE)
+
+	set ZARROUT("ErrorDesc")=$J("",256)
+	set ZERRCD=ZCAUSE
+	set ZARROUT("ErrorCode")=$$PADDING(ZCAUSE,1,30)
+	type ResultSet zerdesc = Db.select("ERRDESC","ZUTBLITFERCD","ERRCD=:ZERRCD")
+	while zerdesc.next() do {
+		set ZARROUT("ErrorDesc")=$$PADDING(zerdesc.getCol(1),1,256)
+	}
+
+
+	type ResultSet zerdesc = Db.select("ERRDESC","ZUTBLITFERCD","ERRCD=:ZERRCD")
+	while zerdesc.next() do {
+		set ZARROUT("ErrorDesc")=$$PADDING(zerdesc.getCol(1),1,256)
+	}
+	set ZOM=$$PADDING(ZCID,2,10)
+	set ZOM=ZOM_$J("",467)
+	set ZOM=ZOM_"10"
+	set ZOM=ZOM_ZARROUT("ErrorCode")
+	set ZARROUT("ErrorDesc")=$$PADDING($G(ZARROUT("ErrorDesc")),1,256)
+	set ZOM=ZOM_$G(ZARROUT("ErrorDesc"))
+	set ZOM=ZOM_$J("",95)
+	set ^TMP("ZRINQBS","OUT",ZSEQ,ZCID)=ZOM
+
+	quit
+
+
+PROC(ZSEQ,ZCID)
+
+	type Number ZSTATUS
+	type Number ZBAL,ZBALAVL,ZCLAMT,ZHLDAMT,ZRETENTION
+	type Number ZER
+	set ZER=0
+	set ZSTATUS="00"
+	type String ZGRP,ZOM
+	if 'Db.isDefined("DEP","CID=:ZCID") do ZREJ(ZSEQ,ZCID,"E0002") quit
+	type RecordDEP DEP=Db.getRecord("DEP","CID=:ZCID")
+
+	set ZOM=""
+	set ZGRP=DEP.GRP
+	if (ZGRP'="SAV"),(ZGRP'="DDA") do ZREJ(ZSEQ,ZCID,"E0030") quit
+
+	set ZARROUT("AcctId")=$$PADDING(DEP.CID,2,10)
+	set ZARROUT("AcctNameTh")=$$PADDING(DEP.ZACTNAM,1,180)
+	set ZARROUT("AcctNameEn")=$$PADDING(DEP.ZEACTNAM,1,180)
+	set ZARROUT("KBankProductCode")=$$PADDING(DEP.ZPRODCD,2,9)
+	set ZARROUT("Curcode")=$$PADDING(DEP.CRCD,1,3)
+
+	//21/04/2014 - Anchalee Ch.
+	//Assigned amount values into separated variables and calculate their
+	//amount signs from the new variables.
+	set ZRETENTION=DEP.ZHLDAMT+DEP.ZCHKHLD
+	set ZARROUT("RetentionAmt")=$$PADDING(ZRETENTION,7,18)
+	set ZARROUT("RetentionAmtSign")=$$BALSIGN(ZRETENTION)
+
+	//set ZARROUT("ClearingAmt")=$$PADDING(DEP.ZCHKHLD,3,"")
+	set ZCLAMT=+DEP.ZCHKHLD
+	set ZARROUT("ClearingAmt")=$$PADDING(ZCLAMT,7,18)
+	set ZARROUT("ClearingAmtSign")=$$BALSIGN(ZCLAMT)
+
+	set ZHLDAMT=+DEP.ZHLDAMT
+	set ZARROUT("HoldAmt")=$$PADDING(ZHLDAMT,7,18)
+	set ZARROUT("HoldAmtSign")=$$BALSIGN(ZHLDAMT)
+
+	set ZBAL=+DEP.BAL
+	set ZARROUT("AcctBal")=$$PADDING(ZBAL,7,18)
+	set ZARROUT("AccBalSign")=$$BALSIGN(ZBAL)
+
+	set ZBALAVL=DEP.BALAVL
+	set ZARROUT("AvailBal")=$$PADDING(ZBALAVL,7,18)
+	set ZARROUT("AvailBalSign")=$$BALSIGN(ZBALAVL)
+	//End of 21/04/2014
+
+	set ZARROUT("StatusCode")=ZSTATUS
+	set ZARROUT("ErrorCode")=$J("",30)
+	set ZARROUT("ErrorDesc")=$J("",256)
+
+	set ZOM=ZOM_ZARROUT("AcctId").get()
+	set ZOM=ZOM_ZARROUT("AcctNameTh").get()
+	set ZOM=ZOM_ZARROUT("AcctNameEn").get()
+	set ZOM=ZOM_ZARROUT("KBankProductCode").get()
+	set ZOM=ZOM_ZARROUT("Curcode").get()
+	set ZOM=ZOM_ZARROUT("RetentionAmtSign").get()
+	set ZOM=ZOM_ZARROUT("RetentionAmt").get()
+	set ZOM=ZOM_ZARROUT("ClearingAmtSign").get()
+	set ZOM=ZOM_ZARROUT("ClearingAmt").get()
+	set ZOM=ZOM_ZARROUT("HoldAmtSign").get()
+	set ZOM=ZOM_ZARROUT("HoldAmt").get()
+	set ZOM=ZOM_ZARROUT("AccBalSign").get()
+	set ZOM=ZOM_ZARROUT("AcctBal").get()
+	set ZOM=ZOM_ZARROUT("AvailBalSign").get()
+	set ZOM=ZOM_ZARROUT("AvailBal").get()
+	set ZOM=ZOM_ZARROUT("StatusCode")
+	set ZOM=ZOM_ZARROUT("ErrorCode")
+	set ZOM=ZOM_ZARROUT("ErrorDesc")
+	set ZOM=ZOM_$J("",95)
+
+	set ^TMP("ZRINQBS","OUT",ZSEQ,ZCID)=ZOM
+
+	quit
+
+BALSIGN(zbal)
+
+	type String output
+	if zbal.get()<0 set output="-"
+	//21/04/2014 - Anchalee Ch. - Replaced "+" with space
+	else set output=" "
+	//End of 21/04/2014
+	quit output
+
+READ
+	type Number i,EXIT
+	set (EXIT,i)=0
+	do SYSVAR^SCADRV0()
+	type Date ZIMDT
+	set ZIMDT=%SystemDate.toString("YEARMMDD")
+	type IO in =Class.new("IO")
+	set in.fileName =$$TRNLNM^%ZFUNC("SCAU_SPOOL_ITF")_"/SHARE.ORDER.INQBAL.RQ_"_ZIMDT
+	set in.openParams ="READ"
+	set in.recordSize =1024
+	do in.open()
+
+	do {
+
+		catch BALINQREAD {
+			set ER = 1
+			set RM = BALINQREAD.description
+			//set ZERRCD="E9999"
+
+			for  set REC =in.read() { quit:EXIT
+				type String output
+				type Number ZCID
+				set ZCID=""
+				if REC["H01" //Skipp header
+				set i=i+1
+				if REC["T01" set EXIT=1 quit //quit when reached footer
+				set ZCID=+$E(REC,1,10)
+				set ^TMP("ZRINQBS","IN",i,ZCID)=""
+			}
+		}
+
+
+		quit
+
+PADDING(array,flg,fixL)
+
+	type String out
+	type Number zlength
+	set out=""
+
+	//Blank padding
+	if flg=1 do {
+		type String in
+		set in=array.get()
+		set zlength=in.length()
+		set out=in_$J("",fixL-zlength)
+
+	}
+	//Zero padding
+	if flg=2 do {
+		type Number in
+		set in=array.get()
+		set zlength=in.length()
+		set out=in.zero(fixL)
+	}
+	//MainFrame
+	if flg=3 do {
+		type Number in,ZER,zprefix
+		type String ZRM
+		set (ZER,zprefix)=0
+		set ZRM=""
+		set in=array.get()*100
+		do CONVENC^ZITFUTL(1,in,.out,.ZER,.ZRM)
+		if $L(out)<18 do {
+			//set zprefix=18-$L(out)
+			set zprefix=zprefix.zero(18-$L(out))
+			set out=zprefix_out
+		}
+	}
+	if flg=4 do {
+		type Number in
+		set in=array.get()
+		set out=in.zero(fixL,2,0,0)
+	}
+	//Default value for mandatory date
+	if flg=5 do {
+
+		if array.get()="" set out="9999-12-31"
+		else set out=array
+
+	}
+	if flg=6 do {
+		//No decimal,sign representation,Right zero justify
+
+		type Number in,zlength
+		type String pre,suf,ZERO
+		set ZERO=""
+		set in=array.get()
+		if in<0 set in=-in
+		set pre=$P(in,".",1)
+		set pre=pre.zero(3)
+		set suf=$P(in,".",2)
+		set in=pre_"."_suf
+		//set zlength=in.length()
+		//set ZERO=ZERO.zero(fixL-zlength)
+		set zlength=suf.length()
+		set ZERO=ZERO.zero(8-zlength)
+		set out=in_ZERO
+
+
+		//set out=in_$J("0",fixL-zlength)
+	}
+	if flg=7 do {
+		//No decimal,sign representation,Right zero justify,length specified
+		type Number in,zlength
+		type String pre,suf,ZERO
+		set ZERO=""
+		set in=array.get()
+		if in<0 set in=-in
+		set pre=$P(in,".",1)
+		set suf=$P(in,".",2)
+		set out=pre_$E(suf,1,2)	//2 Decimal
+		set zlength=out.length()
+		set out=out.zero(fixL)
+		//set out=in_ZERO
+	}
+	quit out
+
+GENTEST
+
+	type IO out =Class.new("IO")
+	set out.fileName =$$TRNLNM^%ZFUNC("SCAU_SPOOL")_"/TESTRQRINQBS.txt"
+	set out.openParams ="NEWV/WRITE"
+	set out.recordSize =1024
+	do out.open()
+
+	set ZHEADER=$J("",140)
+	do out.write(ZHEADER)
+	do out.write("0011000029")
+	do out.write("0021041688")
+	do out.write("T")
+	do out.close()
+
+	quit
+
+---------- THREXIT ------ Section marker

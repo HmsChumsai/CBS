@@ -1,0 +1,370 @@
+//DO NOT MODIFY  CICS Message|ZCICSMSG|||||||1
+ZCICSMSG(IM)
+	/*
+	 ORIG: 1 - 18/10/2013
+	 DESC: 
+	
+	 ---- Comments --------------------------------------------------------
+	
+	 ---- Revision History ------------------------------------------------
+	
+	 ****** Consider using setAuditFlag for all objects in this procedure
+	   example :do dep.setAuditFlag(1)
+	
+	*/
+	
+	catch error {
+		//new ET,RM
+		set ET=error.type
+		set RM="[MAIN]"_error.description
+		set FROM=error.thrownAt
+		if error.type["%GTM-" do ZE^UTLERR
+		do EXC
+		quit
+	}
+	
+	//Drop null message (no reply)	
+	if $G(IM)="" quit ""	
+	
+	// Initialize variables
+	do SYSVAR^SCADRV0()
+	new OM,ERR,ERRD
+ 	set (OM,ERR,ERRD)=""
+	set ER=0
+	set RM=""
+	set INTRFACE="CICSMSG"
+	
+	// Log Input Messages.
+	type String ZCDT,ZCT,ZCTM,ZPCID
+	do Runtime.start("CS")
+	set ZCDT=$$DAT^%ZM(%CurrentDate,"YYMMDD")	//current date
+	set ZCT=$$TIM^%ZM(%CurrentTime,"2460SS")	//time sec
+	set ZCTM=$$GETTIM^%ZFUNC()
+	set ZCTM=$E(ZCTM,$L(ZCTM)-5,$L(ZCTM)-3)		//time milisec
+	set ZPCID=%ProcessID
+	set ZNSMKEY=ZCDT_ZCT_ZCTM_ZPCID.zero(10)	// Create NSMKEY
+	do NSMLOG^ZITFUTL(INTRFACE,ZNSMKEY,IM,1,)	//log input NSMLOG
+	do Runtime.commit()
+        
+        // Process transaction
+	do PROC(IM,.OM)
+	
+	// Log Output Messages. If TRollback occured in application, issue new TStart
+        if $TLevel=0 do {  if 1
+                TStart ():transactionid="CS"
+                do NSMLOG^ZITFUTL(INTRFACE,ZNSMKEY,OM,2,$G(ERR))
+                TCommit:$TLevel
+        }
+        else  do NSMLOG^ZITFUTL(INTRFACE,ZNSMKEY,OM,2,$G(ERR))
+	
+	quit OM
+
+PROC(IM,OM)
+        catch error {
+                set ET=error.type
+                set ER=1
+                set RM="[PROC]"_error.description
+                set FROM=error.thrownAt
+                if error.type["%GTM-" do ZE^UTLERR
+                do EXC
+                
+                if 'ZPROCNM.get().isNull() do {
+        		set ZPGMR="ZCREJMSG"_ZPROCNM_"(1,"""_IM_""",.OM,20,""E9999"")"
+        		do @ZPGMR
+        	} 
+                quit
+        }
+ 
+ 	type String ZFCD, ZPROCNM, ZPGM, ZPGMR, ZRETIN, ZRETO, ZRETOUT, ZRETEXC, ZEXCSEQ, ZEXCMSG, ZZZRQUID, ZRQSEQ, ZSTCD, ZERRCD, ZZORQUID
+ 	type Number ZTPAPP, ZFLG, ZQUIT, ZCHKREV
+ 	
+ 	set OM=IM
+ 	set ZQUIT=0
+ 	set ZFLG=2	//Delimeter flag
+        set ZFCD=""
+        
+        //Validate Function Name
+        set ZFCD=($$TRIM^%ZS(IM.extract(1,30))).upperCase()
+        if ('ZFCD.isNull()),Db.isDefined("ZUTBLEXTSRV","ZFCD") do {
+        	//set ZZZRQUID=$$TRIM^%ZS(IM.extract(31,77))
+        	set ZZZRQUID=(IM.extract(31,77)).trim()
+        }
+        else  do {
+        	set ZFCD=($$TRIM^%ZS(IM.extract(1,20))).upperCase()
+        	//set ZZZRQUID=$$TRIM^%ZS(IM.extract(21,67))
+        	set ZZZRQUID=(IM.extract(21,67)).trim()
+        }	
+  	
+ 	if (ZFCD.isNull())!('Db.isDefined("ZUTBLEXTSRV","ZFCD")) set RM="Invalid function name "_ZFCD do EXC quit
+ 	
+        type RecordZUTBLEXTSRV rcsrv=Db.getRecord("ZUTBLEXTSRV","ZFCD")
+        set ZPROCNM=rcsrv.PROCNM
+        set ZTPAPP=rcsrv.TPAPP
+        set ZCHKREV=rcsrv.CHKREV
+        
+        //Validate User ID and Override Error Code
+        set ZUID=rcsrv.USERFP
+        set ZUID=$$TRIM^%ZS(IM.extract(ZUID.piece("-",1),ZUID.piece("-",2)))
+        if (ZUID.isNull())!('Db.isDefined("SCAU","UID=:ZUID")) do { quit
+        	set ZPGMR="ZCREJMSG"_ZPROCNM_"(2,"""_IM_""",.OM,10,""E0017"")" 
+        	do @ZPGMR
+        	do CE9999(.OM,"E0017") quit
+        }
+        
+        //if TP apply do check duplicate RQUID
+        //==================================================================================================
+        if ZTPAPP do { quit:ZQUIT
+        	set ZPGMR="RQIN"_ZPROCNM_"("_ZFLG_","""_IM_""",.ZRETIN)"
+        	do @ZPGMR
+        	
+        	if ZRETIN.get().isNull() do { quit	//INVALID APP ID
+        		set ZQUIT=1
+        		set ZPGMR="ZCREJMSG"_ZPROCNM_"(2,"""_IM_""",.OM,10,""E0038"")"
+        		do @ZPGMR
+        	}
+        }
+        	
+        do Runtime.start("CS")
+        
+        if ZTPAPP do {
+	        //check duplicate
+	        if $$CHKDUP(ZZZRQUID,.ZSTCD,.ZERRCD) set ZQUIT=1
+	        	
+	        //original RQUID to reverse
+	        set ZZORQUID=ZRETIN.piece(":;",6)
+	        
+	        //check reverse
+	        if ZCHKREV,$$CHKREV(ZZZRQUID,ZZORQUID,.ZSTCD,.ZERRCD) set ZQUIT=1
+        }
+        	
+        if ZQUIT!'ZTPAPP do {
+        	do Runtime.rollback()
+        	
+        	if ZTPAPP,'ZPROCNM.get().isNull() do {
+        		set ZPGMR="ZCREJMSG"_ZPROCNM_"(2,"""_IM_""",.OM,"_ZSTCD_","""_ZERRCD_""")"
+        		do @ZPGMR
+        	}
+        }
+        
+        if ZTPAPP do {	
+        	
+		set ZRQSEQ=Db.nextVal("ZRQLOG1","%CurrentDate,ZZZRQUID")
+		type RecordZRQLOG1 rclog1=Db.getRecord("ZRQLOG1","%CurrentDate,ZZZRQUID,ZRQSEQ",1)
+		set rclog1.status=ZSTCD.get()
+		set rclog1.appid=ZRETIN.piece(":;",2)
+		set rclog1.FNAME=ZRETIN.piece(":;",3)
+		set rclog1.KTRC=ZRETIN.piece(":;",4)
+		set rclog1.TIME=%CurrentTime
+		set rclog1.ERRCD=ZERRCD.get()
+		set rclog1.RQDATE=ZRETIN.piece(":;",5)
+		set rclog1.TJD=%SystemDate
+		do rclog1.save()
+        }	
+       	
+       	//Override Error Code
+        if ZQUIT do CE9999(.OM,ZERRCD) quit
+        
+        //===================================================================================================
+        
+        //do MAIN
+        set ZPGM="set ZRETO=$$MAIN"_ZPROCNM_"("_ZFLG_","""_IM_""",.OM,.ERR,.ERRD)"
+        X ZPGM
+        
+        //Override Error Code
+        if ERR'="" do CE9999(.OM,ERR)
+        
+        //if TP apply do log RQUID
+        //==================================================================================================
+        if ZTPAPP do {
+        	
+        	set ZRETOUT=ZRETO.piece("|#|",1)
+        	set ZRETEXC=ZRETO.piece("|#|",2)
+        	
+        	set ZSTCD=ZRETOUT.piece(":;",1)
+        	set ZERRCD=ZRETOUT.piece(":;",6)
+        	
+        	if ZSTCD'="00" do { quit	//transaction fail
+        		do Runtime.rollback()
+        		
+	    		type RecordZRQLOG rclog=Db.getRecord("ZRQLOG","%CurrentDate,ZZZRQUID",1)
+	    		set rclog.status=ZSTCD.get()
+	    		set rclog.TIME=%CurrentTime
+	    		set rclog.ERRCD=ZERRCD.get()
+	    		set rclog.CID=ZRETOUT.piece(":;",7)
+	    		set rclog.TSEQ=ZRETOUT.piece(":;",8)
+	    		set rclog.appid=ZRETIN.piece(":;",2)
+			set rclog.FNAME=ZRETIN.piece(":;",3)
+			set rclog.KTRC=ZRETIN.piece(":;",4)
+			set rclog.RQDATE=ZRETIN.piece(":;",5)
+			set rclog.TJD=%SystemDate
+			set rclog.FDTSEQ=ZRETOUT.piece(":;",10)
+			set rclog.TOCID=ZRETOUT.piece(":;",11)
+	    		do rclog.save()
+        		
+        		set ZRQSEQ=Db.nextVal("ZRQLOG1","%CurrentDate,ZZZRQUID")
+	    		type RecordZRQLOG1 rclog1=Db.getRecord("ZRQLOG1","%CurrentDate,ZZZRQUID,ZRQSEQ",1)
+	    		set rclog1.status=ZSTCD.get()
+	    		set rclog1.TIME=%CurrentTime
+	    		set rclog1.ERRCD=ZERRCD.get()
+	    		set rclog1.CID=ZRETOUT.piece(":;",7)
+	    		set rclog1.TSEQ=ZRETOUT.piece(":;",8)
+	    		set rclog1.appid=ZRETIN.piece(":;",2)
+			set rclog1.FNAME=ZRETIN.piece(":;",3)
+			set rclog1.KTRC=ZRETIN.piece(":;",4)
+			set rclog1.RQDATE=ZRETIN.piece(":;",5)
+			set rclog1.TJD=%SystemDate
+			set rclog1.FDTSEQ=ZRETOUT.piece(":;",10)
+			set rclog1.TOCID=ZRETOUT.piece(":;",11)
+	    		do rclog1.save()
+	    		
+	    		set ZEXCSEQ=1		//keep all EXC1 when reject post
+	    		for  set ZEXCMSG=$P(ZRETEXC,";;",ZEXCSEQ) quit:(ZEXCMSG="")  do {
+	    			type RecordZRQLOGEXC1 rcexc1=Db.getRecord("ZRQLOGEXC1","%CurrentDate,ZZZRQUID,ZRQSEQ,ZEXCSEQ",1)
+	    			set rcexc1.data=ZEXCMSG
+	    			do rcexc1.save()
+	    			
+	    			set ZEXCSEQ=ZEXCSEQ+1
+	    		}
+        	}
+        	else  if ZSTCD="00" do {	//transaction success
+        		type RecordZRQLOG rclog=Db.getRecord("ZRQLOG","%CurrentDate,ZZZRQUID",1)
+	    		set rclog.status=ZSTCD.get()
+	    		set rclog.TIME=%CurrentTime
+	    		set rclog.ERRCD=ZERRCD.get()
+	    		set rclog.CID=ZRETOUT.piece(":;",7)
+	    		set rclog.TSEQ=ZRETOUT.piece(":;",8)
+	    		set rclog.FDTSEQ=ZRETOUT.piece(":;",10)
+	    		set rclog.TOCID=ZRETOUT.piece(":;",11)
+	    		do rclog.save()
+        		
+	    		type RecordZRQLOG1 rclog1=Db.getRecord("ZRQLOG1","%CurrentDate,ZZZRQUID,ZRQSEQ",1)
+	    		set rclog1.status=ZSTCD.get()
+	    		set rclog1.TIME=%CurrentTime
+	    		set rclog1.ERRCD=ZERRCD.get()
+	    		set rclog1.CID=ZRETOUT.piece(":;",7)
+	    		set rclog1.TSEQ=ZRETOUT.piece(":;",8)
+	    		set rclog1.FDTSEQ=ZRETOUT.piece(":;",10)
+	    		set rclog1.TOCID=ZRETOUT.piece(":;",11)
+	    		do rclog1.save()
+	    		
+	    		do Runtime.commit()
+        	}
+        
+        }
+        //==================================================================================================
+        
+        quit
+
+
+CHKDUP(XRQUID,XSTCD,XERRCD)
+
+	/*
+		check duplicate RQUID from ZRQLOG
+		check back 3 days until today
+	
+		XRQUID : RQUID
+		XSTCD  : return status code
+		XERRCD : return error code 
+		
+		quit 1:duplicate or rquid is null
+		     0:unduplicate
+	*/
+
+	type Number ZDUP, ZSTOP
+	type Date XCDT,XDT
+	set (ZDUP,ZSTOP)=0
+	set XCDT=%CurrentDate
+	
+	//INVALID RQUID
+	if XRQUID.isNull() set XSTCD="10",XERRCD="E0014" quit 1	
+	
+	for i=0:1:3 do { quit:ZSTOP
+		set XDT=XCDT-i
+		if Db.isDefined("ZRQLOG","XDT,XRQUID") set ZSTOP=1
+	}
+		
+	if 'ZSTOP quit ZDUP
+	
+	type RecordZRQLOG rclog=Db.getRecord("ZRQLOG","XDT,XRQUID",1)
+	if rclog.status="00" set ZDUP=1,XSTCD="10",XERRCD="E0003"	//DUPLICATED TRANSACTION
+	
+	quit ZDUP
+
+
+
+CHKREV(ZRQUID,XRQUID,XSTCD,XERRCD)
+
+	/*
+		check reversed RQUID from ZRQLOG
+		service can reverse only sameday transaction (today & 3 minite after midnight)
+		
+		ZRQUID : RQUID
+		XRQUID : original RQUID
+		XSTCD  : return status code
+		XERRCD : return error code
+		
+		quit 1:reversed transaction or can not reverse
+		     0:not reversed transaction
+		     
+		save at table ZDRQUID(ZRQUID)=XCDT|XRQUID
+		log original date|original rquid
+		//ZRQUID must not null
+	*/
+
+	type Number ZREVl, ZSTOP
+	type Date XCDT,XDT
+	set (ZREV,ZSTOP)=0
+	set XCDT=%CurrentDate
+
+	//INVALID ORIGINAL RQUID
+	if XRQUID.isNull() set XSTCD="10",XERRCD="E0045" quit 1
+	
+	for i=0:1:1 do { quit:ZSTOP
+		set XDT=XCDT-i
+		if Db.isDefined("ZRQLOG","XDT,XRQUID") set ZSTOP=1
+	}
+	
+	//TRANSACTION NOT FOUND
+	if 'ZSTOP set XSTCD="10",XERRCD="E0004" quit 1
+
+	type RecordZRQLOG rclog=Db.getRecord("ZRQLOG","XDT,XRQUID",1)
+	if rclog.status'="00" set XSTCD="10",XERRCD="E0004" quit 1		//in case that transaction not success
+	if rclog.REVFLG=1 set XSTCD="10",XERRCD="E0006" quit 1  	//TRANSACTION ALREADY REVERSED
+	
+	if (XCDT=%CurrentDate-1),(%CurrentTime>180) set XSTCD="10",XERRCD="E0044" quit 1	//UNABLE TO REVERSE BACKDATE 
+	
+	
+	//INVALID RQUID
+	if ZRQUID.isNull() set XSTCD="10",XERRCD="E0014" quit 1
+	type RecordZDRQUID rcdlog=Db.getRecord("ZDRQUID","ZRQUID",1)
+	set rcdlog.DATE = XDT
+	set rcdlog.REVRQUID = XRQUID
+	do rcdlog.save()
+	
+	quit ZREV
+
+
+EXC     //LOG ERROR TO DAYEND
+        new INTF
+        if $G(INTRFACE)="" set INTF="CICSMSG"
+        else  set INTF=$G(INTRFACE)
+ 
+        do LOG^UTLEXC(INTF,"*",,$G(ZNSMKEY),$G(RM),$G(ET),)
+        //kill ET
+        //set ER=0
+        //set (RM,ERR,ERRD)=""
+ 
+      	quit
+      	
+      	
+CE9999(OM,ERRCD)
+	//mapping error code to E9999 except for error code that bank known
+	
+	if ERRCD.isNull() quit
+	type RecordZUTBLITFERCD rcercd=Db.getRecord("ZUTBLITFERCD","ERRCD",1)
+	if rcercd.ZERRBNK quit
+	
+	set OM=OM.replace(ERRCD,"E9999")
+
+	quit
+	

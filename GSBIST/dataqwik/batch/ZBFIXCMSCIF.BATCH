@@ -1,0 +1,71 @@
+//DO NOT MODIFY  Batch For Fixing CMS Extraction|ZBFIXCMS||||||ZCONVRPT|PID='ACN'|ZTJD|100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	kill ^ZCMS("ACN")
+	do SYSVAR^SCADRV0()
+	
+	new %TAB,%READ
+	set %TAB("ZTJD")="/DES=DATE/REQ/TYP=D/LEN=10"
+	set %READ="@@%FN,,ZTJD"
+	do ^UTLREAD if VFMQ="Q" quit
+	
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	type Date ZEXTDAT
+	set ZEXTDAT=(ZTJD).toString("YEARMMDD")
+	
+	type IO out =Class.new("IO")
+	set out.fileName =$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTCMS")_"/ToCMS/CIF_"_ZEXTDAT_".txt"
+	set out.openParams ="NEWV/WRITE"
+	set out.recordSize =1024
+	do out.open()
+	
+	set cifHead="ACN|THAI_TITLE|THAI_FNAME|THAI_LNAME|THAI_MNAME|CITIZEN_ID|TAX_ID|LEGAL_ADDR1|LEGAL_ADDR2|LEGAL_ADDR3|LEGAL_TAMBOL_CD|"
+	set cifHead=cifHead_"LEGAL_AMPHUR_CD|LEGAL_PROVINCE_CD|LEGAL_COUNTRY_CD|LEGAL_POSTAL_CD|HOME_PHONE|MOBILE_PHONE|OFFICE_PHONE|OFFICE_PHONE_EXT|"
+	set cifHead=cifHead_"JURISTIC_ID|MAILING_ADDR1|MAILING_ADDR2|MAILING_ADDR3|MAILING_TAMBOL_CD|MAILING_AMPHUR_CD|MAILING_PROVINCE_CD|MAILING_COUNTRY_CD|MAILING_POSTAL_CD|OFFICE_ADDR1|"
+	set cifHead=cifHead_"OFFICE_ADDR3|OFFICE_ADDR2|OFFICE_TAMBOL_CD|OFFICE_AMPHUR_CD|OFFICE_PROVINCE_CD|OFFICE_COUNTRY_CD|OFFICE_POSTAL_CD|MARITAL_STATUS|SEX|"
+	set cifHead=cifHead_"DATE_OF_BIRTH|FAX_NUMBER|EMAIL|CUST_CD|CUST_DESC|CUST_TYPE|PASSPORT_NUMBER|"
+
+	type Number i=0
+	do out.write(cifHead)
+	set i=0
+	
+	set ZPOINT=$O(^ZCMS("ACN",""))
+	while 'ZPOINT.isNull() do {
+		type String ZDATA
+		set ZDATA = ^ZCMS("ACN",ZPOINT)
+		do out.write(ZDATA)
+		set ZPOINT=$O(^ZCMS("ACN",ZPOINT))
+		set i=i+1
+	}
+	do out.write("Total "_i)
+	do out.close()
+	
+	quit
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	if PID="ACN" do PROC(SEQ)
+	
+	quit
+	
+PROC(ACN)
+	
+	type ResultSet rsh = Db.select("SEQ","CIFH","ACN=:ACN AND TJD=:ZTJD","SEQ DESC")
+	if 'rsh.isEmpty() do ZCIF^ZBCMSCIF(ACN)
+
+	quit
+	
+---------- THREXIT ------ Section marker

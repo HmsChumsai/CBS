@@ -1,0 +1,140 @@
+//DO NOT MODIFY  Batch for fixs EFD data|ZFIXEFD2||||||EFD|||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	do GENLIST
+	do GENPCM
+	quit
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	do Runtime.rollback()
+	do PROC(EFDATE,BUFF,SEQ)
+	quit
+	
+PROC(EFDATE,BUFF,SEQ)
+
+	
+	type Date ZDATE
+	type Number ZCID
+	type String ZSQL,ZAFTER
+	type RecordEFD efd =Db.getRecord("EFD","EFDATE=:EFDATE,BUFF=:BUFF,SEQ=:SEQ")
+	set ZQUIT=0
+	set ZSQL=efd.sql
+	set ZDATE=EFDATE
+	set ZDATE=ZDATE.toString("DD/MM/YEAR")
+	//if ZSQL["PCM=," quit
+	if ZSQL["PCM=," set ^ZFIXPCM(efd.CID,SEQ)=efd.CID_"|"_SEQ_"|"_ZDATE_"|"_ZSQL quit
+	else if ZSQL["PCM=1" set ^ZFIXPCM(efd.CID,SEQ)=efd.CID_"|"_SEQ_"|"_ZDATE_"|"_ZSQL quit
+	else do {
+		if ZSQL["= WHERE" set ZAFTER=ZSQL.replace("= ","='' WHERE")
+		//else ZSQL["= ," set ZAFTER=ZSQL.replace("= ","='' WHERE")
+		else if ZSQL["=," set ZAFTER=ZSQL.replace("=,","='',")
+		else set ZQUIT=1
+	}
+	if ZQUIT quit
+
+	//quit if sql statement doesn't match incident pattern 
+	
+	set zcorrected=ZAFTER
+	set ^ZFIXEFD2(efd.CID,SEQ)=efd.CID_"|"_SEQ_"|"_ZDATE_"|"_ZSQL_"|"_zcorrected
+	set efd.sql=zcorrected
+	do efd.setAuditFlag(1)
+	do efd.save()
+	
+	
+
+	quit
+	
+GENLIST
+	do SYSVAR^SCADRV0()
+	type Date ZEXTDAT
+	set ZEXTDAT=(%SystemDate).toString("YEARMMDD")
+	type Number i,ZCID,ZSEQ
+	
+	type IO out =Class.new("IO")
+	set out.fileName =$$TRNLNM^%ZFUNC("SCAU_SPOOL")_"/extract/FIXEDEFD2_LIST_"_ZEXTDAT_".txt"
+	set out.openParams ="NEWV/WRITE"
+	set out.recordSize =1024
+	do out.open()
+	
+	set Header="CID|SEQ|EFDATE|OLD_SQL|NEW_SQL"
+	do out.write(Header)
+	
+	set i=0
+	
+	set ZCID=$O(^ZFIXEFD2(""))
+	while 'ZCID.isNull() do {
+		set ZSEQ=$O(^ZFIXEFD2(ZCID,""))
+		while 'ZSEQ.isNull() do {
+			type String ZDATA1,ZDATA2
+			set ZDATA1 = ^ZFIXEFD2(ZCID,ZSEQ).get()
+			do out.write(ZDATA1)
+			//set ZDATA2 = ^ZFIXEFD(ZCID,ZSEQ,2).get()
+			//do out.write(ZDATA2)
+			set ZSEQ=$O(^ZFIXEFD2(ZCID,ZSEQ))
+			set i=i+1
+		}
+		set ZCID=$O(^ZFIXEFD2(ZCID))
+		
+	}
+	do out.write("Total "_i)
+	do out.close()
+	
+	
+	quit
+	
+GENPCM
+	do SYSVAR^SCADRV0()
+	type Date ZEXTDAT
+	set ZEXTDAT=(%SystemDate).toString("YEARMMDD")
+	type Number i,ZCID,ZSEQ
+	
+	type IO out =Class.new("IO")
+	set out.fileName =$$TRNLNM^%ZFUNC("SCAU_SPOOL")_"/extract/FIXEDEFD2_PCM_LIST_"_ZEXTDAT_".txt"
+	set out.openParams ="NEWV/WRITE"
+	set out.recordSize =1024
+	do out.open()
+	
+	set Header="CID|SEQ|EFDATE|SQL|"
+	do out.write(Header)
+	
+	set i=0
+	
+	set ZCID=$O(^ZFIXPCM(""))
+	while 'ZCID.isNull() do {
+		set ZSEQ=$O(^ZFIXPCM(ZCID,""))
+		while 'ZSEQ.isNull() do {
+			type String ZDATA1,ZDATA2
+			set ZDATA1 = ^ZFIXPCM(ZCID,ZSEQ).get()
+			do out.write(ZDATA1)
+			//set ZDATA2 = ^ZFIXEFD(ZCID,ZSEQ,2).get()
+			//do out.write(ZDATA2)
+			set ZSEQ=$O(^ZFIXPCM(ZCID,ZSEQ))
+			set i=i+1
+		}
+		set ZCID=$O(^ZFIXPCM(ZCID))
+		
+	}
+	do out.write("Total "_i)
+	do out.close()
+	
+	
+	quit
+
+
+---------- THREXIT ------ Section marker

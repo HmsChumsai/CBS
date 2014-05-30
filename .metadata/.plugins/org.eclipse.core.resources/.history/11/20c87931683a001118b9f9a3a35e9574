@@ -1,0 +1,136 @@
+//DO NOT MODIFY  EDU Procedure|ZEDUPROC|||||||1
+ZEDUPROC
+	/*
+	 ORIG: 1 - 29/12/2010
+	 DESC: 
+	
+	 ---- Comments --------------------------------------------------------
+	
+	 ---- Revision History ------------------------------------------------
+	
+	27/07/11 - Soungtam - IBANK
+		   Modified code use branch from acn.boo
+	
+	 ****** Consider using setAuditFlag for all objects in this procedure
+	   example :do dep.setAuditFlag(1)
+	
+	*/
+
+
+	quit
+	
+EDUINQ(IM)
+
+	new HEADER, ACCNUM, ACSTATCD, OM 
+	new REFID, ARG1
+	set ER=0
+	set (OM,HEADER,RM,ARG1)=""
+	
+	do SYSVAR^SCADRV0()
+	
+	//set ZDATE=$$DAT^%ZM(%SystemDate,"YEAR-MM-DD")
+	//set ZTIM=$$TIM^%ZM(%CurrentTime,"24:60:SS")
+	set ZDATE=%CurrentDate
+	set ZTIM=%CurrentTime
+	set REJTIME=$$TIM^%ZM(%CurrentTime,"2460SS")
+	
+	for I=1:1:10 do {
+		set HEADER=HEADER_IM.piece("|",I)_"|"
+	}
+	
+	set REFID = IM.piece("|",9)
+	set ACCNUM = IM.piece("|",11).trim()
+	
+	if ACCNUM.isNull() set RSPCD=1259 quit $$RSPMSG(1,RSPCD,RM,,,13)
+	set ACCNUM=+ACCNUM
+	
+	if 'ACCNUM.isNull() do {
+		if 'Db.isDefined("ACN", "CID=:ACCNUM") set ER=1,RSPCD=1259
+	}
+	
+	if ER.get() quit $$RSPMSG(2,RSPCD,RM,,,13)
+	
+	type RecordACN zacn=Db.getRecord("ACN","CID=:ACCNUM")
+	
+	//type RecordDEP dep = Db.getRecord("DEP", "CID=:ACCNUM")
+		
+	set ACSTATCD=zacn.zstatcd
+	
+	if ACSTATCD=0 set ACSTATCD="ACT"
+	else  if ACSTATCD=1 set ACSTATCD="UNCL"
+	else  if ACSTATCD=4 set ACSTATCD="CLSD"
+	else  set ACSTATCD="NOTACT"
+	
+	new ZCUSTYP,ZCUSNUM,ZBOO,ZBOONAM
+	set (ZCUSTYP,ZCUSNUM,ZBOO,ZBOONAM)=""
+	do {				
+		if 'Db.isDefined("CIF", "ACN=:zacn.acn") quit
+		type RecordCIF zcif = Db.getRecord("CIF", "ACN=:zacn.acn")
+		
+		//set ZBOO=zcif.boo
+		
+		//type RecordUTBLBRCD zbrcd = Db.getRecord("UTBLBRCD", "BRCD=:ZBOO")
+		//set ZBOONAM=zbrcd.desc
+		
+		if zcif.zcizid'="" set ZCUSTYP="CID",ZCUSNUM=zcif.zcizid quit
+		if zcif.pasnum'="" set ZCUSTYP="PP",ZCUSNUM=zcif.pasnum quit
+		if zcif.taxid'="" set ZCUSTYP="TAXID",ZCUSNUM=zcif.taxid quit
+		if zcif.dlnum'="" set ZCUSTYP="DL",ZCUSNUM=zcif.dlnum quit
+		if zcif.oin'="" set ZCUSTYP="OTH",ZCUSNUM=zcif.oin quit
+		
+	}
+	
+	//Soungtam start 27/07/2011
+	set ZBOO=zacn.boo
+		
+	type RecordUTBLBRCD zbrcd = Db.getRecord("UTBLBRCD", "BRCD=:ZBOO")
+	set ZBOONAM=zbrcd.desc
+	//Soungtam end 27/07/2011
+	
+	if (zacn.cls="D") do {
+		type RecordDEP zdep = Db.getRecord("DEP", "CID=:ACCNUM")
+		set OM=$$DEP(zdep)
+	}
+	if (zacn.cls="L") do {
+		type RecordLN zln = Db.getRecord("LN", "CID=:ACCNUM")
+		set OM=$$LN(zln)
+	}
+				
+	quit OM
+	
+DEP(RecordDEP zdep)
+
+	set OM=HEADER_ZDATE_":"_ZTIM_"|"_""_"|"_""_"|"_0_"|"_""_"|"_zdep.type_"|"_zdep.acn_"|"_ACSTATCD_"|"_zdep.title1_"|"_ZCUSTYP_"|"_ZCUSNUM
+	set OM=OM_"|"_ZBOO.zero(3)_"|"_ZBOONAM_"|"_zdep.balavl_"|"_zdep.bal_"|"_$$DAT^%ZM(zdep.odt,"DD/MM/YEAR")_"|"_$$DAT^%ZM(zdep.tld,"DD/MM/YEAR")
+	set OM=OM_"|"_$$DAT^%ZM(zdep.ccld,"DD/MM/YEAR")_"|"_ACCNUM.zero(10)_"|"_zdep.cls_"|"
+	set OM=OM_"|"
+
+	quit OM
+	
+LN(RecordLN zln) 
+	
+	set OM=HEADER_ZDATE_":"_ZTIM_"|"_""_"|"_""_"|"_0_"|"_""_"|"_zln.type_"|"_zln.acn_"|"_ACSTATCD_"|"_zln.title1_"|"_ZCUSTYP_"|"_ZCUSNUM
+	set OM=OM_"|"_ZBOO.zero(3)_"|"_ZBOONAM_"|"_zln.balavail_"|"_zln.bal_"|"_$$DAT^%ZM(zln.odt,"DD/MM/YEAR")_"|"_$$DAT^%ZM(zln.tld,"DD/MM/YEAR")
+	set OM=OM_"|"_$$DAT^%ZM(zln.ccld,"DD/MM/YEAR")_"|"_ACCNUM.zero(10)_"|"_zln.cls_"|"_zln.subt
+	set OM=OM_"|"_zln.zmktcd
+	
+	quit OM
+
+RSPMSG(RSPCD2,CODE,RM,ARG1,ARG2,PITE)
+	
+	set ER=1
+	
+	set RM=$$^MSG(CODE,$G(ARG1),$G(ARG2))
+	
+	//set RSPCD2=Db.getOneRow("RESPCDE1","UTBLEXTRSP1","INTRFACE,CODE")
+	
+	new Y,W
+	set W=""
+	for Y=1:1:PITE do {
+		set W=W_"|"
+	}
+	
+	set OM=HEADER_ZDATE_":"_ZTIM_"|||"_RSPCD2_"|"_RM_W
+	
+	quit OM
+	

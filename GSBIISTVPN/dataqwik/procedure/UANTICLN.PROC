@@ -1,0 +1,3939 @@
+//DO NOT MODIFY  Account Projection Utilities - Loans|UANTICLN|||||||1
+UANTICLN
+
+	/*
+	Account Projection Utilities - Loans
+
+	---------- Revision History -------------------------------------------
+
+	Jul 16, 2013 - Tom Locke
+		   Modified SETLCHG to not call SETQUE when ln.lcad=EFD.
+		   Modified EVENTL section to project missing late charges.  See section
+		   for documentation.
+		   
+	Jan 18, 2013 - Tom Locke
+		   Added call to BCHLNUNAPF to fix issue where payment made
+		   1 day prior to due date went to unapplied funds, but did not debit
+		   UNAPF and make the payment on the bill date.
+		   
+	12/06/12 - Siripong Prayoonhong (06Dec12)
+		   Modified EVENTL section to set ACRADJ(ln.cid,"ZSUBACR") to 
+		   zero if ACRADJ(ln.cid,"ZSUBACR") does not exist.
+
+	Sep 24, 2012 - Tom Locke
+		   Releasing changes in this procedure from subsidy retrofit.
+
+	03/01/12 - Tom Locke
+		   Added logic for government subsidy payments.
+
+	04/20/12 - Siripong Prayoonhong (20Apr12)
+		   Modified UPDLN section to convert NULL keyword in SQL 
+		   update statements to ''.
+
+	12/15/10 - Siripong Prayoonhong (15Dec10)
+		   Modified SETQUE section to shift XDT back one frequency 
+		   before bumping XDT until XDT is greater than the maturity 
+		   date in case ZOJD is on the maturity date. This was causing 
+		   an error when the payment frequency uses next business date 
+		   but the maturity date is on a non-business day. 
+		   For example, using DIST1FRE = 1MNE, MDT = 61938, the return 
+		   value from $$NJD^UFRE(61938,"1MNE") is 61969. But the next 
+		   due date should be 61940.
+
+	12/14/10 - Siripong Prayoonhong (14Dec10) - GSB
+		   Modified LICHND to consider legal status "03" as another 
+		   trigger for balance adjustment for accrual calculation on 
+		   court-order accounts, and use only principal balance in 
+		   comparison.
+
+	11/29/10 - Paradorn
+		   Fixed ln.ZLSTIBAL to be 2 decimal.
+
+	11/22/10 - Siripong Prayoonhong (22Nov10)
+		   Modified EVENTL section to remove setting up queue 
+		   for billing date and scheduled date roll when bringing 
+		   a loan current (CTL="10") from changing status from Closed 
+		   to Active in case the account is re-opened on the same day 
+		   it was closed.
+
+	09/15/10 - Tom Locke - GSB HP loans
+		   Protect variables LCAD and LGD prior to calling LCAD^BCHLNLD.
+		   
+	09/09/10 - Siripong Prayoonhong (09Sep10)
+		   Modified LNACR section to ensure that LN.DIST1ND has 
+		   a value before determining whether LN.DLCAF should be set.
+
+	08/18/10 - Tom Locke - GSB
+		   Modified LNACR section to set and use OLDESTLCAD.
+		   
+	07/28/10 - Varakrit Loykulnant - GSB
+		   Modified RERUMFM section to not bring back reversed
+		   interest value incase it was changed.
+
+	07/15/10 - Siripong Prayoonhong (15Jul10)
+		   o Modified SETQUE section to consider the maturity date when 
+		   bumping NJD if EVNTNAME is 'RUNBIL', 'RUNSCHND' or 'RUNPMT'.
+		   o Modified LNACR section to add .get() on BASREL to prevent 
+		   an UNDEFINED error.
+
+	07/07/10 - Tom Locke - HP loans
+		   Added logic to RUNBIL section to ensure DAYENDLCHG is set for backdated
+		   loans.
+		   
+	06/25/10 - Siripong Prayoonhong (25Jun10)
+		   Modified EVENTL section to also set up queue for billing 
+		   date and scheduled date roll when bringing a loan current 
+		   (CTL="10") from changing status from Closed to Active.
+
+	06/11/10 - Siripong Prayoonhong (11Jun10)
+		   Modified LNACR section to check whether LN.POPT 
+		   has a value before getting the late charge plan.
+
+	06/04/10 - Siripong Prayoonhong (04Jun10) - Profile Upgrade
+		   Merged custom code from V6.4 as follows:
+
+		    06/03/05 - VARAKRIT ***** Patch *****
+		    Modified section RUNAUT to skip calling SING^PROCAUTO
+		    since it will cause a host update error in case there
+		    is not enough fund in the deposit account.
+
+	05/04/10 - Siripong Prayoonhong (04May10) - Profile Upgrade
+		   o Modified SETAUT section to determine queue location of 
+		   QUE079 rather than QUE115 if CUVAR.ALPHI is set to N.
+		   o Modified RERUNHIST section to use the branch code 
+		   associated with the transaction object for late charge 
+		   adjustment, defaulting to CUVAR.BOBR if it is null.
+
+	04/12/10 - Tom Locke
+	           Modified RUNCLHG section to set ln.dlcaf = 1.  Also added variable
+	           LCFROMDT in RUNLCHG section.  This was fixed for HP
+	           loans but can be released as a general fix.
+	           
+	04/08/10 - Pete Chenard
+		   Modified RUNAUT to check if the primary transaction that initiated
+		   the auto loan payment is online.  For example,a backdated loan payment
+		   from the teller window will trigger unwind/reapply of auto payments.
+		   If any of the reapplied payments fail, we do not want to reject
+		   this teller payment.  In this case, we set ER=0 and ET="" and
+		   continue.
+	
+	04/07/10 - Tom Locke
+	           Modified section SETAUT to allow a payment to process on EFD
+	           if EFD is a scheduled due date and auto loan payments is in EOD.
+	           
+	03/10/10 - Allan Mattson
+	           Modified RERUNHIST to use the branch code associated with
+	           the transaction object, defaulting to CUVAR.BOBR if it is
+	           null.  Prior to this change, CUVAR.BOBR was always used.
+
+	03/07/10 - Pete Chenard
+		   Modified EVENTL to correct initialization of ACRADJ arrray. See
+		   corresponding change in UANTIC.
+
+	03/02/10 - Siripong Prayoonhong (02Mar10) - Profile Upgrade
+		   Modified SETAUT and RUNAUT sections to determine queue 
+		   location of QUE115 rather than QUE079 if CUVAR.ALPHI 
+		   is set to Y.
+
+	01/11/10 - Tom Locke
+	           Modified RUNPMT1 section to remove "if ER set ER=0 quit".  This fixes
+	           a problem where an error occured during a payoff quote but processing
+	           actuially filed an accrual adjustment.
+	
+	12/31/09 - Tom Locke 
+	 	   Modified ACRADJ section to set the accrual adjustment to the
+	 	   value in array ACRADJ instead of ln.acr-ACRADJ.  This fixes an issue
+	 	   where the accrual adjustment was wrong, and was very apparent when credit
+	 	   transactions to principal increased the accrual instead of decreasing it.
+	 	   
+	12/22/09 - Pete Chenard
+		   Modified UPDLN to untokenize the value that gets set into
+		   the ln object.  Prior to this change, only the column name
+		   was being untokenized.
+
+	12/09/09 - Allan Mattson
+	           Modified subroutine RUNFMEFD to correct a GTM-E-QUITARGREQD
+	           error.
+
+	11/08/09 - Pete Chenard
+		   Added the following fix from core Profile
+			08/26/08 - BIJOY CHELORA - CR 34699
+			   Modified sections LNACR and ACRADJ to have ACRADJ properly 
+			   accrue interest adjustments again.
+
+	09/19/09 - VARAKRIT
+		   Remove unused retrofit relating to moving late charge batch.
+
+	06/30/09 - KumarB - CR 38152
+		   Modify section RERUNFM to check for FID "LNSEG" along with
+		   "ACNSEG".
+
+	06/20/09 - MATTSONA
+		   Retrofit of the following custom KTB code:
+		   
+		   	17/01/07 - Varakrit
+		   	  Modified section ACRCALC to consider legal status and 
+		   	  calculate based on court order maximum balance to 
+		   	  accrue processing if applicable
+		   	
+		   	01/27/05 - VARAKRIT
+		   	  Modify DLYLATE section to always include transaction
+		   	  in the daily late charge recomputation
+		   	
+		   	10/20/04 - VARAKRIT
+		   	  Fix backdate/reversal posting ploblem causing from  
+		   	  BCHLNLATE is moved to beginning of day and some 
+		   	  other adjustment issues. Modify:ACRCALC section 
+		   	  to add one more day to adjustment 
+		   	
+		   	  RUNBIL section to check LCBO before shifting date 
+		   	  (this change was not added as it was not necessary).
+		   	  RUNLCHG section to stabilize the first day adjustment. 
+		   	
+		   	16/08/04 - FGK 
+		   	  Adjustment because of movement BCHLNLATE from END of 
+		   	  DAY to BEGINNING OF DAY
+
+	06/20/09 - KinI/KumarB - CR 40856
+		   Modified RERUNHIST to remove EXACTACRVATR and EXACTACRVPDRL
+		   TSO fields when reapplying the payment transaction to the 
+		   loan with LN.VATINTOPT option of 5.
+		   
+	04/03/09 - KinI/KumarB - CR 38918
+		   Modified for Rebate VAT on Interest enhancement:
+		 o Modified LNACR section to move the interest calculation 
+		   processing to LNACR^LNU function to improve code modularity.
+		 o Modified ACRADJ section to include LN.VATINTOPT of 5 where
+		   options 3 and 4 are considered to update LN.ACRVAT, 
+		   LN.ACRREAL and LN.ACRVATRL with adjustments stored in ACRADJ
+		   array and set "EXACTACRVATR" TSO component if LN.VATINTOPT 
+		   is 5.
+		 o Updated RUNPMT section to consider LN.GTDUE as the payment
+		   amount for the loan with VATINTOPT>0.
+		 o Modified SETUDI section to set UDI change event for the loan
+		   with LN.VATINTOPT option of 5.
+		   
+	02/26/09 - KumarB - CR 38440
+		   Modified section ACRADJ to adjust the Accrued Real Interest
+		   Life (ACRRREALL) for VATINTOPT 4. This will fix the issue of
+		   ACRREALL amount is double the amount of ACRREAL.
+
+	01/16/09 - Bijoy Chelora - CR 36443
+		   Modified SETQUE and SETEVENT section to skip setting accrual
+		   event when paying off a loan when only file maintenance 
+		   reapplication is allowed. Added new PAYOFFREV flag to SETQUE
+		   and SETEVENT sections to distinguish payoff reversal case 
+		   when setting accrual event. Modified all SETQUE calls to add
+		   PAYOFFREV parameter (should always be false except when 
+		   passed from MAIN^UANTIC in case of payoff reversal).
+
+	12/23/08 - DHANALAKSHMI R/NATRAJAH - CR 37288
+		   Modified sections RUNPMT, RUNLCHG, RERUNHIST, DLYLATE, 
+		   ACRADJ and LATE2 to replace the variable RLCHGADJ with 
+		   VATLCHG according to the return value of EXTERN^BCHLNLATE.
+		   Also modified to correct LCHGTSO settings. This corrects 
+		   .01 difference in VAT on late charge amount while unwind 
+		   process due to rounding issue.
+		   Modified LICHND section to update the interest rate changes
+		   in the account history record.
+
+	12/12/08 - DHANALAKSHMI R - CR 37049
+		   Modified sections DLYLATE, ACRADJ, LATE2, RUNPMT, RUNLCHG 
+		   and RERUNHIST to set and pass LCHGTSO in the call to 
+		   POSTADJ^LNPTS12 this corrects "Unable to locate transaction
+		   in account history" error while error correction.
+
+	12/11/08 - DHANALAKSHMI R - CR 37094
+		   Modified the RERUNHIST section to assess late charges 
+		   accumulated during the reapply process prior to reapplying
+		   a payment transaction.  This fixes an issue where a payment
+		   being reapplied did not satisfy late charges as would
+		   normally happen during non-backdated activity.
+
+	11/20/08 - Clayton Schwartz - CR36076 
+		 o General warnings cleanup.  
+		 o Modified the SETICAP section to quit prior to creating the 
+		   event for interest capitalization when ln.iropt is set 
+		   to 5 (Capitalize at Billing).
+		 o Modified section RUNBIL to update ACRADJ for interest that
+		   will capitalize at billing prior to calling EXEC^BCHLNLD.
+		 o Modified RERUNFM to accept the lnseg() object array as the
+		   3rd argument and RERUNHIST to pass the value. RERUNFM will
+		   now reapply acnseg table file maintenance.
+		 o Modified LNACR to update ACRADJ for segments (matches 
+		   changes made under CR 34699 for non-segmented accounts).
+		 o Modified ACRADJ to accept a segment number as the 9th 
+		   argument. When passed ACRADJ will post an accrual adjustment
+		   to only the specified segment. 
+		 o Moved the code processing each individual segment from
+		   ACRADJ to a new section SEGACRADJ.
+		 o Modified EVENTL to initialize the ACRADJ values to zero.
+		 o Removed Z named table references from RERUNFM as updates to 
+		   these tables will fail becuase the object for the Z named 
+		   table does not exist.
+		   
+	11/12/08 - KumarB - CR 36288
+		   Modified all the call to POSTADJ^LNPTS12 to pass lnseg
+		   object as the 5th parameter, to avoid new object being
+		   created while posting late charge capitalization for
+		   segmented account.
+
+	09/15/08 - DHANALAKSHMI R - CR 35480
+		   Modified the sections EVENTL, RUNPMT, RUNLCHG, RERUNFM, 
+		   LNACR, DLYLATE, ACRADJ and LATE2 to calculate VAT on Real  
+		   Interest and VAT on Real Late Charge Charge.
+		   Modified RUNEOM section to update LNVAT table.
+		   Added the sections SETUDI and RUNUDI to set and process 
+		   UDI values.
+
+	08/05/08 - Naveen G - CR 34289
+		   Modified SETLCHG to set up the RUNLCHG event when a loan with
+		   a one-time late charge has LCAD set in the future and when daily
+		   late charge has LCAD set in the future and hasn't started assessing
+		   yet.  This fixes a problem where the one-time late charge wasn't 
+		   projected during future-dated payoff quotes when the EFD of the payoff 
+		   was beyond the LCAD.
+		   
+		   Modified the RUNBIL section to correct a problem where the RUNLCHG 
+		   event was setup to run for the EFD of a ftd'd payoff projection.  
+		   This prevents more late charges from being assessed than should have
+		   been during the projection.
+		   
+		   Modified the SETBIL section to prevent an incorrect value of BLOFF
+		   from being calculated when BNDT > SCHND (i.e., during an offset period).
+
+	07/17/08 - Naveen G - CR 34113
+		   Modified the SETNETFEE section to prevent the RUNNETFEE event
+		   from being set up when the effective date of the transaction is
+		   after the end date of the net deferred fee.  This prevents an
+		   error from being displayed, "Amount processed equal to zero", 
+		   because no fees/expenses would have amortized after the end date.
+
+	06/27/08 - Naveen G - CR 34500
+		   Modified RUNPMT to remove use of the LADJ variable.  This
+		   variable was used to account for the amount of late charges
+		   accrued on the first "dayend" event so that it could be
+		   included in projected payments, but LNPTS12 is adjusting
+		   ln.lchg and therefore that late charge amount was being
+		   double-counted.
+	
+	05/13/08 - KELLYP - CR 33696
+		   Modified code and documentation in LNACR related to neg bal
+		   transfers to conform to standards.  
+
+	05/08/08 - Sanjay Kumar - CR 33269
+		   Modified RUNBIL to prevent the system from setting up a late
+		   charge event for a date beyond the effective date associated
+		   with a future-dated payoff projection.  This resolves an issue
+		   where the system was projecting too much interest.
+		   
+	04/18/08 - KELLYP - CR 32532
+		   Modified the RUNBIL section to call the new CALCLCAD extrinsic
+		   in BCHLNBLDB to calculate the loan's proper late charge action
+		   date after deleting a bill for unwind processing.  This ensures
+		   the correct LCAD is set on the account based on delinquency
+		   status and account parameters.
+
+	03/19/08 - STOUTD - CR31693
+		   Modified ACRADJ section for non-segmented loans to only
+		   reduce ln.acr once for the accrual adjustment transaction.
+	
+		   Several changes for the Amortization enhamncements retrofitting
+               
+                   Modified section SETNETFEE, add logic to existing if statement to test
+		   lncycpts.nxadt < CUVAR2.  This will prevent the system from trying
+		   to reapply amortizations, that were not reversed with a backdated
+		   payoff.
+	
+		   Modified the RUNBIL section to reset BLOFF to LN.BLOFF when
+		   the calculated BLOFF value is negative.  This prevents invalid
+		   QUEUE entries from being created for dates prior to the current
+		   projected system date.
+	
+		   Modified the RUNBIL section to call the new CALCLCAD extrinsic
+		   in BCHLNBLDB to calculate the loan's proper late charge action
+		   date after deleting a bill for unwind processing.  This ensures
+		   the correct LCAD is set on the account based on delinquency
+		   status and account parameters.
+	
+		   Modified RUNPMT section to correctly handle the late charge 
+		   daily adjustment generated when projecting the future-dated
+		   payoff with "Anticipated Payment" flag set to "Y" so that
+		   projected late charge is equal to zero. Before, the system
+		   would assess that daily adjustment just after executing the
+		   payment event(s) leaving it unpaid in the "due" bucket.
+	
+		   Modified RUNBIL section to prevent quitting before building
+		   the late charges event when there is no projecting payments.
+		   Before, future-dated payoff status report didn't display the
+		   late charges adjustments with "Anticipated Payment" flag set
+		   to "N".
+	
+		   Modified RUNDEFFEE section to redefine deferred fee 
+		   amortization event date for backdated loan creating. 
+		   The System Date used in SETDEFFEE in this case is not true 
+		   event date when LNFEEP.BES="N" on the fee plan.
+	
+		   Modified the LNACR section to prevent accrual adjustments
+		   when backdating transactions if the loan previously qualified
+		   for a negative balance transfer and the Suspend Int Accrual
+		   option (LN.NBTNOACR) is enabled.  Accrual adjustments only 
+		   necessary in this case if backdating prior to the date the 
+		   loan qualified for the transfer.  Also modified the SETCYMSC
+		   section to catch-up/project cycled item amortizations when
+		   performing a future-dated payoff quote.
+	
+		   Modified the RUNNETFEE, RUNDEFFEE, and RUNCYCMSC sections to
+		   pass a value of "1" to the EXTERN section of their respective 
+		   batch definitions (CTL parameter).  This indicates a forward
+		   catch-up amortization should take place.  Also modified the
+		   SETCYCMSC and SETDEFFEE sections to use the "next" amortization
+		   date rather than CUVAR2 and TJD (respectively) when setting up
+		   events for cycled items and deferred fees.  This fixes an issue
+		   where the batch did not amortize these balances correctly when
+		   the next cycle date was not equal to the account opening date.
+	
+		   Modified the SETBIL & RUNBIL sections to handle the generation
+		   of bill records when the new product-level Offset Period Bill
+		   option is enabled.  This ensures that the proper billing offset 
+		   period is used when setting up next/last billing dates for 
+		   account modeling & reapply in the event that any offset period
+		   bills were produced.
+
+		   Modified SETCYCMSC, SETNETFEE, and SETDEFFEE to also call
+		   these sections' corresponding RUN* sections for error corrects
+		   and same-day reversals of backdated payoffs.  This ensures 
+		   that a loan's cycled items, net deferred fees, and regular
+		   deferred fees are brought current for backdated payoff 
+		   transactions that are EC'd or reversed on the same day the
+		   payoff was processed.
+			   
+		   Also fixed a problem in DLYLATE and RUNLCHG for daily late
+		   charge calculations that occurred when a backdated payoff
+		   reversal was processed such that only one accrual event 
+		   was created (properly) but late charges weren't calculated
+		   for the entire effective-dated period.
+	
+		   Modified for the Amortization enhancement project.
+		   - Added SETDEFFEE, SETNETFEE and SETCYCMSC sections to create 
+		   the events for the amortization of deferred loan fees, net 
+		   deferred fees and miscellaneous cycled items.
+		   - Modified EVENTL section to call new SETDEFFEE, SETNETFEE 
+		   and SETCYCMSC sections.
+		   - Added RUNDEFFEE, RUNNETFEE and RUNCYCMSC sections to call 
+		   new EXTERN^BCHDEFFE, EXTERN^BCHNDFAM and EXTERN^BCHLNAMO 
+		   line tags respectively that perform the actual amortization.
+	
+	02/21/08 - Kumarb - CR 31369
+		   Modified section LNACR to use Promotional Rate (TRATE) for
+		   both the segment and account levels, if Promotional Expiry
+		   date is in future when determining the interest rate for
+		   accrual calculations.
+	
+	02/11/08 - TAOC - CR 31691
+		   Modified SETBIL section to handle the generation of Offset
+		   Period Bills during backdated account openings. Fixed a 
+		   problem with the calculation of billing next dates when a loan 
+		   that allows offset period billing has been paid in advance 
+		   (needed to use SCHND, not DIST1ND, to do these calculations).  
+		   This fixes a problem where a loan that has been paid in advance 
+		   did not have UANTIC schedule it's anticipated billing dates 
+		   properly, which led to errors during the scheduled date roll 
+		   projection.
+		   
+		   Modified RUNBIL section to reset the local BLOFF variable,
+		   based on the current due date and Date of Note of the loan
+		   account, while generating an offset period bill. Also BLOFF
+		   is added as the fourth parameter when calling EXEC^BCHLNLD.
+		   Modified RUNFEE section to pass "110" to EXTERN^BCHLNFEE.
+
+	02/02/08 - KELLYP - CR 31684
+		   Modified the RUNBIL section to take the new Multiple Grace 
+		   Periods option (LN.PMTGRCM) into consideration for one-time
+		   (non-daily) late charge plans.  Also modified the RUNBIL
+		   section not to calculate late charges at account opening.
+		   Also modified LNACR to fix a bug where LN.DLCAF wasn't being 
+		   reset properly because the system was looking at LNBIL1.CDPD 
+		   (the due date) instead of LNBIL1.CASD (amount still due).
+		   
+		   Also fixed a problem in DLYLATE and RUNLCHG for daily late
+		   charge calculations that occurred when a backdated payoff
+		   reversal was processed such that only one accrual event 
+		   was created (properly) but late charges weren't calculated
+		   for the entire effective-dated period.
+
+	11/06/07 - CHHABRIS - CR30077
+		   Modified EVENTL section to set/initialize ACRADJ(CID,"ACR")
+		   to ln.acr if ACRADJ(CID,"ACR") does not exist. The interest
+		   adjustment/projected interest accrual value was wrongly
+		   calculated for future dated loan payoff status report.
+		   Also, ACRADJ array for "CPACR","ONEAGOACR" and "TWOAGOACR"
+		   was initialized with LNSEG counterparts if it does not
+		   exist.
+
+	09/27/07 - Kumarb - CR 28343
+		   Modified section LICHND, to set PAR("IXLOAD")=1 if the
+		   value is already defined, to use IX array in CTL^UINDX.
+	
+	09/12/07 - Kumarb - CR 28928
+		   Added RecordLNSEG lnseg() parameter for necessary sections,
+		   and also passed .lnseg() param to those sections.
+	
+	09/04/07 - RussellDS - CR28928
+		   Added scope management for call to TRNSINGL^TRNDRV
+	
+	08/28/07 - Chhabris - CR28958
+		   Removed the subtraction of ACRADJ(ln.cid, "ACR") from
+		   ln.acr in the ACRADJ section. Also removed the rounding of
+		   ACRADJ(ln.cid,"ACR") and placed the code for add-on/
+		   discounted loan in the 'if' block for non-segmented
+		   accounts. Due to the 08/22/07 change, backdated transactions
+		   after the first disbursement would incorrectly bring the
+		   accrual back to 0.
+
+	08/22/07 - Chhabris - CR28684
+   		   Modified EVENTL and LNACR sections to restructure the use 
+		   of ACRADJ(,,) for loan non-segmented accounts to behave like
+		   deposit acounts do (in which original accrual amounts are 
+		   saved instead of manipulating each time through the LNACR 
+		   section). Also, modified ACRADJ section to set TSO with
+		   'EXACTACR' amount which will be used by LNPTS15 to set up
+		   the accrual on the loan account. This corrects accrual
+		   adjustment calculation for accounts that capitalize interest.
+
+	08/05/07 - KumarB / SmithCD - CR 27856
+		   Modified ACRADJ, LNSEGACRADJ, and LNACR sections to 
+		   restructure the use of ACRADJ(,,) for loan segmented 
+		   acounts to behave like deposit acounts do (in which 
+		   original accrual amounts are saved in LNUEFD instead of 
+		   manipulating each time through the LNACR section). This 
+		   simplifies accrual adjustments for loan segmented accounts, 
+		   which typically capitalize interest (making them like 
+		   deposit accounts in that respect). Removed ORDERBY clause 
+		   from LNSEG record fetches where not needed, to improve 
+		   efficiency. Modified LNACR section to improve code related 
+		   to trouble-shooting statistics.
+		   
+	07/30/07 - SmithCD/Chhabris - CR27841
+		   Modified the RUNBIL section to set the late charge action 
+		   date according to the late charge batch queue location. 
+		   The associated accrual event was changed to only be set for 
+		   dates less than the projected-to date. Previously an extra 
+		   day of accrual was being added for a future projection b/c 
+		   the accrual event for the late charge action date was for 
+		   the effective (projected-to) date, which should never 
+		   happen (b/c accruals is an EOD process).
+	
+	07/03/07 - DHANALAKSHMI R - CR27573
+		   Modified the section RUNBIL to correct the settings of LCAD 
+		   to avoid the error message "Late Charge Action Date Invalid".
+
+	06/12/07 - Anitha Chandran - CR 27538
+		   Modified the LATE2 section to change it's third parameter
+		   from CUVAR2 to %EffectiveDate and declared the CUVAR2 as 
+		   public inside LATE2 section to properly anticipate
+		   late charges when the Daily Claculation Flag is set to "Y" 
+		   for the loan payoff status report.
+		   
+	05/23/07 - GIRIDHAL CR 26692
+		   Modified RUNBIL section to initialize UANTICTL flag as a means
+		   to suppress fees at backdated loan create. UANTICTL is checked
+		   in BASIS^LNFEEU.
+		   Also modified the call to EXEC^BCHLNLD in RUNBIL section to 
+		   pass in .ttx as the third parameter.
+
+	05/02/07 - SENTHIL.J KUMAR - CR 25028
+		   Modified the RERUNHIST section to reapply transactions using
+		   the back-office branch code.  These are system-generated
+		   transactions so they should use the system branch.  This
+		   prevents OOB errors from occurring that were caused by the
+		   LN.BOO being used.
+
+	04/18/07 - KUMARB / SmithCD - CR 26550
+		   Modified section LNINDEX, LICHND and LNACR sections for
+		   interest change for segmented accounts.
+		   Modified section LICHND to remove the condition
+		   LNUEFD.get()!LNPTSRV.get().
+		   Modified section LNSEGACRADJ to log the index/matrix
+		   changes in history.
+	
+	03/24/07 - chhabris - CR 24680
+		   These changes are made for credit card processing.
+		   Modified LNACR section to calculate accruals for segments
+		   based on lnseg.bal. ACRADJ array will be updated with
+		   adjustments for current period accrual, last period accrual
+		   and accumulative prior period accrual. Also update the loan
+		   record (ln), loan segment record (lnseg) with the
+		   appropriate values. This will only affect the loan accounts
+		   with segments.
+		   Modified ACRADJ section to update loan and loan segments
+		   record with the adjustments. 
+		   Added a new section LNSEGACRADJ to post the final adjustment
+		   amount for current period accrual, last period accrual and
+		   accumulative prior period accrual. The offset (MDR if the
+		   transaction is a credit, and MCR for a debit) for the same
+		   is also posted in this section.
+	
+	12/12/06 - SANTHUMS - CR 22042
+		   Modified LICHND section to add the condition 
+		   ln.ichnd = EVNTJD prior to bumping the dates. Since 
+		   the interest change next date(ln.ichnd) was not set properly
+		   the error "New interest amount not defined - Account not 
+		   reset" was getting displayed in EXTERN^BCHICHAN.
+		   Removed .exists() since it is not required to get into LICHND 
+		   from LNACR for basis indexes.
+		   		 	
+	11/30/06 - DHANALAKSHMI R - CR 21407
+		   Modified the section RERUNFM to use DBTBL1D instead of 
+		   the Table DBTBL11 and also added a condition to make sure 
+		   that only the non-computed columns for LN and DEP records
+		   are getting updated.
+
+	11/27/06 - KELLYP - CR 24216
+		   Modified the LICHND section to create a HIST record after 
+		   updating the loan's interest rate.  This prevents a problem 
+		   where variable rate loan accounts that were backdated over 
+		   interest change dates did not have rate changes logged to 
+		   HIST.  Also modifued the LICHND section not to pass the IX
+		   is loaded parameter to CTL^UINDX.  The system cannot ensure
+		   that all rate change dates have been loaded into the IX
+		   array when back-dating or projecting.
+	
+	10/25/06 - KELLYP - CR 23485
+		   Modified RUNBIL section to consider grace days when
+		   determining whether to set up the late charge event for
+		   future-dated payoffs.  This fixes a problem where the PFW
+		   Payoff Status report did not calculate late charges for a
+		   non-daily late charge plan.
+	
+	09/21/06 - Ravindra Rathi - CR 22770
+	           Modified RERUNHIST^UANTICLN to pass the OVR array to 
+	           TRNSINGL^TRNDRV for not processing overrides for any 
+	           backdated processing.
+	
+	09/14/06 - SANTHUMS - CR 22181
+		   Modified RUNDSBSCH section to re-retrieve the ln record 
+		   after the call to EXEC^BCHLNDS since the updated ln object 
+		   reference is lost after the call to EXEC^TRNDRV.
+			   
+	08/07/06 - KELLYP - CR 22530
+		   Modified EVENTL section not to setup an accrual event for
+		   EFD-1 for same-day error corrects/reversals.  This prevents
+		   an accrual adjustment from being posted in error.
+
+	08/01/06 - KELLYP - CR 22417
+		   Modified LNACR section to prevent an UNDEFINED error on the
+		   BASREL array.  The BASREL array is not defined when the
+		   EFD of the transaction being reversed is the same as the
+		   current system date.
+
+	06/28/06 - chhabris - CR21762
+		   Modified EVENTL section with 'ln.subpln.isNull() as 
+		   subpln is a string and alawys turns out to be a false and 
+		   does not call SETLNSUB section. Included the below changes
+		   also.
+		   o 06/27/06 - SmithCD
+		     Replaced ln.intfre check in EVENTL with 'ln.intfre.isNull() 
+		     before calling LNINDEX section to prevent potentially not 
+		     including frequencies that do not start with a number (such 
+		     as custom frequencies).
+
+	06/15/06 - DHANALAKSHMI R - CR 21798
+		   Modified the section SETDISB by changing 'rs.next() to 
+		   rs.isEmpty() in the "if" block condition to avoid skipping   
+		   the first disbursement record.
+
+	06/09/06 - DHANALAKSHMI R - CR 21181
+		   Modified the section RUNFEE by adding a condition before
+		   calling the batch to prevent running BCHLNFEEDE batch for 
+		   today's date since this batch is part of DAYEND at EOD and 
+		   so will be processed during regular DAYEND processing on  
+		   that date and should not be called by UANTICLN, to prevent 
+		   double-posting.
+
+	05/17/06 - Mugilvannan - CR 21147
+		   Modified the comment in BUILDQ section for the BALIRN() array
+		   as it populate vale if the interest rate or balance change.
+		   		   
+	05/03/06 - SANTHUMS - CR 20797
+		   Modified RUNPMT section to set Payoff transaction code 
+		   only if TAMT is greater than or equal to payoff amount.
+		   	
+	04/27/06 - SmithCD - CR 20965
+		   Removed local scoping of ER in RERUNHIST section, and 
+		   modified RERUNFM to properly handle deposit account file 
+		   maintenance (was attempting to set the ln object instead of 
+		   dep, which triggered an error, which in turn caused the 
+		   rollback of the transaction up to that point). Also added 
+		   consideration of ln.minacr and ln.minopt in LNACR section 
+		   to prevent accrual on balances less than the minimum.
+	
+	04/07/06 - KELLYP - CR 20579
+		   Modified SETICAP section to reference ln.iropt instead of
+		   ln.icap when setting up FRE and NJD for int. capitalization.
+	
+	04/07/06 - KELLYP - CR 20520
+		   Modified EVENTL section to check the FUPO variable when
+		   determining whether to set up payment related events.  This
+		   ensures that the payment events are called for future-dated
+		   loan payoff status reports with anticipated payment activity
+		   (partial retrofit of CR 5895 from Profile01).
+	
+	03/16/06 - Srinivar - CR 19664
+		   Modified the BUILDQ section to remove the line of code which
+		   was setting the promotional rate as interest rate. The above
+		   change will prevent the problem of incorrect accrual of 
+		   interest for promotional rate. Interest will be 
+		   calculated on the promotional rate which is specified 
+		   only till expiration date and after that the interest will be
+		   calculated on regular rate.	
+	
+	03/16/06 - KELLYP - CR 19875
+		   Modified SETQUE section to make CID local instead of public.
+		   This prevents a TPTIMEOUT error when SETQUE is called from
+		   RESETHIST for backdated loan accounts with escrow attached.
+	
+	03/14/06 - TITOVE - CR 20054
+		   Modified SETFEE to prevent setting up multiple QUEUE entries
+		   for the same date.
+
+	03/13/06 - KUMARB - CR 19875
+		   Modified section SETQUE to set the value of CID and also 
+		   added quit:ER in "for" loop of "Multiple entries".
+		   
+	03/07/06 - S.Krishnan - CR 19711
+		   In the RUNDSBSCH section, removed the CTL parameter in call
+		   to EXEC^BCHLNDS as the use of CTL variable is removed from
+		   the Batch BCHLNDSDE. 
+
+	03/03/06 - KELLYP - CR 19885
+		   Modified RUNAUT section to only pass the ln object to 
+		   EXEC^PROCAUTO.  PROCAUTO should generate it's own ttx objects
+		   and treat them locally, not accept them as a parameter.  This
+		   prevents a ttx undefined error in PROCAUTO because ttx was
+		   never initialized.  Also modified SETFEE to get LNFEEP object
+		   from disk instead of %CACHE because it needed to be protected
+		   with a 1 in the third parameter.
+	
+	03/01/06 - Hillanbrand - CR 19801
+	           Modified SETQUE section change %EffectiveDate to SAVEEFD to
+	           allow the LCHG queue to be set when backdating a disbursement.
+	           if EVNTJD > %EffectiveDate quit to if EVNTJD > SAVEFD quit
+	
+	02/21/06 - KELLYP - CR 19338
+		   Modified the EVENTL section to reset ln.ichld=ln.dtnt prior to 
+		   resetting ln.ichnd (based on ln.ichld).  This prevents a
+		   problem from occurring where the system would calculate the
+		   ln.ichnd based upon a value that was prior to the date of note
+		   and then reset ln.ichld anyway (so the ld and nd wouldn't be
+		   in synch).
+	
+	02/06/06 - TITOVE - CR 18449
+		   Modified SETFEE by restoring Profile01 logic: no need to
+		   set first piece of DAYENDLNFEEC to 1 - there is no column
+		   for that piece. Added check for SKIP piece 2 to special
+		   event set up, to prevent double-booking at disbursement.
+
+	02/03/06 - KELLYP - CR 19343
+		   Modified SETFMEFD section to use ln.cid instead of CID to
+		   prevent an UNDEFINED error.
+	
+	01/30/06 - SmithCD - CR 19343 (16890)
+		   Retrofitted changes involving escrow-related CR 2916, and 
+		   interest index fixes from p01. Changes include:
+		   . Modified ACRADJ to be ACRADJ(,) to accommodate escrow 
+		     accounts
+		   . Modified ACRADJ section to call ESCADJ^UANTICDP when 
+		     escrow accrual adjustments are necessary
+		   . Changed ACRDT to ACRDT() throughout
+		   . Modified QUEUE(,) to accommodate an extra second key (CID)
+		   . Changed key structure of ttx1(,) to have account number 
+		     as the second key to handle multiple accounts
+		   . Added ESCSEC section
+		   General changes not specifically related to escrow:
+		   . Moved RATECHGL and INTFREL sections to ^UANTIC (enhanced 
+		     for efficiency and renamed to RATECHG and INTFRE, 
+		     respectively) b/c the basic index logic s/be mostly the 
+		     same for loans and deposits
+		   . Added LNINDEX section to drive loan-specific interest 
+		     rate changes
+		   . Removed EVNTSQ parameter from RUN* sections since they 
+		     are no longer used in those sections
+		   . Removed FHMTRN section - uses AuditFlag(1) instead
+		   . Changed RERUNHIST to post transactions through 
+		     TRNSINGL^TRNDRV instead of POST^LNTRB to prevent invalid 
+		     HISTLST insertions to previously unwound transactions
+		   . Removed CTL parameter in call to EXTERN^BCHLNSCH to 
+		     prevent undefined error
+		   . Added a quit from the top of the SETPPI if it is not a 
+		     future projection to prevent accruals from incorrectly 
+		     starting from the date of note on backdated transactions
+		   . Labeled sections that are only called from within the 
+		     system area as private (instead of public)
+		   . Further cleaned up code
+
+	*/
+
+	quit
+
+
+private BUILDQ(RecordLN ln,		// Loan account			/REF:R
+	       RecordTTX ttx,		// Transaction			/NOREQ/REF:R
+	       Date %SystemDate,	// System date
+	       Date %EffectiveDate,	// Effective (thru) date
+	       String CTL,		// Control indicators		/NOREQ
+	       String SKIP,		// Skip indicators		/NOREQ
+	       String BALIRN(),		// Interest Accrual Projection	/REF:RW
+	       Number ACRDT(),		// Accrued-thru date		/REF:W
+	       RecordLNSEG lnseg())	// Loan segments		/REF:RW
+
+	/*
+	Project loan %SystemDate through %EffectiveDate, and build QUEUE(,,)
+
+	Additional notes on ARGUMENTS:
+
+	. SKIP
+		Position   
+		1 - skip regular loan payments
+		2 - skip initial disbursement
+	*/
+	
+	type public Boolean ER
+		
+	// Initialize accrued-thru date
+	set ACRDT(ln.cid) = %SystemDate - 1
+	
+	// For Interest Accrual Projection Report, set up BALIRN() entry for 
+	// first day, and later whenever the interest rate or balance changes
+	if BALIRN set BALIRN(%SystemDate) = ln.balint_"|"_ln.irn
+	
+	do EVENTL(.ln, .ttx, .lnseg()) quit:ER
+	
+	quit
+	
+
+EVENTL(RecordLN ln,		// Loan account			/REF:R
+       RecordTTX ttx,		// Transaction			/NOREQ/REF:R
+       RecordLNSEG lnseg())	// Loan segments		/REF:RW
+
+	// Build events for loan accounts
+
+	type public Boolean ER, FUPO, LNMDLR, LNPTSRV
+	type public Number TRNSEQ
+	type public String ACRADJ(,,), BALIRN(), CTL, SKIP, QUEUE(,,)
+	type public Date ACRDT(), CUVAR2, SAVEFD, SAVTJD
+
+	type String EVNT
+
+	/*
+	LNUEFD.proc initializes ACRADJ() array to zero and tracks the adjustment
+	amount for the account and segments as it is unwound. For projections
+	the array will not exist and must be initialized to zero also so that
+	the projection may track the accurate adjustment amount.
+	*/
+	#IF ('CUVAR.NOSEGMENTS!(CUVAR.NOSEGMENTS=3))!($$SEGUSE^BTTOPTMZ("L"))
+	if ln.segments do {
+		type Number SEGMENT = ""
+		for  set SEGMENT = lnseg(SEGMENT).order() quit:SEGMENT.isNull()  do { quit:ER
+			// Save original accrual amounts
+			if 'ACRADJ(ln.cid, "CPACR", SEGMENT).exists() do {
+				set ACRADJ(ln.cid, "CPACR", SEGMENT) = 0
+				set ACRADJ(ln.cid, "ONEAGOACR", SEGMENT) = 0
+				set ACRADJ(ln.cid, "TWOAGOACR", SEGMENT) = 0
+				}	
+			}
+		}
+	#ENDIF
+	
+	if 'ACRADJ(ln.cid, "ACR").exists() set ACRADJ(ln.cid, "ACR") = 0
+
+	// Siripong - 06Dec12 - Begin
+	if 'ACRADJ(ln.cid, "ZSUBACR").exists() set ACRADJ(ln.cid, "ZSUBACR") = 0
+	// Siripong - 06Dec12 - End
+
+	// Set EFT Collection Orders (for MRPC100 only)
+	if BALIRN = 1 do SETEFT^UANTIC(.ln, %SystemDate, %EffectiveDate, 2) quit:ER
+
+	/*
+	Check for Teaser Rate Expiration Date - set in QUEUE(,,) to
+	force accrual calculations, if a teaser rate exists
+	*/
+	if ln.trexd > ACRDT(ln.cid), ln.trexd < %EffectiveDate do SETEASER(.ln) quit:ER
+
+	// Set up return processing
+	if 'ln.rdt.isNull(), ln.rdt < %EffectiveDate do SETQUE(.ln, "", ln.rdt, 0, 0, "Loan Return|RUNRTRN", false) quit:ER
+		
+
+	// Set up maturity date processing
+	if 'ln.mdt.isNull(), ln.mdt '> %EffectiveDate do SETQUE(.ln, "", ln.mdt, 0, 0, "Maturity Date Process|RUNMDTL", false) quit:ER
+		
+
+	/*
+	Future dated file maintenace application must precede proceeses
+	such as the scheduled date roll.  Subsidy processing, for example,
+	requires values as changed by the file maintenance process.
+	*/
+	do SETFMEFD(.ln, %SystemDate, %EffectiveDate) quit:ER
+
+	/*
+	Skip billing, date roll, interest and payment offset processing and
+	change processing, if this account has no Distribution Frequency.
+	*/
+	// Siripong - 25Jun10 - Begin ---- Siripong - 22Nov10 - Removed
+	if ('ln.dist1fre.isNull()), ((%SystemDate '= CUVAR2) ! (CTL = "01") ! (LNMDLR.get()) ! (FUPO.get())) do { quit:ER
+	// if ('ln.dist1fre.isNull()), ((%SystemDate '= CUVAR2) ! (CTL = "10") ! (CTL = "01") ! (LNMDLR.get()) ! (FUPO.get())) do { quit:ER
+	// Siripong - 25Jun10 - End ---- Siripong - 22Nov10 - Removed
+
+		// Government subsidy payment
+		do ZSETSUB(.ln)
+		
+		// Set bill
+		do SETBIL(.ln)
+
+		// Setup balance for interest calculations
+		do SETIDGP(.ln, %SystemDate, %EffectiveDate, CUVAR2)
+
+		// Setup for Scheduled date roll
+		do SETQUE(.ln, ln.dist1fre, ln.schnd, 0, 0, "Scheduled Date Roll|RUNSCHND", false) quit:ER
+				
+		// Setup for Late Charges
+		if 'ln.lchgnoto do SETLCHG(.ln, %SystemDate, %EffectiveDate, FUPO.get()) quit:ER
+
+		// Set up custom notice date if custom notices trigger late charges
+		if ln.lchgnoto, %SystemDate < CUVAR2 do SETCUS(.ln, 2, %SystemDate, CUVAR2) quit:ER
+
+		// Interest offset processing setup
+
+		if ln.ichnd, 'ln.intfre.isNull() do { quit:ER
+
+			// Roll back ln.ichld / ln.ichnd if bringing loan current
+			if CTL.extract(1) do { quit:ER
+				if ln.intfre = "*2" quit
+				for  quit:($$INTOFFDT^LNCDI(ln.ichld, ln.intoff, ln.intoffcl)) < ln.dtnt  set ln.ichld = ln.ichld.nextFreqDate("-"_ln.intfre) quit:ER
+				if ln.ichld < ln.dtnt set ln.ichld = ln.dtnt
+				set ln.ichnd = ln.ichld.nextFreqDate(ln.intfre) quit:ER
+				}
+				
+			do LNINDEX(.ln, .lnseg())
+			}
+
+		// Set up for Payment offset processing
+		if 'ln.pcoff.isNull() do SETQUE(.ln, ln.pcfre, ln.pchnd, ln.pcoff, 0, "Payment Offset Processing|RUNPCOFF", false) quit:ER
+				
+		// Set up for Payment change date
+		if ln.pcfre do SETQUE(.ln, ln.pcfre, ln.pchnd, 0, 0, "Payment Change Date|RUNPCHND", false) quit:ER
+				
+		// Set up for deferred interest capitalization
+		do SETDECAP(.ln) quit:ER
+
+		/*
+		Subsidy review processing, an end-of-day process which
+		takes place after the previous beginning-of-day functions.
+		*/
+
+		if 'ln.subpln.isNull() do SETLNSUB(.ln, %SystemDate) quit:ER
+		}
+
+	// Loan fee setup	
+	do SETFEE(.ln, %SystemDate, CUVAR2, SKIP) quit:ER
+	
+	/*	
+	Prepaid (Odd) Interest setup.
+	If a loan is not set up to renew, this section only be passed 
+	through once.
+	If a loan is set up to renew, the process calls this section
+	twice. The first pass will set up all QUEUE entries up to the 
+	renewal date.  The loan will then renew. Then, the second pass 
+	will set up all of the QUEUE entries from the renewal date up 
+	to EFD. 
+	Prepaid Interest should be processed only once for all loans.  
+	The check "if SAVTJD=%SystemDate" makes sure that SETPPI is 
+	called only once.
+	*/
+		
+	if SAVTJD = %SystemDate do SETPPI(.ln) quit:ER
+		
+	// Set up for future-dated disbursement(s)
+	type Number PRISEQ
+	
+	if ttx.exists() set PRISEQ = +TRNSEQ.get()
+	else  set PRISEQ = 0
+	
+	do SETDISB(.ln, %SystemDate, %EffectiveDate, PRISEQ, SKIP, LNPTSRV.get()) quit:ER
+
+	// Set up for Automatic Loan payment
+	do SETAUT(.ln, CUVAR2, CTL) quit:ER
+
+	/*
+	Loan payments are not set up through PAT, but other
+	unscheduled loan transactions may be.  Process these.
+	*/
+	if 'ln.ptf do SETPAT^UANTIC(.ln, %SystemDate, %EffectiveDate) quit:ER
+
+	/*
+	Loan payments are made through PAT. If loan payments are
+	not supposed to be skipped, process these.
+	*/
+	if ln.ptf, 'SKIP.extract(1) do SETPAT^UANTIC(.ln, %SystemDate, %EffectiveDate) quit:ER
+
+	/*
+	Loan payments are not made through PAT.  
+	If we are not supposed to skip loan payments, set these up to be 
+	processed.
+	*/
+	if 'ln.ptf, 'SKIP.extract(1) do SETPMT(.ln, %SystemDate, %EffectiveDate) quit:ER
+
+	// Set up for capitalized interest due
+	do SETICAP(.ln) quit:ER
+
+	// Set up for EFT payment orders (for MRPC100 only)
+	if BALIRN = 1 do SETEFT^UANTIC(.ln, %SystemDate, %EffectiveDate, 1) quit:ER
+
+	// Set the end of month events
+	do SETEOM(.ln, %SystemDate, CUVAR2) quit:ER
+
+	// Set up RUNUDI
+	#IF (CUVAR.VATPROC) do SETUDI(.ln, SAVTJD, SAVEFD) quit:ER
+
+	// Set up Deferred Loan Fees Amortization Event
+	do SETDEFFEE(.ln, %SystemDate, .ttx, SKIP)
+	
+	// Set up Net Deferred Loan Fees Amortization Event
+	if ln.ptsp do SETNETFEE(.ln, %SystemDate, .ttx, SKIP)
+	
+	// Set up Miscellaneous Cycled Item Amortization Event
+	if ln.mscp do SETCYCMSC(.ln, %SystemDate, .ttx, SKIP)
+	
+	// July 16, 2013 tlocke
+	// Set up missing LCHG entries.  If, for example, DIST1FRE="1MAE",PMTGRC="62D",DIST1ND=11/30/10 and system date = 1/1/2011,
+	// then ln.lcad is already bumped out to 3/3/11.  Therefore, late charges would not be calculated for 1/31/11.
+	if ln.dist1nd<%SystemDate do {
+		
+		type Date LCEFD,LCAD
+		
+		set LCEFD = ln.dist1nd
+		for  do { quit:ER  quit:LCAD'<ln.lcad  quit:LCAD'<EFD
+			
+			set LCAD=$$CALCLCAD^BCHLNLD(.ln, LCEFD)
+			
+			if LCAD '< ln.lcad quit
+			
+			if LCAD '< EFD quit  ; do not calculate EOD late charges on final date
+			
+			do SETQUE(.ln, "", LCAD, 0, 0, "Late Charge Processing|RUNLCHG", false)
+			
+			set LCEFD = LCEFD.nextFreqDate(ln.dist1fre)
+			
+	}
+
+	// Ensure final accrual event is set
+	if (SAVTJD '= CUVAR2)!(%EffectiveDate > CUVAR2) set QUEUE((%EffectiveDate - 1), ln.cid, 9999) = "Calculate accruals"
+ 
+	quit
+
+
+SETEASER(RecordLN ln)		// Loan account			/REF:R
+	
+	// Setup teaser
+	
+	type public Boolean ER
+	
+	do SETQUE(.ln, "", ln.trexd, 0, 0, "Teaser rate expires|TEASER", false) quit:ER
+
+	quit
+
+
+SETFMEFD(RecordLN ln,		// Loan account			/REF:R
+	 Date %SystemDate,	// System date
+	 Date %EffectiveDate)	// Effective date
+
+	// Set up future-date file maintenance
+	
+	type public Boolean ER
+
+	type Date JD
+	
+ 	type ResultSet rs = Db.select("EFDATE", "EFD", "TABLE='LN' AND AKEY=:ln.cid AND EFDATE>:%SystemDate")
+ 	   
+ 	while rs.next() do { quit:JD > %EffectiveDate ! (ER)
+ 		set JD = rs.getCol("EFDATE")
+		if JD > %EffectiveDate quit
+
+ 		do SETQUE(.ln, "", JD, 0, 0, "Future-dated File Maintenance|RUNFMEFD", false) quit:ER		
+		}
+
+	quit
+
+
+SETBIL(RecordLN ln)		// Loan account			/REF:R
+
+	// Bill processing
+	
+	type public Boolean ER
+	type public Cache %CACHE()
+
+	type Date BNDT
+	type Number BLOFF, CID
+	type String EVNT
+	
+	set EVNT ="Billing|RUNBIL"
+
+	set CID = ln.cid
+
+	type RecordPRODCTL prodctl = %CACHE("PRODCTL").getRecord("PRODCTL", "TYPE = :ln.type")
+
+	if prodctl.opb do {
+		// Force the first bill's offset period to be equal to the actual
+		// difference between the pmt due date and the next bill date
+		set BLOFF = ln.schnd - ln.bndt
+		
+		// Internal bill created during offset period; no printed bill produced
+		if BLOFF < ln.bloff do Runtime.setErrXBAD("LN","OPBNOBIL") quit:ER
+		
+		// Create an event for the first bill
+		do SETQUE(.ln, , (ln.bndt + BLOFF), BLOFF, 1, EVNT, false)
+		
+		// Create events for any other bills
+		set BNDT = ln.schnd.nextFreqDate(ln.dist1fre) quit:ER
+		set BNDT = BNDT - ln.bloff
+		if BNDT '> %EffectiveDate do SETQUE(.ln, ln.dist1fre, (BNDT + ln.bloff), ln.bloff, 1, EVNT, false)
+		}
+	else  do SETQUE(.ln, ln.dist1fre, (ln.bndt + ln.bloff), ln.bloff, 1, EVNT, false)
+
+	quit
+
+
+SETLCHG(RecordLN ln,		// Loan account			/REF:R
+	Date %SystemDate,	// System date
+	Date %EffectiveDate,	// Effective date
+	Boolean FUPO)		// Calculate future payoff	/NOREQ
+
+	// Late charge processing
+	
+	type public Boolean ER
+	type public Cache %CACHE()
+	type public Date CUVAR2
+	
+	type Boolean DOLCHG = 0
+
+	if ln.lcad.isNull() quit
+	if ln.lcad > %EffectiveDate quit
+
+	if ln.lcad '< %SystemDate do {
+
+		// LCAD is in the past; need to run this event
+		if ln.lcad < CUVAR2 set DOLCHG = 1 quit
+		
+		// Future-dating a projection
+		if FUPO.get() do {
+			type RecordLNPOPT lnpopt = %CACHE("LNPOPT").getRecord("LNPOPT","GRP=:ln.grp,POPT=:ln.popt")
+			
+			if 'lnpopt.cdf,(ln.lcad '< CUVAR2) set DOLCHG = 1 quit
+			
+			if lnpopt.cdf,'ln.dlcaf,(ln.lcad '< CUVAR2) set DOLCHG = 1 quit
+			}
+		}
+
+	// Late Charge Action Date
+	// July 16, 2013 - Tom Locke.  Do not calculate late changes on last day of projection.  Late charges
+	// are calculated during EOD (except for KTB), therefore should not be calculated.
+	if DOLCHG,ln.lcad<EFD do SETQUE(.ln, "", ln.lcad, 0, 0, "Late Charge Processing|RUNLCHG", false) quit:ER
+
+	quit
+
+
+SETLNSUB(RecordLN ln,		// Loan account			/REF:R
+	 Date %SystemDate)	// System date
+
+	// Payment change date processing
+
+	type public Boolean ER
+	
+	do SETQUE(.ln, ln.dist1fre, ln.schnd, 0, 0, "Subsidy Review Processing|RUNLNSUB", false) quit:ER
+
+	/*
+	If today is the last scheduled date, and today is not the opening date 
+	for account, must also set up for today. The subsidy process is run
+	end-of-day, so must be queued to occur for the first time on the 
+	system date.
+	*/
+	if ln.schld '= %SystemDate ! (ln.schld = ln.odt) quit
+	
+	do SETQUE(.ln, "", ln.schld, 0, 0, "Subsidy Review Processing|RUNLNSUB", false) quit:ER
+
+	quit
+
+
+SETPMT(RecordLN ln,		// Loan account			/REF:R
+       Date %SystemDate,	// System date
+       Date %EffectiveDate)	// Efective date
+
+	// Loan Payments processing
+	
+	type public Boolean ER
+
+	do SETQUE(.ln, "", (%SystemDate + 1), 0, 0, "Post Delinquent Amounts|RUNPMT", false) quit:ER
+
+	do SETQUE(.ln, ln.dist1fre, ln.schnd, 0, 0, "Post Due Amounts|RUNPMT", false) quit:ER
+
+	quit
+
+
+SETIDGP(RecordLN ln,		// Loan account			/REF:R
+	Date %SystemDate,	// System date
+	Date %EffectiveDate,	// Effective date
+	Date CUVAR2)		// Customer variables system date
+
+	// Setup balance for interest calculations
+	
+	type public Boolean ER
+
+	type String EVNT
+	type Date EXPDT
+
+	set EVNT = "Free Interest Expiration Process|RUNIDGP"
+
+	type DbSet ds = Db.selectDbSet("LNDS1", "CID=:ln.cid")	
+	while ds.next() do { quit:ER
+		type RecordLNDS1 lnds1 = ds.getRecord("LNDS1")
+
+		// Grace Period Expiration Date
+		set EXPDT = lnds1.expdt
+
+		if 'EXPDT, ln.idgp set EXPDT = lnds1.sdd + ln.idgp - 1
+		if %EffectiveDate '> CUVAR2, (EXPDT > (CUVAR2 - 1)) quit
+
+		// Loan Scheduled Disbursement Date
+		set EVNT.piece("|", 4) = lnds1.sdd
+		if (EXPDT > (%SystemDate - 1)), (EXPDT '> %EffectiveDate) do SETQUE(.ln, ,(EXPDT + 1), 0, 0, EVNT, false) quit:ER
+		}
+
+	quit
+
+
+SETCUS(RecordLN ln,		// Loan account			/REF:R
+       Number DELQTYP,		// Delinquency type
+       Date %SystemDate,	// System date
+       Date CUVAR2)		// Customer variable system date
+
+	/*
+	Set up custom notice date
+	
+	Additional notes on ARGUMENTS:
+	. DELQTYP		
+	  2 Regular delinqency
+	  5 Monetary transaction delinquency
+	  12 Reversed transaction delinquency
+	*/
+	
+	type public Boolean ER
+	type public String LCHGNOT(), QUEUE(,,)
+
+	type Number DELQ, MINNOTBA
+	type String CUSTNOT, LCGRDNOT
+	type Date NOTDT
+	
+	// Custom Notice Production
+	if ln.custnot.isNull() quit
+
+	// Billing - Last Sequence Number
+	if ln.bseq.isNull() quit
+	
+	set CUSTNOT = ln.custnot	
+ 
+	if 'LCHGNOT(CUSTNOT).exists() do LDLCNOT(CUSTNOT)
+	if 'LCHGNOT(CUSTNOT).exists() quit
+ 
+	// Delinquency
+	set DELQ = LCHGNOT(CUSTNOT).piece("|", DELQTYP)
+	if DELQ.isNull() quit
+	
+	type RecordLNBIL1 lnbil1 = Db.getRecord("LNBIL1", "CID=:ln.cid,SCHSEQ=:ln.bseq")
+	
+	// Payment Due Date
+	if lnbil1.cdpd.isNull() quit
+	
+	// Regular delinqency
+	if DELQTYP = 2 do { quit
+		set NOTDT = $$PERIOD^LNU(lnbil1.cdpd, DELQ, ln.dist1fre) quit:ER
+		if 'NOTDT.isNull(), NOTDT < CUVAR2 do { quit:ER
+			type Number ZSEQ = ""
+			type Boolean FOUND = 0
+			 
+			// Avoid duplicate queue entries
+			for  set ZSEQ = QUEUE(NOTDT, ln.cid, ZSEQ).order() quit:ZSEQ.isNull()  do { quit:FOUND
+				if QUEUE(NOTDT, ln.cid, ZSEQ).piece("|", 2) = "RUNCUS" set FOUND = 1
+				}
+			quit:FOUND
+			do SETQUE(.ln, "", NOTDT, 0, 0, "Custom Notice Date|RUNCUS", false) quit:ER
+			}
+		}
+
+	/*
+	If DELQTYP '= 2 (Monetary transaction delinquency or
+	Reversed trasnaction delinquency)
+	*/
+	type Date DDATE
+	
+	set DDATE = $$PERIOD^LNU(lnbil1.cdpd, DELQ, ln.dist1fre) quit:ER
+	
+	if DDATE '> %SystemDate do {
+ 
+		// Don't create a notice if due amount is less than MINNOTBA
+		if lnbil1.casd < MINNOTBA quit
+	
+		do NOTICE(.ln)
+		}
+
+	quit
+
+
+LDLCNOT(String CUSTNOT)		// Delinquency notice name
+ 
+ 	/*
+ 	Load LCHGNOT array with Custom Notice category that triggers late 
+ 	charges
+ 	*/
+ 	
+ 	type public String LCHGNOT()
+ 
+ 	type ResultSet rs = Db.select("LCGRDNOT", "UTBLCUSNOT", "NOTICE=:CUSTNOT AND LCGRDNOT IS NOT NULL")
+ 	   
+ 	if rs.next() set LCHGNOT(CUSTNOT) = rs.getRow().toString()
+
+	quit
+
+
+SETDECAP(RecordLN ln)		// Loan account			/REF:R
+
+	// Set up for deferred interest capitalization
+
+	// Defer Interest In Excess of Accrual
+	if ln.dxsi = 0 quit
+	
+	// Resolution Option
+	if ln.iropt.isNull() quit
+
+	type Number IROPT
+	type String FRE = ""
+	type Date NJD
+
+	set IROPT = ln.iropt
+
+	if IROPT = 2 set FRE = ln.dirfre set NJD = ln.dirnd
+	if IROPT = 3 set FRE = ln.pcfre set NJD = ln.pchnd
+	if IROPT = 4 set FRE = ln.dist1fre set NJD = ln.schnd
+
+	if FRE.isNull() quit
+
+	do SETQUE^UANTIC(.ln, FRE, NJD, 0, 0, "Capitalize Deferred Interest|RUNDECAP")
+
+	quit
+
+
+SETFEE(RecordLN ln,		// Loan account			/REF:R
+       Date %SystemDate,	// System date
+       Date CUVAR2,		// Customer variable system date
+       String SKIP)		// Skip control indicators
+
+	/*
+	  Set up DAYENDLNFEEC record for every fee type, while making sure that
+	  "Loan Fees" event should be run only once for every assessment date, 
+	  which could include multiple fee types. 
+
+	Additonal notes on ARGUMENTS:
+	. SKIP
+	  Position   1 - skip regular loan payments
+		     2 - skip initial disbursement
+	*/
+	
+	type public Boolean ER
+	type public String QUEUE(,,)
+
+	type String QUE(,)
+
+	// Exclude fees that have a fee plan that is "Linked to Fee"
+	type DbSet ds = Db.selectDbSet("LNFEE", "CID=:ln.cid AND LFEE<>1")
+	
+	while ds.next() do { quit:ER
+		
+		type RecordLNFEE lnfee = ds.getRecord("LNFEE")
+		
+		type RecordLNFEEP lnfeep = Db.getRecord("LNFEEP", "FEETYP=:lnfee.feetyp",1)
+
+		// Fee Computation/Assessment Method = 0 (Special Event)
+		if SKIP.extract(2), (lnfeep.amth = 0), (ln.dtnt < CUVAR2), (%SystemDate '> ln.dtnt) do { quit:ER
+
+			// If an entry exists, prevent setting up multiple QUEUE entries
+			if 'QUE(%SystemDate,ln.cid).exists() do SETQUE(.ln, "", %SystemDate, 0, 0, "Loan Fees|RUNFEE", false) quit:ER
+
+			type RecordDAYENDLNFEEC daylnfee = Db.getRecord("DAYENDLNFEEC", "ASND=:%SystemDate,CID=:ln.cid,FEETYP=:lnfee.feetyp", 1)
+			
+			set daylnfee.reversed = 0
+			
+			do daylnfee.bypassSave()
+			
+			set QUE(%SystemDate,ln.cid) = ""
+			}
+
+		if lnfee.asnd, 'lnfeep.cfre.isNull() do { quit:ER
+
+			// If an entry exists, prevent setting up multiple QUEUE entries
+			if 'QUE(lnfee.asnd,ln.cid).exists() do SETQUE(.ln, lnfeep.cfre, lnfee.asnd, 0, 0, "Loan Fees|RUNFEE", false) quit:ER
+
+			type RecordDAYENDLNFEEC daylnfee = Db.getRecord("DAYENDLNFEEC", "ASND=:lnfee.asnd,CID=:ln.cid,FEETYP=:lnfee.feetyp", 1)
+			
+			set daylnfee.reversed = 0
+			
+			do daylnfee.bypassSave()
+			
+			set QUE(lnfee.asnd,ln.cid) = ""
+			}
+		}
+
+	quit
+
+
+SETPPI(RecordLN ln)		// Loan account			/REF:R
+
+	// Setup prepaid (odd days) interest event
+	
+	type public Boolean ER
+	type public Date CUVAR2
+	
+	// For projections into future only
+	if %SystemDate '> CUVAR2 quit
+
+	// Disclosure - Prepaid Interest Amount	
+	if 'ln.disppi quit
+
+	// Odd Days Interest Option	
+	if ln.odio = 1 quit
+	
+	do SETQUE(.ln, "", ln.dtnt, 0, 0, "Prepaid (Odd Days) Interest|RUNPPI", false) quit:ER
+
+	quit
+
+
+SETDISB(RecordLN ln,		// Loan record			/REF:R
+	Date %SystemDate,	// System date
+	Date %EffectiveDate,	// Effective (thru) date
+	Number PRISEQ,		// Transaction sequence
+	String SKIP,		// Skip control indicators
+	Boolean LNPTSRV)	// Loan reverse/reapp indicator	/NOREQ
+
+	/*
+	Set-up for future-dated disbursement(s)
+
+	Additonal notes on ARGUMENTS:
+	. SKIP
+	  Position   1 - skip regular loan payments
+		     2 - skip initial disbursement
+
+	*/
+	
+	type public Boolean ER
+
+	type Number BALCMP, CRLMT
+	type Date JD, ODD
+	
+	set BALCMP = +ln.bal
+	if ln.aruf set BALCMP = BALCMP - ln.udbal
+
+	set CRLMT = ln.crlmt
+
+	type ResultSet rs = Db.select("SDD", "LNDS1", "CID=:ln.cid")
+	if rs.isEmpty(),'SKIP.extract(2), 'BALCMP, 'ln.cntdr do { quit
+		
+		// Call made from LNPTSRV
+		if LNPTSRV.get() quit
+		
+		if CRLMT = 0 quit
+		
+		// Original Disbursement Date
+		set ODD = ln.odd
+		
+		// Use original disbursement date vs system (event) date
+		if ln.odd < %SystemDate set ODD = %SystemDate
+
+		type RecordLNDS1 lnds1 = Class.new("RecordLNDS1", "CID=:ln.cid,SDD=:ODD")
+
+		set lnds1.sda = CRLMT
+		
+		do lnds1.bypassSave()	
+		
+		do SETQUE(.ln, "", ODD, 0, 0, "Single Loan Disbursement|RUNDSBSCH", false) quit:ER
+		}
+
+	set JD = %SystemDate - 1
+	while rs.next() quit:(JD > %EffectiveDate)  do { quit:ER
+		if rs.getCol("SDD") < %SystemDate quit
+		set JD = rs.getCol("SDD")
+		do SETQUE(.ln, "", JD, 0, 0, "Disbursement Schedule|RUNDSBSCH", false) quit:ER
+		}
+
+	quit
+
+
+SETAUT(RecordLN ln,		// Loan account			/REF:R
+       Date CUVAR2,		// Customer variable system date
+       String CTL)		// Control indicators		/NOREQ
+
+	// Automatic Loan payment
+	
+	type public Boolean ER
+
+	// Automatic Loan Payment Due Method
+	if 'ln.alpdue quit		
+
+	type Date SCHND,PMTDT
+
+	// Scheduled Payment - Next Date	
+	set SCHND = ln.schnd
+
+	// Siripong - 02Mar10 - Begin
+	// if CTL="01", ln.dist1nd = CUVAR2, $$QUELOC^UANTIC("QUE079") = 1 set SCHND = CUVAR2
+	#IF CUVAR.ALPHI
+		if CTL="01", ln.dist1nd = CUVAR2, $$QUELOC^UANTIC("QUE115") = 1 set SCHND = CUVAR2
+	#ELSE
+		if CTL="01", ln.dist1nd = CUVAR2, $$QUELOC^UANTIC("QUE079") = 1 set SCHND = CUVAR2
+	#ENDIF
+	// Siripong - 02Mar10 - End
+	
+	// Assume next auto loan payment date is the next scheduled due date
+	set PMTDT=SCHND
+	// Siripong - 04May10 - Begin
+	// Tom Locke- 4/7/10 - Added variable PMTDT and logic to process on the effective date
+	// If this date is a schedule due date, then allow EOD to process for today
+	// if ln.schld=%SystemDate,$$QUELOC^UANTIC("QUE115")=1 set PMTDT=ln.schld
+	#IF CUVAR.ALPHI
+		if ln.schld = %SystemDate, $$QUELOC^UANTIC("QUE115") = 1 set PMTDT = ln.schld
+	#ELSE
+		if ln.schld = %SystemDate, $$QUELOC^UANTIC("QUE079") = 1 set PMTDT = ln.schld
+	#ENDIF
+	// Siripong - 04May10 - End
+
+	do SETQUE(.ln, ln.dist1fre, PMTDT, 0, 0, "Automatic Loan Payment|RUNAUT", false) quit:ER
+
+	quit
+
+
+SETICAP(RecordLN ln)		// Loan account			/REF:R
+	
+	// Set up for capitalized interest due
+	
+	type public Boolean ER
+	
+	// Interest Capitalization
+	if 'ln.icap quit 	
+
+	// No Resolution Option	or at billing (handled by the billing event)
+	if ln.iropt.isNull() ! (ln.iropt = 5) quit	
+		
+	type String FRE = ""
+	type Date NJD
+
+	if ln.iropt = 2 set FRE = ln.dirfre set NJD = ln.dirnd
+	if ln.iropt = 3 set FRE = ln.pcfre set NJD = ln.pchnd
+	if ln.iropt = 4 set FRE = ln.dist1fre set NJD = ln.schnd
+
+	if FRE.isNull() quit
+
+	do SETQUE(.ln, FRE, NJD, 0, 0, "Capitalize Interest Due|RUNICAP", false) quit:ER
+
+	quit
+
+
+SETEOM(RecordLN ln,		// Loan account			/REF:R
+       Date %SystemDate,	// System date
+       Date CUVAR2)		// Customer variable system date
+
+	// Set the end of month events
+	
+	type public Boolean ER
+
+	type Date EOMDATE
+	
+	set EOMDATE = $$EOMJD^SCADAT(%SystemDate, 1)
+	
+	for  quit:EOMDATE > CUVAR2  do { quit:ER
+		do SETQUE(.ln, "", EOMDATE, 0, 0, "End of Month Balance|RUNEOM", false) quit:ER
+
+		set EOMDATE = EOMDATE + 1
+		set EOMDATE = $$EOMJD^SCADAT(EOMDATE, 1)
+		}
+
+	quit
+
+
+SETDEFFEE(RecordLN ln,		// Loan account			/REF:R
+	  Date %SystemDate,	// System date
+	  RecordTTX ttx,	// Primary transaction		/REF:R
+	  String SKIP)		// Skip control indicators
+	  
+	  /*
+	  	. SKIP
+	  Position   1 - skip regular loan payments
+		     2 - skip initial disbursement
+		     
+		     SKIP="11" is sent from LNDE1, Backdated loan creation/disbursal
+	  */
+	  
+	// Set Deferred Loan Fees Amortization Event
+
+	type public Boolean ER
+	type public Cache %CACHE()
+
+	type Number FEESEQ
+	type String FEETYP
+	type String QUE(,)
+
+	// Exclude fees that have a fee plan that is "Linked to Fee"
+	type DbSet ds = Db.selectDbSet("LNFEE", "CID=:ln.cid AND LFEE<>1")	
+	while ds.next() do { quit:ER
+		
+		type RecordLNFEE lnfee = ds.getRecord("LNFEE")
+		
+		type RecordLNFEEP lnfeep = %CACHE("LNFEEP").getRecord("LNFEEP", "FEETYP=:lnfee.feetyp",1)
+
+		if (lnfeep.definc '= 1) quit
+
+		/* Set event for Special Event fee at account creation (SKIP=11).
+		   If QUE entry exists, prevent setting up multiple QUEUE 
+		   entries possible in case of multiple fees included in the 
+		   fee group.
+		*/
+		if (lnfeep.amth = 0) , (SKIP.extract(2)), 'QUE(%SystemDate,ln.cid).exists() do { quit
+
+			do SETQUE(.ln, "", %SystemDate, 0, 0, "Deferred Loan Fees Amortization|RUNDEFFEE", false) 
+			set QUE(%SystemDate,ln.cid) = ""
+			}
+
+		// Set event for payoff reversal or for a loan with
+		// frequency based fee assessment method (lnfeep.amth=1)				
+		if (ttx.exists()) , ('ttx.efd.isNull()) do {
+			
+			type RecordTRN trn = %CACHE("TRN").getRecord("TRN", "ETC=:ttx.etc")
+			
+			type DbSet dsfeed = Db.selectDbSet("LNFEED","CID=:ln.cid AND FEETYP=:lnfee.feetyp")
+			while dsfeed.next() do {
+			
+				type RecordLNFEED lnfeed = dsfeed.getRecord("LNFEED")
+				
+				// If this is payoff reversal that includes settlement of 
+				// unamortized amount, set up event.
+				if ((ttx.itc12)!(ttx.itc6)), (trn.pcfl5 = 1), (%SystemDate = ttx.efd) do SETQUE(.ln, "", lnfeed.cycnd, 0, 0, "Deferred Loan Fees Amortization|RUNDEFFEE", false) quit
+			
+				/* 
+				 Distinguish between disbursement or payment processing 
+				 for other then special event fees. In this case need 
+				 event only for disbursement of the loan with frequency
+				 based assessment method fee. Since LNFEED record is 
+				 created at disbursement for those fees, if LNFEED 
+				 record does not exists yet - this is disbursement so 
+				 set up the event.
+				*/
+				type ResultSet rs = Db.select("FEESEQ", "LNFEED", "CID=:ln.cid AND FEETYP=:lnfee.feetyp AND DEFORG<>AMOFA")
+
+				if rs.isEmpty(), (lnfeep.amth = 1) do SETQUE(.ln, "", lnfeed.cycnd, 0, 0, "Deferred Loan Fees Amortization|RUNDEFFEE", false) 			
+				}
+			}
+		}
+
+	quit
+
+
+SETNETFEE(RecordLN ln,		// Loan account			/REF:R
+	  Date %SystemDate,	// System date 
+	  RecordTTX ttx,	// Primary transaction		/REF:R
+	  String SKIP)		// Skip control indicators
+	  	  	  	
+	// Set Net Deferred Loan Fees Amortization Event
+	
+	type public Boolean ER
+	type public Date CUVAR2
+	
+	type DbSet ds = Db.selectDbSet("LNCYCPTS","CID=:ln.cid")	
+	while ds.next() do {
+		
+		type RecordLNCYCPTS lncycpts = ds.getRecord("LNCYCPTS")	
+		
+		// If this is account creating, set up event
+		if (SKIP.extract(2)) , (ln.dtnt = %SystemDate)  do SETQUE(.ln, "", lncycpts.nxadt, 0, 0, "Net Deferred Loan Fees Amortization|RUNNETFEE", false) quit
+
+		// If this is payoff reversal that includes settlement of 
+		// unamortized amount, set up event
+		if (ttx.exists()) , ('ttx.efd.isNull()) , (lncycpts.nxadt < CUVAR2), (ttx.efd '> lncycpts.endt) do {
+			
+			type public Cache %CACHE()
+			type RecordTRN trn = %CACHE("TRN").getRecord("TRN", "ETC=:ttx.etc")
+			
+			if ((ttx.itc12)!(ttx.itc6)), (trn.pcfl5 = 1), (%SystemDate = ttx.efd) do SETQUE(.ln, "", lncycpts.nxadt, 0, 0, "Net Deferred Loan Fees Amortization|RUNNETFEE", false) quit:ER
+			}
+		}
+
+	quit	
+
+
+SETCYCMSC(RecordLN ln,		// Loan account			/REF:R
+	  Date %SystemDate,	// System date 
+	  RecordTTX ttx,	// Primary transaction		/REF:R
+	  String SKIP)		// Skip control indicators
+  
+	// Set up the Miscellaneous Cycled Item Amortization Event for
+	// the scenarios noted in the comments below
+
+	type public Boolean ER, FUPO
+	type public Cache %CACHE()
+	type public Date CUVAR2, SAVEFD
+	
+	type Number AMORTIZE = 0
+
+	// Backdated account creation
+	if (SKIP.extract(2)),(ln.dtnt = %SystemDate) set AMORTIZE = 1
+
+	// Payoff reversal
+	if (ttx.exists()),('ttx.efd.isNull()) do {
+		type RecordTRN trn = %CACHE("TRN").getRecord("TRN", "ETC=:ttx.etc")
+		if ((ttx.itc12)!(ttx.itc6)),(trn.pcfl5),(%SystemDate = ttx.efd) set AMORTIZE = 1
+		}
+
+	// Future-dated payoff projections, but only in scenarios where either the loan has not
+	// qualified for a neg bal transfer, or has but doesn't have the NBTNOAMO flag enabled.
+	if FUPO.get(),(('ln.nbtnoamo)!(ln.nbtnoamo & ln.nbtrdt.isNull())) set AMORTIZE = 1
+
+	if 'AMORTIZE quit
+
+	type DbSet ds = Db.selectDbSet("LNCYCMSC","CID=:ln.cid")	
+	while ds.next() do {
+		
+		type RecordLNCYCMSC lncycmsc = ds.getRecord("LNCYCMSC")
+
+		do SETQUE(.ln, "", lncycmsc.nxadt, 0, 0, "Miscellaneous Cycled Item Amortization|RUNCYCMSC", false) quit
+		}
+	
+	quit
+
+
+private RESETHIST(RecordLN ln,		// Loan account			/REF:R
+		  RecordTTX ttx1(,,),	// Transaction set from history	/REF:R
+		  Boolean PAYOFFREV)	// Payoff Reversal Indicator	/REF:W
+
+
+	/*
+	Reset records previously found in ^HIST to QUEUE(,,)
+
+	Additional notes on ARGUMENTS:
+	. ttx1(,,)
+		Contains previously-existing history entries that need
+		to be examined and possibly overridden
+		
+	Note that PAYOFFREV flag equals to true only when passed here from 
+	MAIN^UANTIC in case of payoff reversal.	
+	*/
+	
+	type public Boolean ER
+	type public Date ACRDT()
+	type public String QUEUE(,,)
+
+	type Number CID, TSEQ
+	type Date HEFD
+	type String EVNT
+	
+	set (CID, HEFD) = ""
+	
+	set EVNT = "Reset history entries|RERUNHIST"
+
+	for  set HEFD = ttx1(HEFD).order() quit:HEFD.isNull()  do { quit:ER
+		for  set CID = ttx1(HEFD, CID).order() quit:CID.isNull()  do { quit:ER
+			do SETQUE(.ln, "", HEFD, 0, 0, EVNT, PAYOFFREV) quit:ER
+			if CID = ln.cid do ESCSEC(.ttx1(,,), HEFD, CID, .QUEUE(,,))
+			}
+		}
+
+	quit
+
+
+ESCSEC(RecordTTX ttx1(,,),	// Transaction set from history		/REF:R
+       Date HEFD,		// Effective date in history
+       Number LCID,		// Loan account number
+       String QUEUE(,,))	// Event queue				/REF:W
+
+	/*
+	Set accrual entries in QUEUE(,,) for attached escrow accounts
+	
+	For financial loan transactions, attached escrow accounts may be hit 
+	via a secondary transaction (indicated in the lower levels of history)
+	... since it is not known at this point how the transaction will 
+	reapply, an accrual entry must be set for the escrow account in case 
+	a secondary transaction to the escrow is spawned from it
+	*/
+	
+	type public Date ACRDT()
+
+	type Number ESCCID, TSEQ = ""
+
+	for  set TSEQ = ttx1(HEFD, LCID, TSEQ).order() quit:TSEQ.isNull()  do {
+
+        	// Monetary transaction
+		if $translate(ttx1(HEFD, LCID, TSEQ).tamt, "0#") do {
+			set ESCCID = ""
+
+			for  set ESCCID = ACRDT(ESCCID).order() quit:ESCCID.isNull()  do {
+				// Exclude the loan itself
+				if ESCCID = LCID quit
+
+				set QUEUE((HEFD - 1), ESCCID, 9999) = "Calculate accruals"
+				}
+			}
+		}
+
+	quit
+
+
+	//*******************************************************
+	// Run events
+	//*******************************************************
+
+private RUNFMEFD(RecordLN ln,		// Loan account			/REF:R
+		 Date %SystemDate)	// System date
+
+	// Set up future-date file maintenance
+	
+	type public Boolean ER
+
+	type DbSet ds = Db.selectDbSet("EFD", "TABLE='LN' AND AKEY=:ln.cid AND EFDATE=:%SystemDate")
+
+	while ds.next() do { quit:ER
+		type RecordEFD efd = ds.getRecord("EFD")
+
+		// Update the loan object using SQL statement from EFD table
+		do UPDLN(.ln, efd.sql)
+		}
+	
+	quit
+
+
+UPDLN(RecordLN ln,		// Loan account			/REF:R
+      String TRN)		// SQL statement
+
+	// Update the loan object using SQL statement from EFD table
+	
+	type public Boolean ER
+
+	type Number I, SETLEN
+	type String col, tok, val, x, NODATA, SET, WHERE
+	
+	set NODATA = $$RET^SQL($$TOK^SQL(TRN, "SET,WHERE", .tok), .tok)
+	
+	set SETLEN = SET.length(",")
+	
+	for I=1:1:SETLEN do { quit:ER
+		set x = $$POP^%ZS(SET.piece(",", I))
+		set col = $$RET^SQL(x.piece("=", 1), .tok)
+		set col = $$TRIM^%ZS(col)
+		if col.isLike("%.%") set col = col.piece(".",2)
+
+		// Siripong - 20Apr12 - Begin
+		//set val = $$QSUB^%ZS($$RET^SQL(x.piece("=", 2, 999),.tok),"'")
+		set val = $$RET^SQL(x.piece("=", 2, 999),.tok)
+		set val = $$TRIM^%ZS(val)
+
+		// Convert NULL keyword to ''
+		if val = "NULL" set val = "''"
+
+		set val = $$QSUB^%ZS(val,"'")
+		// Siripong - 20Apr12 - End
+
+		set val = $$TRIM^%ZS(val)
+		set ln.@col = val
+	   }
+
+	quit
+
+
+private RUNCUS(RecordLN ln,		// Loan account			/REF:R
+	       Date %SystemDate,	// System date
+	       Date CUVAR2)		// Customer variable system date
+
+	// Determine LCAD from custom notice date
+	
+	type public String LCHGNOT()
+
+	type Number CUSTNOT, LCGRDNOT, MINNOTBA
+
+	if ln.custnot.isNull() quit	// Custom Notice Production
+
+	set CUSTNOT = ln.custnot
+
+	if 'LCHGNOT(CUSTNOT).exists() do LDLCNOT(CUSTNOT)
+	if 'LCHGNOT(CUSTNOT).exists() quit
+	
+	type RecordLNBIL1 lnbil1 = Db.getRecord("LNBIL1", "CID=:ln.cid,SCHSEQ=:ln.bseq")
+
+	// Late Charge Grace Days Based on Notice
+       	set LCGRDNOT = LCHGNOT(CUSTNOT).piece("|", 13)
+	// Minimum Bill Amount for Notice
+	set MINNOTBA = LCHGNOT(CUSTNOT).piece("|", 11)
+
+	// Don't create a notice if due amount is less than MINNOTBA
+	if lnbil1.casd < MINNOTBA quit
+	
+	do NOTICE(.ln)
+	
+	quit
+
+
+NOTICE(RecordLN ln)		// Loan account		/REF:R
+
+	type public String QUEUE(,,)
+	type public Date CUVAR2
+	type public Boolean ER
+	type public Number LCGRDNOT
+
+	// Late Charge Action Date
+	set ln.lcad = $$PERIOD^LNU(%SystemDate + 1, LCGRDNOT, ln.dist1fre) quit:ER
+
+	if ln.lcad '< CUVAR2 quit
+	
+	do SETQUE(.ln, "", ln.lcad, 0, 0, "Late Charge Processing|RUNLCHG", false) quit:ER
+
+	// Set accrual event for end of current day
+	set QUEUE(ln.lcad, ln.cid, 9999) = "Calculate accruals"
+
+	quit
+
+	
+private RUNFEE(RecordLN ln,		// Loan account			/REF:RW
+	       Date %SystemDate,	// System date
+	       RecordTTX ttx,		// Primary transaction		/REF:R
+	       RecordLNSEG lnseg())	// Loan segments		/REF:RW
+
+	// Run frequency-based loan fees
+	
+	type public Boolean ER
+	type public Date CUVAR2
+	type public String CTL
+
+	// If not projecting forward and fee batch is in EOD portion of DAYEND,
+	// (where it should be), it will process today's fee records later today
+	if (CTL '= "01"), (%SystemDate = CUVAR2), ($$QUELOC^UANTIC("QUE005") = 1) quit
+
+	// Create and post transactions
+	do EXTERN^BCHLNFEE(.ln, .ttx, "110", .lnseg()) quit:ER
+
+	quit
+
+
+private RUNMDTL(RecordLN ln,		// Loan account		/REF:RW
+		Date %SystemDate)	// System date
+
+	// Maturity date
+	
+	type public Boolean ER
+	type public Date CUVAR2
+
+	// These variables get changed by BCHROLL
+	type String %UserClass, %UserID, ETC
+	type Number BRCD
+	
+	// Generate transactions
+	do EXTERN^BCHROLL(.ln) quit:ER
+
+	quit
+
+
+private RUNBIL(RecordLN ln,		// Loan record		/REF:RW
+	       RecordTTX ttx,		// Transaction record	/NOREQ/REF:R
+	       Date %SystemDate,	// System date
+	       Date %EffectiveDate,	// Effective date
+	       RecordLNSEG lnseg())	// Loan segments		/REF:RW
+
+	// Generate bills
+	
+	type public Boolean ER, FUPO
+	type public Cache %CACHE()
+	type public Date CUVAR2, SAVEFD
+	type public String QUEUE(,,), CTL, SKIP
+ 
+	type Boolean LCHGNOTO
+	type Number BLOFF, CID, I
+	type Date BLDT, LCAD, TPD
+	type String DIST1FRE, ITC, NBDC, PMTGRC, UANTICTL = CTL
+
+	set TPD = %SystemDate
+	set CID = ln.cid
+	
+	type RecordPRODCTL prodctl = %CACHE("PRODCTL").getRecord("PRODCTL", "TYPE = :ln.type")
+
+	// For offset period billing, always use the actual billing offset
+	if prodctl.opb set BLOFF = ln.schnd - %SystemDate + 1
+	else  set BLOFF = ln.bloff
+	
+	/*
+	 In the event a loan is closed early during the projection process, 
+	 (e.g., because of pre-payments) then SCHND will not be bumped and 
+	 BLOFF will be calculated as a negative value on the next scheduled
+	 billing date because SCHND will be less than the current projected
+	 system date.  In this case, reset BLOFF to the normal billing offset.
+	*/
+	if BLOFF < 0 set BLOFF = ln.bloff	
+	
+	// Generate bill records 
+	do EXEC^BCHLNLD(.ln, 1, .ttx, BLOFF, .lnseg()) quit:ER
+	
+	// Jan 18, 2013.  Now that the bill is generated, see if unapplied funds should be reversed
+	// to make a payment.  For loan integrity purposes, perform this here (.vs. RUNSCHND) if billing
+	// and scheduled date bump occur on different dates.
+	if ln.schnd-%SystemDate,ln.unapf>0 do {
+		
+		if 'ln.zhpflag,ln.unapf<(ln.dpmt-ln.ppa) quit
+		
+		do EXEC^BCHLNUNA(ln)
+	}
+	
+	// Handle situation where LCAD is equal to the system date.  Nothing else
+	// will set this for tonight's DAYEND.  Added July 7, 2010.  Locke.
+	if ln.lcad=CUVAR2 do {
+		type RecordDAYENDLCHG delchg=Db.getRecord("DAYENDLCHG","TJD=:CUVAR2,CID=:ln.cid",1)
+		do delchg.save()
+	}
+
+	// No Penalty Calculation Method set up for this account
+	if ln.popt.isNull() quit
+	
+	// Get Calendar from CUVAR
+	set NBDC = CUVAR.LCNBDC
+
+	// Do not calculate late charges when error correcting a transaction
+	if ttx.exists(), ttx.itc6 &(CUVAR2 = %SystemDate) quit
+
+	// Do not calculate late charges at account opening
+	if 'ln.tdr quit
+
+	// Late Charge Processing
+		
+	// Billing - Last Date			
+	set BLDT = ln.bldt
+	
+	// Distribution 1 Frequency		
+	set DIST1FRE = ln.dist1fre	
+	// Payment Grace Period	
+	set PMTGRC = ln.pmtgrc
+	// Late Charge Notice Option	 	
+	set LCHGNOTO = ln.lchgnoto	
+
+	if LCHGNOTO, %SystemDate < CUVAR2 do SETCUS(.ln, 2, %SystemDate, CUVAR2) quit
+
+	// Next Late Charge Action Date - projected based on the Payment Date
+	set LCAD = $$CALCLCAD^BCHLNLD(.ln,(BLDT + BLOFF))
+
+	// Late Charge Action Date
+	set ln.lcad = LCAD
+
+	//  Late Charge Effective Date	
+	set ln.lcefd = BLDT + BLOFF 	
+
+	if 'FUPO.get(), LCAD '< CUVAR2 quit
+
+	/*
+	 Need to consider grace days, otherwise a future-dated payoff
+	 never sets up the late charge event for non-daily late charges.
+	 Thou build the late charge event if not projecting payments.
+	*/
+	if ('SKIP.extract(1)), (FUPO.get()) , (LCAD > (%EffectiveDate + PMTGRC)) quit
+	
+	type Number QUELOC = $$QUELOC^UANTIC("QUE003")
+
+	// Late charges is an EOD process - cannot be equal to today or in future
+	if QUELOC = 1, LCAD '< SAVEFD quit
+	
+	// Late charges is a BOD process - can be equal today but not in future
+	if QUELOC = 2, LCAD > SAVEFD quit
+	
+	do SETQUE(.ln, "", LCAD, 0, 0, "Late Charge Processing|RUNLCHG", false) quit:ER
+	set QUEUE(LCAD, ln.cid, 9999) = "Calculate accruals"
+	if LCAD < SAVEFD set QUEUE(LCAD, ln.cid, 9999) = "Calculate accruals"
+	
+	if %SystemDate < $$BOYJD^SCADAT((CUVAR2 - 1), 1) do {
+		if ttx.exists() do FISCAL^LNPTSR(.ln, ttx.efd) if 1
+		else  do FISCAL^LNPTSR(.ln, %SystemDate)
+		}
+			
+	quit
+
+
+private RUNICHND(RecordLN ln,		// Loan account		/REF:RW
+		 Date %SystemDate,	// System date
+		 Date CUVAR2)		// Customer variable system date
+
+	// Change interest rate at interest change next date, create history 
+	// records as part of Interest Change processing
+ 
+	type public Boolean ER
+	type public String RM
+
+	type Number OLDRATE
+
+	set OLDRATE = +ln.irn
+
+	do EXTERN^BCHICHAN(.ln, %SystemDate)
+	
+	// RM is returned as an array from BCHICHAN - report only the first one
+	if 'RM(1).get().isNull() set RM = RM(1)
+
+	quit
+
+
+private RUNINTOFF(RecordLN ln,		// Loan account		/REF:RW
+		  Date %SystemDate)	// System date
+
+	// Rate change offset date - calculate new rate, store in LNVRCHG
+
+	// DAYEND process: Adjust Variable Interest Rate Loans
+	do EXTERN^BCHVRCHG(.ln, 1)
+
+	quit
+
+
+private RUNLNSUB(RecordLN ln,		// Loan account		/REF:RW
+		 Date %SystemDate)	// System date
+
+	// Loan subsidy review processing
+
+	do EXTERN^BCHSUBDE(.ln, %SystemDate)
+
+	quit
+
+
+private RUNPCHND(RecordLN ln,		// Loan account		/REF:RW
+		 Date %SystemDate)	// System date
+
+	// Payment change date
+	
+	do EXTERN^BCHPMTCG(.ln,%SystemDate)
+
+	quit
+
+
+private RUNPCOFF(RecordLN ln,		// Loan account			/REF:RW
+		 Date %SystemDate)	// System date
+
+	//Payment change offset date - calculate new payment
+
+	// No balance
+	quit:ln.bal = 0
+
+	do EXTERN^PRCPMTCG(.ln, 1)
+
+	quit
+
+private RUNPMT(RecordLN ln,		// Loan account			/REF:RW
+	       RecordTTX ttx,		// Transaction			/REF:R
+	       Date %SystemDate,	// System date
+	       RecordLNSEG lnseg())	// Loan segments		/REF:RW
+
+	// Post loan payment
+
+	type public Number LCHGADJ, VATLCHG
+	type public String EVENT, LCHGTSO
+	type String ETC
+	type Number POFFAMT, TAMT
+
+	// Get information from PRODCTL
+	type public Cache %CACHE()
+	type RecordPRODCTL prodctl = %CACHE("PRODCTL").getRecord("PRODCTL", "TYPE=:ln.type")
+
+	// First, satisfy fee amounts not appearing in payment file
+	set TAMT = $$MCNB^LNCO3(.ln)
+	if TAMT do RUNPMT1(.ln, .ttx, prodctl.crtrmi, TAMT, %SystemDate, .lnseg())
+
+        /* Second, if the daily late charge adjustment has been calculated in
+           DLYLATE section, assess this amount so it can be paid below along
+           with delinquent amounts. */
+        if EVENT.piece("|", 1) = "Post Delinquent Amounts" do {
+
+                set LCHGADJ = LCHGADJ.roundCur(ln.crcd)
+                #IF (CUVAR.VATPROC) set VATLCHG = VATLCHG.roundCur(ln.crcd)
+
+                // Assess daily late charges
+                if LCHGADJ do POSTADJ^LNPTS12(.ln, .ttx, LCHGADJ, VATLCHG, LCHGTSO, .lnseg())
+                
+                // Zero out adjustment amount so the late charge is not 
+                // assessed twice when getting to LATE2 finilizing event
+                set (LCHGADJ, VATLCHG) = 0
+                set LCHGTSO = ""
+                }
+        
+	// Third, satisfy regular payment due
+	#IF (CUVAR.VATPROC)
+		/*
+		Account defined with VATINTOPT should use LN.GTDUE as TAMT,
+		since the regular payment will not include the VAT amounts
+		such as VAT on Interest, VAT on Fees, VAT on Late Charges etc.
+		*/
+		if (ln.vatintopt > 0) set TAMT = ln.gtdue
+		else  do {
+		
+			// Total Due
+			set TAMT = ln.tdue
+			if TAMT < 0 set TAMT = 0
+			
+			// Late Charge Due
+			set TAMT = TAMT + ln.lchg
+			}
+	#ELSE
+		// Total Due
+		set TAMT = ln.tdue
+		if TAMT < 0 set TAMT = 0
+		
+		// Late Charge Due
+		set TAMT = TAMT + ln.lchg
+	#ENDIF
+	
+	set ETC = prodctl.crtrgp
+
+	// Payoff logic
+	if $$PAYOFF(.ln, TAMT) do {
+		set POFFAMT = $$EXEC^LNTCP1(.ln,.ttx, .lnseg())
+		if TAMT '< POFFAMT set TAMT = POFFAMT,ETC = prodctl.crtrci
+		}
+
+	// Account Maturity Date
+	if ln.mdt, %SystemDate '< ln.mdt do {
+		set TAMT = $$EXEC^LNTCP1(.ln, .ttx, .lnseg())
+		set ETC = prodctl.crtrci
+		}
+
+	if TAMT do RUNPMT1(.ln, .ttx, ETC, TAMT, %SystemDate, .lnseg())
+
+	quit
+
+RUNPMT1(RecordLN ln,			// Loan account			/REF:RW
+	RecordTTX ttx,			// Transaction			/REF:R
+	String ETC,			// External transaction code
+	Number TAMT,			// Transaction amount
+	Date %SystemDate,		// System date
+	RecordLNSEG lnseg())		// Loan segments		/REF:RW
+
+	// Create payment transactions
+	
+	type public Boolean ER
+	type public String CTL
+	type public Date CUVAR2
+	
+	type Number BRCD,CID
+	
+ 	set CID = ln.cid
+	set BRCD = ln.boo
+	if BRCD.isNull() set BRCD = CUVAR.BOBR
+
+	// Create and post secondary payment transaction
+	do POST^LNTRB(.ttx, CID, ETC, TAMT, %SystemDate, %UserStation, , , ln.crcd, , , , , , .lnseg())
+
+
+	// Offset with "Cash In" if "cash flow" processing is used
+	if CTL.extract(2) do { if ER set ER = 0 quit
+
+		set ETC="CI"
+		type public Cache %CACHE()
+		type RecordTRN trn = %CACHE("TRN").getRecord("TRN", "ETC=:ETC")
+		do POST^LNTRB(.ttx, trn.acn, ETC, TAMT, %SystemDate, %UserStation, , , ln.crcd, , , , , , .lnseg()) quit:ER
+		}
+
+	quit
+ 
+
+private RUNPPI(RecordLN ln,		// Loan account			/REF:RW
+	       RecordTTX ttx,		// Primary transaction		/REF:R
+	       Date %SystemDate,	// System date
+	       RecordLNSEG lnseg())	// Loan segments		/REF:RW
+
+	// Post Prepaid (Odd) Interest
+	
+	type public Date CUVAR2
+	type public Boolean ER
+	type public Cache %CACHE()
+		
+	type Number BRCD,DISPPI
+	type String ETC
+	
+	quit:%SystemDate '> CUVAR2
+
+	if ln.ipl '< ln.disppi quit	
+
+	// Disclosure - Prepaid Interest Amount
+	set DISPPI = ln.disppi - ln.ipl
+
+	// Branch of Ownership
+	set BRCD = ln.boo
+	if BRCD.isNull() set BRCD = CUVAR.BOBR
+
+	// Create and post Preapaid (Odd Days) Interest transaction
+
+	// Get information from PRODCTL
+	type RecordPRODCTL prodctl = %CACHE("PRODCTL").getRecord("PRODCTL", "TYPE=:ln.type")
+
+	// Create secondary CR Int/Div Tran Code transaction
+	do POST^LNTRB(.ttx, ln.cid, prodctl.crtrin, DISPPI, %SystemDate, %UserStation, , , ln.crcd, , , , , , .lnseg())
+	if ER.get() set ER = 0 quit
+ 
+	set ETC = "CI"
+	type RecordTRN trn = %CACHE("TRN").getRecord("TRN", "ETC=:ETC")
+	do POST^LNTRB(.ttx, trn.acn, ETC, DISPPI, %SystemDate, %UserStation, , , ln.crcd, , , , , , .lnseg()) quit:ER
+
+	quit
+
+
+private RUNSCHND(RecordLN ln,		// Loan account			/REF:RW
+		 Date %SystemDate,	// System date
+		 Date CUVAR2)		// Customer variable system date
+
+	// Scheduled date roll
+	
+	type public Boolean ER
+	
+	// Generate transactions
+	do EXTERN^BCHLNSCH(.ln) quit:ER
+	
+	// Jan 18, 2013.  See if unapplied funds should be reversed
+	// to make a payment.  For loan integrity purposes, perform this here (.vs. RUNBIL) if billing
+	// and scheduled date bump occur on the same date.
+	if ln.schld=%SystemDate,ln.unapf>0 do {
+		
+		if 'ln.zhpflag,ln.unapf<(ln.dpmt-ln.ppa) quit
+		
+		do EXEC^BCHLNUNA(ln)
+	}
+
+	quit
+
+
+private LICHND(RecordLN ln,		// Loan account			/REF:RW
+	       Date %SystemDate,	// System date
+	       Date CUVAR2,		// Customer variable system date
+	       RecordLNSEG lnseg())	// Loan segments		/REF:RW
+
+	// Change interest rate and bump interest change dates on this 
+	// projected system date - loans
+	
+	type public Boolean ER, LNPTSRV, LNUEFD
+	type public Date EVNTJD
+	type public String IX()
+
+	type Number BASE, RATE, RRATE, SRATE, URATE
+	type String PAR()
+	
+	#IF ('CUVAR.NOSEGMENTS!(CUVAR.NOSEGMENTS=3))!($$SEGUSE^BTTOPTMZ("L"))
+		if ln.segments do { quit
+			type Number SEGMENT = ""
+			for  set SEGMENT = lnseg(SEGMENT).order() quit:SEGMENT.isNull()  do { quit:ER
+				if lnseg(SEGMENT).index.isNull() quit
+								
+				if lnseg(SEGMENT).ichnd=EVNTJD do {
+					set lnseg(SEGMENT).ichld = %SystemDate
+					set lnseg(SEGMENT).ichnd = lnseg(SEGMENT).ichld.nextFreqDate(lnseg(SEGMENT).intfre) quit:ER
+					}
+				
+				set BASE = lnseg(SEGMENT).bal
+				set PAR("INDEX") = lnseg(SEGMENT).index
+				set PAR("MATRIX") = lnseg(SEGMENT).intmat
+				set PAR("ROUND") = 1
+				set PAR("LIMIT") = 1
+				set PAR("SEG") = lnseg(SEGMENT).segment
+				if 'IX("").order().isNull() set PAR("IXLOAD") = 1
+				
+				// Calculate new rate
+				do CTL^UINDX(.ln, %SystemDate, BASE, .PAR(), , .lnseg(SEGMENT)) quit:ER 
+				
+				// Set the rate change in account history
+				if (lnseg(SEGMENT).irn - RATE) '= 0 do {
+						
+					type RecordHIST hist = Class.new("RecordHIST")
+					set hist.cid = ln.cid
+					set hist.tseq = Db.nextVal("HIST","CID=:ln.cid")
+					set hist.tjd = CUVAR2
+					set hist.efd = %SystemDate
+					set hist.tlo = %UserStation
+					set hist.tcmt = $$TCMTFM^ACNFUNCS(lnseg(SEGMENT).cid_","_lnseg(SEGMENT).segment, "LNSEG", "IRN", lnseg(SEGMENT).irn, RATE, %SystemDate, $$^MSG(3476,lnseg(SEGMENT).segment))
+					set hist.cdt = %CurrentDate
+					set hist.time = %CurrentTime
+					set hist.uid = %UserID
+					set hist.brcd = ln.boo
+					do hist.bypassSave()
+			
+					set lnseg(SEGMENT).irn = RATE
+					do lnseg(SEGMENT).save()
+					}
+				}
+			}
+	#ENDIF
+
+	if 'ln.segments do { quit:ER
+	
+		// Bump interest change dates
+		if ln.ichnd = EVNTJD do {
+			set ln.ichld = %SystemDate
+			set ln.ichnd = ln.ichld.nextFreqDate(ln.intfre) quit:ER
+			}
+
+		// If Base is null, set to Credit Limit or Amount Requested
+		
+		// Adjusted Balance for Accrual Calculations
+		set BASE = ln.balint
+		// Credit Limit - Current
+		if BASE.isNull() set BASE = ln.crlmt
+		// Amount Requested
+		if BASE.isNull() set BASE = ln.amtreq	
+	
+		// ACM 06/20/09
+		// 17/01/07 Varakrit start
+
+		// Siripong - 14Dec10 - Replaced
+		//if ln.zlegf="02",((+ln.zmaxbal>0)!(+ln.zlstibal>0)) do {
+		if ((ln.zlegf = "02")!(ln.zlegf = "03"))&((ln.zmaxbal > 0)!(ln.zlstibal > 0)) do {
+
+			type Number ZACR, ZBAL, ZINTREC
+
+			set ZBAL = ln.bal
+			set ZACR = ln.acr.roundDec(2)
+			set ZINTREC = 0
+
+			// Siripong - 14Dec10 - Begin
+			/*
+			type ResultSet rs=Db.select("FEETYP","LNFEE","CID=:CID")
+			while rs.next() do {
+				set ZFEETYP=rs.getCol(1)
+				type RecordLNFEE lnfee=Db.getRecord("LNFEE","CID=:CID,FEETYP=:ZFEETYP")
+				if ((ZFEETYP="INTREC1")!(ZFEETYP="INTREC2")) set ZINTREC=ZINTREC+lnfee.feerem
+				}
+			if ZBAL > 0 set BASE = ZBAL + ZACR + ZINTREC
+			*/
+			if ZBAL > 0 set BASE = ZBAL
+			// Siripong - 14Dec10 - End
+
+			if ln.zmaxbal > 0, ln.zmaxbal < BASE set BASE = ln.zmaxbal
+			if ln.zlstibal > 0, ln.zlstibal < BASE set BASE = ln.zlstibal
+			}
+		// 17/01/07 Varakrit end
+
+		// Rounding flag	
+		set PAR("ROUND") = 1
+		// Check for limits flag	
+		set PAR("LIMIT") = 1
+			
+		type RecordLNSEG lnseg1
+		do CTL^UINDX(.ln, %SystemDate, BASE, .PAR(), , .lnseg1)
+	
+		if ER quit
+	
+		// Set the rate change in account history
+		if (ln.irn - RATE) '= 0 do {
+
+			type RecordHIST hist = Class.new("RecordHIST")
+			set hist.cid = ln.cid
+			set hist.tseq = Db.nextVal("HIST","CID=:ln.cid")
+			set hist.tjd = CUVAR2			
+			set hist.efd = %SystemDate
+			set hist.tlo = %UserStation
+			set hist.tcmt = $$TCMTFM^ACNFUNCS("", "LN", "IRN", ln.irn, RATE, %SystemDate)
+			set hist.cdt = %CurrentDate
+			set hist.time = %CurrentTime
+			set hist.uid = %UserID
+			set hist.brcd = ln.boo
+			do hist.bypassSave()
+
+			set ln.irn = RATE
+			}
+		}
+	
+	quit
+
+
+private RUNDECAP(RecordLN ln,		// Loan account			/REF:RW
+		 Date %SystemDate,	// System date
+		 Date %EffectiveDate,	// Effective date
+		 RecordLNSEG lnseg())	// Loan segments		/REF:RW
+
+	// Processing for deferred interest capitalization
+	
+	type public Boolean ER
+	type public Date CUVAR2
+	
+	// Generate transactions
+	do EXTERN^BCHLNDIC(.ln, %EffectiveDate, .lnseg()) quit:ER
+
+	quit
+
+
+private RUNICAP(RecordLN ln,		// Loan account			/REF:RW
+		Date %EffectiveDate,	// Effective date
+		RecordLNSEG lnseg())	// Loan segments		/REF:RW
+
+	// Processing for capitalized interest due
+	
+	type public Boolean ER
+	type public Date CUVAR2
+	
+	// Generate transactions
+	do EXTERN^BCHLNCAP(.ln, %EffectiveDate, .lnseg()) quit:ER
+
+	quit
+
+
+private RUNDSBSCH(RecordLN ln,		// Loan account			/REF:R
+	          Date %SystemDate,	// Projected Date
+	          Date CUVAR2)		// System date set in UANTIC	
+
+	// Post disbursement from disbursement schedule
+
+	type public Number CTL
+	
+	// Do not post disbursements for effective dated transaction
+	if 'CTL.get(), (%SystemDate < CUVAR2) quit
+
+	type Number BRCD, CID
+
+	set BRCD = CUVAR.BOBR
+	set CID = ln.cid
+	
+	do EXEC^BCHLNDS(.ln)
+	
+	set ln=Db.getRecord("LN","CID=:CID")	
+	
+	quit
+	
+
+private RUNAUT(RecordLN ln,		// Loan account			/REF:RW
+	       RecordTTX ttx,		// Primary ransaction record	/REF:R
+	       Date %SystemDate,	// System date
+	       Date CUVAR2,		// Customer variable system date
+	       RecordLNSEG lnseg())	// Loan segments		/REF:RW
+	
+	// Automatic Loan Payment
+	
+	type public String CTL
+	type public Boolean ER
+
+	type Number CID
+	type String EVNT
+
+	// Siripong - 02Mar10 - Begin
+	// if CTL '= "01", %SystemDate = CUVAR2, $$QUELOC^UANTIC("QUE079") = 1 quit
+	#IF CUVAR.ALPHI
+		if CTL '= "01", %SystemDate = CUVAR2, $$QUELOC^UANTIC("QUE115") = 1 quit
+	#ELSE
+		if CTL '= "01", %SystemDate = CUVAR2, $$QUELOC^UANTIC("QUE079") = 1 quit
+	#ENDIF
+	// Siripong - 02Mar10 - End
+
+	// Do not reapply autopayments being reversed on this date
+	if ttx.exists() & (ttx.itc6 + ttx.itc12) & (ttx.tso.isLike("%AUTPMT%")) & (%SystemDate = ttx.efd) quit
+ 
+ 	// Create and post transactions
+	// 06/03/05 Varakrit removed
+	// do EXEC^PROCAUTO(.ln, .lnseg())
+	
+	// Pete C. 08 April 2010
+	// if an error occured and we are online (e.g., from the teller window)
+	// then reset ER to 0 and ET to null.  The teller's transaction should 
+	// succeed even if a repply attempt of an auto payment fails.
+	if ER & isOnLine.get() set ER = 0, ET = ""
+
+	if ln.schld + ln.alprtyd = %SystemDate quit 
+
+	set EVNT = "Auto Loan Payment Capitalization|RUNAUT"
+	if ln.alprtyd, ln.cintbnp = 1 do SETQUE(.ln, "", (ln.schld + ln.alprtyd), 0, 0, EVNT, false) quit:ER
+
+	quit
+
+
+private RUNRTRN(RecordLN ln,		// Loan account			/REF:RW
+		Date %SystemDate)	// System date
+
+	// Return process
+	
+	type public Boolean ER
+	type public Date CUVAR2
+
+	// DAYEND process: Automatic Return 
+	do EXTERN^BCHLNRTN(.ln, 0) quit:ER
+
+	quit
+
+ 
+private TEASER(RecordLN ln,	// Loan account		/REF:R
+	       Date EVNTJD)	// Event date
+
+	// Teaser rate expiration
+	
+	quit
+
+
+private RUNEOM(RecordLN ln,		// Loan account			/REF:RW
+	       Date %SystemDate)	// System date
+
+	// Month end balances
+
+	type public Cache %CACHE()
+	type public Date EVNTJD
+
+	// Balance (Computed)
+	type Number BALCMP, PC, VATPOM
+	type String MEBAL
+	
+	set BALCMP = +ln.bal
+
+	if ln.aruf set BALCMP = BALCMP - ln.udbal
+
+	set PC = +%SystemDate.month()
+
+	// Set Month End Balance
+	set MEBAL = "MEBAL"_PC
+	set ln.@MEBAL = BALCMP
+
+	#IF (CUVAR.VATPROC)
+
+		// Get VAT on Late Charges Calculation from LNPOPT table
+		if 'ln.popt.isNull() do {
+	
+			type RecordLNPOPT lnpopt = %CACHE("LNPOPT").getRecord("LNPOPT","GRP=:ln.grp,POPT=:ln.popt",1)
+			set VATPOM = lnpopt.vatpom
+			}
+	
+		// Populate Monthly Loan VAT on Real table
+		if (ln.vatintopt = 4) ! (VATPOM.get() = 2) do {
+	
+			type Date MEDT = EVNTJD
+			type RecordLNVAT lnvat = Db.getRecord("LNVAT", "BOO = :ln.boo, CID = :ln.cid, MEDT = :MEDT", 1)
+	
+			set lnvat.acr = ln.acr
+			set lnvat.acrreall = ln.acrreall
+			set lnvat.acrrealvat = ln.acrvat
+			set lnvat.ipl = ln.ipl
+			set lnvat.lchgreall = ln.lchgreall
+			set lnvat.papl = ln.papl
+			set lnvat.vatintpd = ln.vatintpd
+			set lnvat.vatlchgdue = ln.vatlchgdue
+			set lnvat.vatlchgpd = ln.vatlchgpd
+	
+			do lnvat.save()
+			}
+	#ENDIF
+
+	quit
+
+
+private RUNIDGP(RecordLN ln,		// Loan account			/REF:RW
+		Date EVNTJD)		// Event date
+ 
+	// Recalculate balance for interest calculation in BOD after the 
+	// expiration date
+
+	type RecordLNDS1 lnds1 = Db.getRecord("LNDS1", "CID=:ln.cid,SDD=:EVNTJD")
+	
+	set ln.balint = ln.balint + lnds1.sda - lnds1.repymt
+
+	quit
+
+
+private RUNLCHG(RecordLN ln,		// Loan account			/REF:RW
+		RecordTTX ttx,		// Primary transaction		/REF:R
+		Date %SystemDate,	// System date
+		Date %EffectiveDate,	// Effective date
+		Date SAVEFD,		// Original effective date
+		Number LCHGADJ,		// Late charge adjustment
+		Number VATLCHG,		// VAT on Late charge adjustment
+		String LCHGTSO,		// Transaction source of funds
+		RecordLNSEG lnseg())	// Loan segments		/REF:RW
+
+	/*
+	Late Charge Processing
+	
+	This section will take care of all one time late charges and
+	apply them to the account. All of the daily charges will be 
+	taken care of in the ACRCALC section.
+	*/
+	
+	type public Cache %CACHE()
+	type public Boolean CTCH(), ER, FUPO
+	
+	// Future dated payoff
+	if FUPO.get(), (%EffectiveDate > SAVEFD) quit
+
+	// Daily - already accruing... will be done in ACRCALC
+	if ln.dlcaf = 1 quit	
+
+	// Penalty option
+	if ln.popt.isNull() quit
+
+	type RecordLNBIL1 lnbil1 = Db.getRecord("LNBIL1", "CID=:ln.cid,SCHSEQ=:ln.oseq", 1)
+
+	// Bill does not exist
+	if lnbil1.getMode() = 0 quit
+
+	// Bill is satisfied		
+	if lnbil1.casd '> 0 quit
+
+	type String LCHRG
+
+	type RecordLNPOPT lnpopt = %CACHE("LNPOPT").getRecord("LNPOPT", "GRP=:ln.grp,POPT=:ln.popt")
+	
+	// Ensure delinquent loans have dlcaf set, since section LNACR may have set it to 0.
+	if lnpopt.cdf,ln.dist1nd<%SystemDate set ln.dlcaf=1
+
+	// Set up entry in LNLCNOT if LCHGNOTO=1
+	if ln.lchgnoto do {
+		type RecordLNLCNOT lnlcnot = Db.getRecord("LNLCNOT", "CID=:ln.cid,LCAD=:%SystemDate", 1)
+		if lnlcnot.getMode() = 1 quit	// Already defined
+		
+		do lnlcnot.bypassSave()
+		}
+	// 04/12/10 - Tom Locke - added setting and usage of LCFROMDT
+	set LCFROMDT=%SystemDate
+	if ln.dlcaf set LCFROMDT=ln.schld
+	
+	// Calculate the late charge for this period
+	// 10/20/04 Varakrit replaced
+	set LCHRG = $$EXTERN^BCHLNLAT(.ln, .ttx, ln.cid, %SystemDate, LCFROMDT, , , .lnseg()) quit:ER
+	// set LCHRG = $$EXTERN^BCHLNLAT(.ln, .ttx, ln.cid, %SystemDate, %SystemDate, , 0, .lnseg()) quit:ER	// ACM 06/20/09
+
+	if lnpopt.cdf do { quit
+
+		// Late Charge Adjustment from UANTIC
+		set LCHGADJ = LCHGADJ + LCHRG 
+
+		#IF (CUVAR.VATPROC)
+
+			// VAT on late charge adjustment
+			set VATLCHG = VATLCHG + LCHRG.piece("|",2)
+
+			if (lnpopt.vatpom = 2) do {
+
+				// Accumulated + current real interest late charge
+				set LCHGTSO = $$FIELD^UTSO(LCHGTSO, "LCHGREAL") + $$FIELD^UTSO(LCHRG.piece("|",3), "LCHGREAL")
+
+				// Source of funds of recent late charge transaction
+				set LCHGTSO = $$FIELDIN^UTSO(LCHRG.piece("|",3), "LCHGREAL", +LCHGTSO)
+				}
+			else  set LCHGTSO = LCHRG.piece("|",3)
+		#ELSE
+			set LCHGTSO = LCHRG.piece("|",3)
+		#ENDIF
+
+		// Daily Late Charge Assessment Flag	 
+		set ln.dlcaf = lnpopt.cdf
+		// Late Charges Calculation Flag 		
+		set CTCH(%SystemDate) = 1 			
+		}
+
+	// Post late charge adjustment
+	// Real Interest Late Charge is applicable only when lnpopt.cdf = 1
+	if LCHRG.piece("|", 1) do POSTADJ^LNPTS12(.ln, .ttx, LCHRG.piece("|", 1), 0, LCHRG.piece("|",3), .lnseg())
+
+	quit
+
+
+private RUNDEFFEE(RecordLN ln,		// Loan record			/REF:RW
+		  Date EVNTJD)		// Event date 
+
+	// Deferred Fees Amortization for the effective-dated loan creation and 
+	// Amortization Reinstatement upon the Payoff Reversal
+	
+	type public String SKIP
+	type public Date CUVAR2
+	type public Boolean DEFFEE
+
+	/* 
+	  Since in SETDEFFEE section when setting amortization event for the
+	  backdated loan creating , the LNFEED record is not yet available 
+	  (it is created only when the loan fee event, RUNFEE, is executed), 
+	  re-define correct event date here.
+	  
+	  The TJD is used as the event date's place-holder in SETDEFFEE but the 
+	  next amortization date should be used. Although TJD is OK when
+	  the fee plan's "Calculate in Advance" flag (LNFEEP.BES) is "Y" 
+	  (since LNFEED.CYCND = LNFEED.STDT = TJD), when LNFEEP.BES="N" the 
+	  next amortization date would be set by LNFEED filer based on 
+	  amortization frequency and selecting from LNFEED record in 
+	  EXEC^BCHDEFFE will not return expected record skipping the fee 
+	  amortization.
+	*/
+	if (SKIP.extract(2)) do { quit
+		
+		type DbSet dsfeed = Db.selectDbSet("LNFEED","CID=:ln.cid")
+		while dsfeed.next() do {
+		
+			type RecordLNFEED lnfeed = dsfeed.getRecord("LNFEED")
+			
+			/* 
+			  Save off CUVAR2 for the multiple fees fee plan. 
+			  In this case, when processing the 1st fee's backdated
+			  amortization transaction, CUVAR2 is redefined in
+			  LNPTS2 and not set back to original value until 
+			  hitting EXEC^UANTIC.		  
+			*/
+			type Date SAVCUVAR2 = CUVAR2
+			
+			do EXTERN^BCHDEFFE(.ln, lnfeed.cycnd, 1)
+			
+			set CUVAR2 = SAVCUVAR2
+			}
+		set DEFFEE = true				
+		}
+			
+	if (DEFFEE = false) do EXTERN^BCHDEFFE(.ln, EVNTJD, 1)
+	
+	quit
+
+
+private RUNNETFEE(RecordLN ln,		// Loan record			/REF:RW
+		  Date EVNTJD)		// Event date 
+
+	// Net Deferred Fees Amortization for effective-dated loan creation and 
+	// Amortization Reinstatement upon the Payoff Reversal
+	
+	do EXTERN^BCHNDFAM(.ln, EVNTJD, 1)
+	
+	quit
+	
+
+private RUNCYCMSC(RecordLN ln,		// Loan record			/REF:RW
+		  Date EVNTJD)		// Event date 
+
+	// Miscellaneous Cycled Item Amortization for effective-dated loan creation and 
+	// Amortization Reinstatement upon the Payoff Reversal
+	
+	type public Boolean CYCMSC
+	
+	if (CYCMSC = 0) do EXTERN^BCHLNAMO(.ln, EVNTJD, 1)
+
+	set CYCMSC = 1  // MSC Item Amortization event is done for today
+	
+	quit
+	
+
+private RERUNHIST(RecordLN ln,		// Loan record			/REF:RW
+		  RecordTTX ttx1(,,),	// Transaction set from history	/NOREQ/REF:R
+		  Date %SystemDate,	// System date
+		  Date CUVAR2,		// Current date
+		  RecordLNSEG lnseg())	// Loan segments		/REF:RW
+
+	/*
+	Reprocess history records on their simulated effective date
+
+	Additional notes on ARGUMENTS:
+
+	. ttx1(,,)
+		An array set in LNUEFD
+		Contains previously-existing history entries that need
+		to be examined and possibly overridden
+	*/
+	
+	type public Boolean ER, LNPTSRV
+	type public Cache %CACHE()
+	type public Number LCHGADJ, VATLCHG
+	type public String OVR(,,), LCHGTSO
+
+	type Number CID, SEQ, TAMT
+	
+	set (CID, SEQ) = ""
+	for  set CID = ttx1(%SystemDate, CID).order() quit:CID.isNull()  do { quit:ER
+		for  set SEQ = ttx1(%SystemDate, CID, SEQ).order() quit:SEQ.isNull()  do { quit:ER
+			set TAMT = ttx1(%SystemDate, CID, SEQ).tamt
+
+			// Monetary transaction
+			if $translate(TAMT, "0#") do { quit:ER
+				type String ITC
+				type Number BRCD,DELQTYP
+				
+				// Manage scope for structures used by TRNSINGL^TRNDRV
+				type RecordTTX TTXOBJS()
+				type String TRNDRVI(,,), TRNPSSTK
+
+				set ITC = ttx1(%SystemDate, CID, SEQ).itc
+				
+				// Reverse or error correct
+				if (ITC.extract(6)) ! (ITC.extract(12)) set DELQTYP = 12
+				else  set DELQTYP = 5
+				
+				if ln.lchgnoto, %SystemDate < CUVAR2 do SETCUS(.ln, DELQTYP, %SystemDate, CUVAR2)
+
+				/*
+				 When reapplying payment transactions to loans currently being assessed
+				 daily late charges, the system should reassess any late charges accumulated
+				 thus far to ensure that the reapplied payment can be directed towards those
+				 late charges, if applicable.
+				*/
+				if LNPTSRV.get() , (LCHGADJ.get() ! VATLCHG.get()) , (ln.dlcaf) do {
+
+					type RecordTRN trn = %CACHE("TRN").getRecord("TRN","ETC=:ttx1(%SystemDate, CID, SEQ).etc")
+					if trn.pcfl9'=1 quit
+
+					// Siripong - 04May10 - Begin
+					type Number BRCD
+
+					set BRCD = ttx1(%SystemDate, CID, SEQ).brcd
+					if BRCD.isNull() set BRCD = CUVAR.BOBR
+					// Siripong - 04May10 - End
+
+					type RecordTTX ttx = Class.new("RecordTTX")
+
+					do POSTADJ^LNPTS12(.ln, .ttx, LCHGADJ.roundCur(ln.crcd), VATLCHG.roundCur(ln.crcd), LCHGTSO, .lnseg())
+					set (LCHGADJ, VATLCHG) = 0
+					set LCHGTSO = ""
+					set ln.lcla = %SystemDate - 1
+					}
+
+				// Allow TRNDRV to reassign
+				set ttx1(%SystemDate, CID, SEQ).trc = ""
+								
+				#IF (CUVAR.VATPROC)
+					type String UTSO(), VATTSO
+				
+					set VATTSO = ttx1(%SystemDate, CID, SEQ).tso
+					
+					/* Remove below TSO fields to avoid
+					   doubling the amounts stored in these
+					   fields when reapplying the payment
+					   for VAT Rebate loan. */
+					if (ln.vatintopt = 5) , (VATTSO.isLike("%EXACTACRVATR%")) , (VATTSO.isLike("%REAPPLY%")) do {
+						
+						do OUT^UTSO(.UTSO, VATTSO)
+						kill UTSO("EXACTACRVATR")
+						kill UTSO("EXACTACRVPDRL")
+						set VATTSO = ""
+						do IN^UTSO(.UTSO, .VATTSO)
+						
+						set ttx1(%SystemDate, CID, SEQ).tso = VATTSO
+						}
+				#ENDIF
+
+				// ----- Beg 03/10/10 revision -----
+				type Number BRCD
+
+				set BRCD = ttx1(%SystemDate, CID, SEQ).brcd
+				if BRCD.isNull() set BRCD = CUVAR.BOBR
+				// ----- End 03/10/10 revision -----
+
+				// Create and post transaction
+				do TRNSINGL^TRNDRV(.ttx1(%SystemDate, CID, SEQ), .ln, %SystemDate, BRCD, 4, , , .OVR(,,), , , , .lnseg()) quit:ER
+				}
+			// File maintenance transaction
+			else  do RERUNFM(.ln, .ttx1(%SystemDate, CID, SEQ), .lnseg())
+			}
+		}
+
+	quit
+
+
+private RERUNFM(RecordLN ln,		// Loan account			/REF:RW
+		RecordTTX ttx1,		// Transaction from set		/REF:R
+		RecordLNSEG lnseg())	// Loan segments		/REF:RW
+	/*
+	Reapply file maintenance from HIST
+	
+	Additional notes on ARGUMENTS:
+	. ttx1
+		An array set in LNUEFD
+		Contains previously-existing history entries that need
+		to be examined and possibly overridden
+	*/
+	
+	type public RecordDEP dep()
+	type public String OVR(,,)
+	type public Number CID
+	type public Date EVNTJD, SAVEFD
+
+	type String DI, FID, FMREC, NV
+
+	// Get table name and data item from TCMT - example [LN]RELCODE
+	set FMREC = ttx1.tcmt.piece(":", 1)
+	set FMREC = FMREC.piece("[", 2)
+
+	if FMREC.isNull() quit
+
+	set FMREC = "["_FMREC
+
+	set FID = FMREC.piece("]", 1).extract(2, 99)
+	set DI = FMREC.piece("]", 2, 99)
+	
+	// Translate all lower case alpha to UPPER CASE
+	set FID = FID.upperCase()
+	set DI = DI.upperCase()
+
+	// "Intervening bill record maint. Verify billed records."
+	if FID = "LNBIL1" ! (FID = "LNBIL0") ! (FID = "LNBIL5") set OVR(ln.cid, "OVR", "BILLFM") = "" quit
+	
+	// Check if the table exists
+	type RecordDBTBL1 dbtbl1 = Db.getRecord("DBTBL1", "%LIBS='SYSDEV',FID=:FID", 1)
+	if dbtbl1.getMode() = 0 quit
+	
+	if FID '= "LN", FID '= "DEP", FID '= "ACN", FID '= "ACNSEG", FID '= "LNSEG" quit
+
+	// File new data into account, if DI exists
+	type RecordDBTBL1D dbtbl1d = Db.getRecord("DBTBL1D","%LIBS='SYSDEV',FID=:FID,DI=:DI", 1)
+
+	if dbtbl1d.getMode() = 0 quit
+
+	// Get new value from the TMCT
+	set FMREC = ttx1.tcmt.piece(":", 2, 3)
+	set NV = FMREC.piece(":", 2)
+		
+	if (FID = "LN") ! (FID = "ACN" & (CID = ln.cid)) do {
+
+		if DI="ZREVINT" quit
+
+		// Update only non computed columns
+		if dbtbl1d.cmp.isNull() set ln.@DI = NV
+	
+		#IF (CUVAR.VATPROC)
+
+			// Set up RUNUDI if VAT on Interest option is changed to 4
+			if (DI = "VATINTOPT") , (NV = 4) do SETUDI(.ln, EVNTJD, SAVEFD)
+		#ENDIF
+
+		/*
+		Update balance for interest calculations when credit 
+		limit is adjusted and Capitalized Deferred Interest 
+		flag set to 1
+		*/
+	
+		type RecordUTBLICPA icpa = Db.getRecord("UTBLICPA", "KEY=:ln.icpa")
+
+		if DI = "CRLMT", icpa.pc10 do {
+			if ln.bal < ln.crlmt set ln.balint = ln.bal
+			else  set ln.balint = ln.crlmt
+			}
+		}
+	else  if (FID = "DEP") ! (FID = "ACN" & (CID '= ln.cid)) do {
+
+		// Update only non computed columns
+		if dbtbl1d.cmp.isNull() set dep(CID).@DI = NV
+		}
+	else  if (FID = "ACNSEG") ! (FID = "LNSEG") do {
+
+		quit:'dbtbl1d.cmp.isNull()
+
+		type Number FMSEG
+		
+		/*
+		 Future consideration will need to be taken when reapplying 
+		 lnseg file maintenance when segments are created/deleted
+		 as part of the transactions.
+		*/
+		set FMSEG = ttx1.tcmt.piece("[", 1).piece(",",2)
+		
+		quit:'lnseg(FMSEG).exists()
+		
+		set lnseg(FMSEG).@DI = NV
+		
+		}
+	quit
+
+
+private SETQUE(RecordLN ln,	// Loan account				/REF:R
+	       String FRE,	// Posting frequency of this event	/NOREQ
+	       Date NJD,	// Projected date
+	       Number OFF,	// Date offset
+	       Boolean PLUS1,	// Plus 1
+	       String EVNT,	// Event name
+	       Boolean PAYOFFREV)  // Payoff Reversal Indicator	/REF:W
+
+	// Set the processing queue
+	
+	type public Cache %CACHE()
+	type public Date CUVAR2, SAVEFD
+	type public String CTL, QUEUE(,,)
+	type public Boolean ER
+
+	type Date EVNTJD, ZOJD
+	type Number CID
+	type String EVNTNAME, ZFRE
+
+	if 'NJD quit
+
+	set CID=ln.cid
+	set EVNTJD = NJD - OFF + PLUS1
+	if EVNTJD > SAVEFD quit
+
+	// Single entry	
+	if FRE.get().isNull() do SETEVENT(.ln, EVNT, EVNTJD, .QUEUE(,,), PAYOFFREV) quit
+		
+	set EVNTNAME = EVNT.piece("|", 2)
+
+	// Special case for Interest Review Offset Calendar
+	if EVNTNAME = "RUNINTOFF" do { quit
+		for  quit:($$INTOFFDT^LNCDI(NJD, OFF, ln.intoffcl) + PLUS1) > %EffectiveDate  do {
+			set EVNTJD = $$INTOFFDT^LNCDI(NJD, OFF, ln.intoffcl) + PLUS1
+			do SETEVENT(.ln, EVNT, EVNTJD, .QUEUE(,,), PAYOFFREV)
+			set NJD = NJD.nextFreqDate(FRE) quit:ER
+			}
+		}
+
+	// Special case for billing offset; offset="1P" (first full payment) 
+	// and date to queue is the projected to date
+	if EVNTNAME = "RUNBIL", OFF = "1P", NJD = %EffectiveDate do {
+		do SETEVENT(.ln, EVNT, NJD, .QUEUE(,,), PAYOFFREV)
+		set OFF = 0
+		}
+
+	// Multiple entries
+	for  quit:EVNTJD > %EffectiveDate  do { quit:ER
+		do SETEVENT(.ln, EVNT, EVNTJD, .QUEUE(,,), PAYOFFREV)
+
+		// Siripong - 15Jul10 - Begin
+		// set NJD = NJD.nextFreqDate(FRE) quit:ER
+		set ZOJD = NJD
+		set NJD = NJD.nextFreqDate(FRE) quit:ER
+		if (EVNTNAME = "RUNBIL")!(EVNTNAME = "RUNSCHND")!(EVNTNAME = "RUNPMT") do {  quit:ER.get()
+			if ('ln.mdt.isNull()),(ln.rencd = 4),(NJD > ln.mdt) do {  quit:ER.get()
+				if ZOJD < ln.mdt set NJD = ln.mdt quit
+				if FRE = "*" do {  quit
+					if 'CID.get() do Runtime.setErrMSG("LN", 7774) quit:ER.get()
+
+					type RecordPRODCTL prodctl = %CACHE("PRODCTL").getRecord("PRODCTL", "TYPE=:ln.type", 1)
+
+					set ZFRE = prodctl.zfrepmts
+					if ZFRE.isNull() set ZFRE = "1MAE"
+					set NJD = ZOJD.nextFreqDate(ZFRE) quit:ER.get()
+					}
+				if ZOJD > ln.mdt quit
+
+				// Siripong - 15Dec10 - Begin
+				//type Date XDT = ZOJD.nextFreqDate(FRE) quit:ER.get()
+				type Date XDT = ZOJD.nextFreqDate(FRE,,1) quit:ER.get()
+				for  set XDT = XDT.nextFreqDate(FRE) quit:ER.get()!(XDT > ZOJD)
+				// Siripong - 15Dec10 - End
+
+				if XDT > ln.mdt set NJD = XDT
+				}
+			}
+		// Siripong - 15Jul10 - End
+
+		set EVNTJD = NJD - OFF + PLUS1
+		}
+
+	quit
+
+
+SETEVENT(RecordLN ln,		// Loan record			/REF:RW
+	 String EVNT,		// Event data
+	 Date EVNTJD,		// Event date
+	 String QUEUE(,,),	// Event queue				/REF:RW
+	 Boolean PAYOFFREV)  	// Payoff Reversal Indicator	/REF:W
+
+
+	// Set a single event and an accompanying accrual event
+	type Number PRVQSQ
+
+	// Get previous non-acrual sequence
+	set PRVQSQ = QUEUE(EVNTJD, ln.cid, 9999).order(-1)
+		
+	// Set new entry in QUEUE(,,)
+	set QUEUE(EVNTJD, ln.cid, PRVQSQ + 1) = EVNT
+	
+	// Skip accrual event if this is payoff but not payoff reversal.
+	if (ln.stat = 4) , ('PAYOFFREV) quit
+		
+	// Set accrual event for end of prior day
+	if (EVNTJD > %SystemDate) , (EVNTJD '> %EffectiveDate) set QUEUE(EVNTJD - 1, ln.cid, 9999) = "Calculate accruals"
+			
+	quit
+        
+
+private LNACR(RecordLN ln,		// Loan record			/REF:RW
+	      RecordTTX ttx,		// Primary transaction		/REF:R
+	      Date EVNTJD,		// Event date
+	      Date ACRDT(),		// Accrual date			/REF:RW
+	      String ACRADJ(,),		// Accrual adjustment		/REF:RW
+	      RecordLNSEG lnseg())	// Loan segments		/REF:RW
+
+	// Calculate accrued interest from ACRDT+1 through EVNTJD
+	
+ 	type public Cache %CACHE()
+	type public Boolean BASREL(), DAILYFRE(,), ER
+	type public Date CUVAR2
+	type public String ITC
+
+	type Boolean STOPACR = 0
+	type Date ACRLD, ACRND
+	type Number ACRAMT, IRN
+	
+	set ACRLD = ACRDT(ln.cid) + 1
+	set (ACRND, ACRDT(ln.cid)) = EVNTJD 
+	if ACRND < ACRLD set ACRLD = ACRND
+	
+	#IF ('CUVAR.NOSEGMENTS!(CUVAR.NOSEGMENTS=3))!($$SEGUSE^BTTOPTMZ("L"))
+
+		type Number CPACR, ONEAGOACR, TWOAGOACR
+
+		// Calculate accrued interest from ACRDT+1 through EVNTJD for Segmented Account
+		if ln.segments do {
+			type Number SEGMENT = ""
+			for  set SEGMENT = lnseg(SEGMENT).order() quit:SEGMENT.isNull()  do { quit:ER
+				if 'lnseg(SEGMENT).index.isNull() do {
+					
+					// BASREL array won't exist if EFD=CUVAR2
+					if BASREL(lnseg(SEGMENT).index).get() do LICHND(.ln, ACRLD, CUVAR2, .lnseg())
+					
+					if DAILYFRE(ln.cid, 0).get() do {
+						set lnseg(SEGMENT).ichnd = ACRND + 1
+						set lnseg(SEGMENT).ichld = ACRND
+						}
+					}
+				
+				// Teaser Rate
+				if lnseg(SEGMENT).trexd > EVNTJD set IRN = lnseg(SEGMENT).trate
+				else  set IRN = lnseg(SEGMENT).irn
+				
+				if lnseg(SEGMENT).bal do { quit:ER
+					set ACRAMT = $$^UIC(lnseg(SEGMENT).bal, ACRLD, ACRND, ln.iacm, IRN, 0, ln.dist1af, ln.dist1fre, ln.icpf, ln.schnd, ln.schld) quit:ER
+					
+					set CPACR = (ACRAMT * (lnseg(SEGMENT).cpbal / lnseg(SEGMENT).bal)).roundDec(5, "", 0)
+					set ONEAGOACR = (ACRAMT * (lnseg(SEGMENT).oneagobal / lnseg(SEGMENT).bal)).roundDec(5, "", 0)
+					set TWOAGOACR =(ACRAMT * (lnseg(SEGMENT).twoagobal / lnseg(SEGMENT).bal)).roundDec(5, "", 0)
+
+					// Update segment accrual fields
+					set lnseg(SEGMENT).acr = lnseg(SEGMENT).acr + CPACR + ONEAGOACR + TWOAGOACR
+					set lnseg(SEGMENT).cpacr = lnseg(SEGMENT).cpacr + CPACR
+					set lnseg(SEGMENT).oneagoacr = lnseg(SEGMENT).oneagoacr + ONEAGOACR
+					set lnseg(SEGMENT).twoagoacr = lnseg(SEGMENT).twoagoacr + TWOAGOACR
+					
+					// Reflect in loan counterparts
+					set ln.acr = ln.acr + CPACR + ONEAGOACR + TWOAGOACR
+					set ln.cpacr = ln.cpacr + CPACR
+					set ln.oneagoacr = ln.oneagoacr + ONEAGOACR
+					set ln.twoagoacr = ln.twoagoacr + TWOAGOACR
+
+					// Reflect accrual changes in ACRADJ to post accurate adjustment
+					set ACRADJ(ln.cid, "ACR").piece("|", 1) = ACRADJ(ln.cid, "ACR") + CPACR + ONEAGOACR + TWOAGOACR
+					set ACRADJ(ln.cid, "CPACR", lnseg(SEGMENT).segment).piece("|", 1) = ACRADJ(ln.cid, "CPACR", SEGMENT).piece("|", 1) + CPACR
+					set ACRADJ(ln.cid, "ONEAGOACR", lnseg(SEGMENT).segment).piece("|", 1) = ACRADJ(ln.cid, "ONEAGOACR", SEGMENT).piece("|", 1) + ONEAGOACR
+					set ACRADJ(ln.cid, "TWOAGOACR", lnseg(SEGMENT).segment).piece("|", 1) = ACRADJ(ln.cid, "TWOAGOACR", SEGMENT).piece("|", 1) + TWOAGOACR
+					}
+	
+				// Uncomment for trouble-shooting statistics (do not remove)
+				//write !,"Re/apply LN "_ln.cid_": LNACR Accrue "_lnseg(SEGMENT).bal_" at "_IRN_"% "_ACRLD.toString()_"-"_ACRND.toString()_" = "_ACRAMT
+				//write !,$char(9)_"(lnseg(SEGMENT).acr = "_lnseg(SEGMENT).acr_")"
+				//write !,"   (ln.acr = "_ln.acr_", ln.bal = "_ln.bal_")"
+				//write !,"   Seg "_lnseg(SEGMENT).segment_": lnseg(SEGMENT).acr = "_lnseg(SEGMENT).acr_", cpacr = "_lnseg(SEGMENT).cpacr_", oneagoacr = "_lnseg(SEGMENT).oneagoacr_", twoagoacr = "_lnseg(SEGMENT).twoagoacr
+				//write !,"   Seg "_lnseg(SEGMENT).segment_": lnseg(SEGMENT).bal = "_lnseg(SEGMENT).bal_", cpbal = "_lnseg(SEGMENT).cpbal_", oneagobal = "_lnseg(SEGMENT).oneagobal_", twoagobal = "_lnseg(SEGMENT).twoagobal
+				}
+			}
+	#ENDIF
+	
+	if 'ln.segments do {
+			
+		/*
+		If BASREL (not basis index) check for interest rate change. If daily 
+		freq, bump the interest change dates, skipping dates within the accrual
+		period. BASREL array won't exist if EFD=CUVAR2
+		*/
+		if 'ln.index.isNull() , BASREL(ln.index).get() do LICHND(.ln, ACRLD, CUVAR2, .lnseg())
+		
+		// Calculate accrued interest between ACRLD and ACRND.
+		do LNACR^LNU(.ln, ACRLD, ACRND, 1)
+		}
+	
+	//Ensure dlcaf is set if loan is delinquent
+	// Siripong - 09Sep10 - Ensure ln.dist1nd has a value.
+	// if ln.dist1nd<=EVNTJD do {
+	if ln.dist1nd, ln.dist1nd<=EVNTJD do {
+
+		if ln.popt.isNull() quit   // Siripong - 11Jun10 - Added
+
+		type RecordLNPOPT lnpopt = Db.getRecord("LNPOPT", "GRP=:ln.grp,POPT=:ln.popt")
+		
+		type String LC()
+		type Date OLDESTLCAD
+		type Date LCAD,LGD  // Protect these, as they are returned from LCAD^BCGLNLD.
+		
+		// If the first action date has not been reached, quit.  8/18/10 - tlocke added logic to set/use OLDESTLCAD
+		do LCAD^BCHLNLD(ln.dist1nd,ln.lcbo,ln.pmtgrc,ln.dist1fre,1)
+		set OLDESTLCAD=LC(ln.dist1nd,ln.lcbo,ln.pmtgrc).piece("|",2)
+		if OLDESTLCAD>=%SystemDate quit  ; added July 7 2010.  Locke.
+		if lnpopt.cdf set ln.dlcaf=1
+	}	
+	// This is not Daily or already calculated
+	if ln.dlcaf '= 1 quit
+
+	type RecordLNBIL1 lnbil1 = Db.getRecord("LNBIL1", "CID=:ln.cid,SCHSEQ=:ln.oseq", 1)
+		 
+        // If no longer delinquent, reset DLCAF to 0 and quit
+	if lnbil1.getMode() = 0 set ln.dlcaf = 0 quit
+	if lnbil1.casd '> 0 set ln.dlcaf = 0 quit
+
+	// Do not calculate late charges when error correcting a transaction
+	if ITC.get().extract(6) & (CUVAR2 = EVNTJD) quit
+
+	// 10/20/04 Varakrit
+	do DLYLATE(.ln, .ttx, ACRLD, EVNTJD, .lnseg())
+	// if CTCH(EVENTJD+1).get().isNull() do DLYLATE(.ln, .ttx, ACRLD+1, EVNTJD+1, .lnseg())
+	// if 'CTCH(EVENTJD+1).get().isNull() do DLYLATE(.ln, .ttx, ACRLD, EVNTJD, .lnseg())
+	// if SAVEVNTJD+1=%SystemDate, CTCH(SAVEVNTJD+1).get()=0 do DLYLATE(.ln, .ttx, SAVEVNTJD+1, SAVEVNTJD+1, .lnseg())
+	
+	quit
+
+
+DLYLATE(RecordLN ln,		// Loan account			/REF:RW
+	RecordTTX ttx,		// Primary transaction		/REF:R
+	Date FD,		// From date
+	Date %SystemDate,	// Thru date
+	RecordLNSEG lnseg())	// Loan segments		/REF:RW
+
+	// Late Charges - Daily
+	
+	type public Boolean CTCH(), ER
+	type public Number LCHGADJ, VATLCHG
+	type public String LCHGTSO
+
+	type Boolean NOLC = 0
+	type Number CID
+	type String LCHRG
+	type Date TD, TPD
+
+	/*
+	 If CTCH(FD)=1, then daily late charges were already calculated for
+	 FD (ACRLD) in the RUNLCHG section.  However, it is possible that 
+	 other late charge dates still need to be processed between FD and 
+	 TJD (EVNTJD).  In this case, bump FD by one so late charges aren't 
+	 assessed twice for ACRLD, then proceed to calculate the late charge 
+	 assessment for FD + 1 through %SystemDate.
+	*/
+	if (CTCH(FD).get() = 1) do {  quit:NOLC
+		if FD < %SystemDate set FD = FD + 1
+		else  set NOLC = 1
+		}
+
+	// If CTCH(TJD)=1, then daily late charges have already
+	// been assessed for this period.  Don't proceed.
+	if (CTCH(%SystemDate).get() = 1) quit
+
+	set (TD, TPD) = %SystemDate
+
+	// 01/27/05 Varakrit replaced
+	set LCHRG = $$EXTERN^BCHLNLAT(.ln, .ttx, ln.cid, TD, FD, , , .lnseg()) quit:ER	// ACM 06/20/09
+	// set LCHRG = $$EXTERN^BCHLNLAT(.ln, .ttx, ln.cid, TD, FD, , 1, .lnseg()) quit:ER
+
+	set LCHGADJ = LCHGADJ + LCHRG
+
+	
+	#IF (CUVAR.VATPROC)
+
+		// VAT on Late Charge 
+		set VATLCHG = VATLCHG + LCHRG.piece("|",2)
+
+		// Accumulated + today's real interest late charge
+		set LCHGTSO = $$FIELD^UTSO(LCHGTSO, "LCHGREAL") + $$FIELD^UTSO(LCHRG.piece("|",3), "LCHGREAL")
+
+		// Source of funds of recent late charge transaction
+		if LCHGTSO set LCHGTSO = $$FIELDIN^UTSO(LCHRG.piece("|",3), "LCHGREAL", +LCHGTSO)
+		else  set LCHGTSO = LCHRG.piece("|",3)
+	#ELSE
+		set LCHGTSO = LCHRG.piece("|",3)
+
+	#ENDIF
+
+	quit
+
+
+public	PAYOFF(RecordLN ln,		// Loan account			/REF:R
+	       Number TAMT)		// Transaction amount		/NOREQ
+
+	// Is this loan nearing payoff ?
+
+	type Number BALCMP, POAMT, PMTAMT
+	
+	// Scheduled Internal Bill Sequence Number
+	if 'ln.schseq quit ""
+	if ln.dseq < ln.schseq quit ""
+
+	set BALCMP = +ln.bal
+	if ln.aruf set BALCMP = BALCMP - ln.udbal
+		
+	type RecordLNBIL1 bil = Db.getRecord("LNBIL1", "CID=:ln.cid,SCHSEQ=:ln.schseq", 1)
+	if bil.getMode() = 0 quit ""
+
+	// balloon amount
+	if ln.ballamt set BALCMP = BALCMP - ln.ballamt  	
+	if 'TAMT.get().isNull() set PMTAMT = TAMT
+	else  set PMTAMT = bil.casd
+
+	set PMTAMT = PMTAMT * 2
+	if PMTAMT > (BALCMP + ln.acr) quit 1
+
+	// Number of Times Renewed
+
+	// Total Principal Only Payments
+	set POAMT = ln.poamt	
+
+	// Total Disbursement Amount
+	if POAMT, ln.tdr, (POAMT / ln.tdr) > .20 quit 1
+
+	quit "" 
+
+public ACRADJ(RecordLN ln,		// Loan account			/REF:RW
+       	      RecordTTX ttx,		// Primary transaction		/NOREQ/REF:R
+              String ACRADJ(,,),	// Accrual adjustment		/REF:R
+              Date CUVAR2,		// Current date
+              Number LCHGADJ,		// Late charge adjustment	/NOREQ
+              Number VATLCHG,		// VAT on late charge adjustment /NOREQ
+              String LCHGTSO,		// Transaction source of funds	/NOREQ
+              RecordDEP dep(),		// Escrow accounts		/NOREQ/REF:RW
+              RecordLNSEG lnseg(),	// Loan segments		/REF:RW
+              Number ACRSEGMENT)	// Segment for accrual		/NOREQ/VAL
+
+	// Create transactions for accrual adjustment
+	
+	type public String CTL
+	type public Boolean ER
+	
+	type Date ACRDT()
+	type Number ACRREAL, ACRTYPE, ACRVAT = 0, ACRVATRL = 0, ESCCID, GLCID, OFFSET, TAMT
+	type String CRCD, ETC, GLSC, TC, TSO
+
+	/*
+	Account projection functions have position 2 set (generate cash 
+	offsets)... do not show interest accrual adjustments in this case
+	*/
+	if CTL.extract(2) quit
+
+	type public Cache %CACHE()
+
+	/*
+	ln.acr has the correct final accrual amount at this point... need to 
+	subtract out the rounded adjustment amount here, so when we post the 
+	accrual adjustment transaction, it puts it back so there is no net 
+	effect on ln.acr.
+	*/
+	set ln.acr = ln.acr - ACRADJ(ln.cid,"ACR").piece("|",1)
+	
+	
+	// ZSUBACR adjustments are stored such that a positive value is an increase, negative is a decrease
+	if ACRADJ(ln.cid, "ZSUBACR") do {
+		
+		type Number TAMT = ACRADJ(ln.cid, "ZSUBACR").roundCur(ln.crcd)
+		
+		if 'TAMT quit
+		
+		type String ETC1,ETC2,GRP,TSO
+		
+		set GRP = ln.grp
+	
+		type RecordPRODCTL prodctl = %CACHE("PRODCTL").getRecord("PRODCTL", "TYPE=:ln.type")
+		
+		type RecordZUTBLSUBPLN subpln = %CACHE("ZUTBLSUBPLN").getRecord("ZUTBLSUBPLN", "ZSUBPLN = :ln.zsubpln")
+		
+	
+		set ln.zsubacr = ln.zsubacr - ACRADJ(ln.cid, "ZSUBACR")
+		
+		if TAMT>0 do {
+			
+			set ETC1 = prodctl.zsubtcdr
+			if ETC1.isNull() set ETC1=$S(ln.grp="COM":"CMSAI",GRP="LN":"LNSAI",1:GRP.extract(1)_"SAI")
+			set ETC2="MCR"
+		}
+		
+		else  do {
+			set TAMT = -TAMT
+			set ETC1 = prodctl.zsubtccr
+			if ETC1.isNull() set ETC1=$S(ln.grp="COM":"CMSAD",GRP="LN":"LNSAD",1:GRP.extract(1)_"SAD")
+			set ETC2="MDR"			
+		}
+		
+	
+		do POST^LNTRB(.ttx, ln.cid, ETC1, TAMT, CUVAR2, %UserStation, , , ln.crcd, , , , , , .lnseg()) quit:ER
+		
+		set TSO = "ZSUBLNCID#"_ln.cid
+		
+		do POST^LNTRB(.ttx, subpln.gcr, ETC2, TAMT, CUVAR2, %UserStation, TSO, , ln.crcd, ln.cc, , , , , .lnseg()) quit:ER
+			
+	}
+
+	#IF (CUVAR.VATPROC)
+		if (ln.vatintopt = 3) ! (ln.vatintopt = 4) ! (ln.vatintopt = 5) do {
+
+			set ln.acrvat = ln.acrvat - ACRADJ(ln.cid,"ACR").piece("|",2)
+
+			if (ln.vatintopt = 4) ! (ln.vatintopt = 5) do {
+				set ln.acrreal = ln.acrreal - ACRADJ(ln.cid,"ACR").piece("|",3)
+				set ln.acrreall = ln.acrreall - ACRADJ(ln.cid,"ACR").piece("|",3)
+
+				if (ln.vatintopt = 5) set ln.acrvatrl = ln.acrvatrl - ACRADJ(ln.cid,"ACR").piece("|",4)
+				}
+			}
+	#ENDIF
+
+	set CRCD = ln.crcd 
+	if CRCD.isNull() set CRCD = %SystemCurrency		
+
+	if 'ln.segments do {
+
+			/*
+			Determine if this is an add-on/discount loan.  If it 
+			is, then in primary sequence entry of TR array, 
+			retrieve EFD if it is there, else system date. If 
+			this date (ttx.efd) is prior to or on the month-end 
+			accrual adjustment last date, then month-end accrual 
+			adjustment process has to be re-executed, by calling 
+			section ACCRUAL.
+			*/
+			if ln.iam, ttx.exists() do {
+				if 'ttx.efd set ACRDT(ln.cid) = ttx.tjd
+				if ttx.efd '> CUVAR.AALD do ACCRUAL(.ln, CUVAR2, .ACRADJ(,))
+				}
+
+			// Get information from PRODCTL
+			type RecordPRODCTL prodctl = %CACHE("PRODCTL").getRecord("PRODCTL", "TYPE=:ln.type")
+
+			if ACRADJ(ln.cid,"ACR").piece("|",1) < 0 do {
+
+				set ETC = prodctl.cradin
+				set TAMT = -ACRADJ(ln.cid,"ACR").piece("|",1)
+
+				#IF (CUVAR.VATPROC)
+					if (ln.vatintopt = 3) ! (ln.vatintopt = 4) ! (ln.vatintopt = 5) do {
+
+						set ACRVAT = -ACRADJ(ln.cid,"ACR").piece("|",2)
+
+						if (ln.vatintopt = 4) ! (ln.vatintopt = 5) set ACRREAL = -ACRADJ(ln.cid,"ACR").piece("|",3)
+
+						if (ln.vatintopt = 5) set ACRVATRL = -ACRADJ(ln.cid,"ACR").piece("|",4)
+						}
+				#ENDIF
+				}
+			else  do {
+
+				set ETC = prodctl.dradin
+				set TAMT = ACRADJ(ln.cid,"ACR").piece("|",1)
+
+				#IF (CUVAR.VATPROC)
+
+					if (ln.vatintopt = 3) ! (ln.vatintopt = 4) ! (ln.vatintopt = 5) do {
+						
+						set ACRVAT = ACRADJ(ln.cid,"ACR").piece("|",2)
+						
+						if (ln.vatintopt = 4) ! (ln.vatintopt = 5) set ACRREAL = ACRADJ(ln.cid,"ACR").piece("|",3)
+							
+						if (ln.vatintopt = 5) set ACRVATRL = ACRADJ(ln.cid,"ACR").piece("|",4)	
+						}
+				#ENDIF
+				}
+
+			if TAMT do {
+
+				set TSO = $$FIELDIN^UTSO("", "EXACTACR", TAMT)
+				set TSO = $$FIELDIN^UTSO(TSO, "SGAA", 1)
+				set TSO = $$FIELDIN^UTSO(TSO, "SYS", "")
+
+				#IF (CUVAR.VATPROC)
+
+					// store VAT on Interest and Real Interest into TSO
+					if ACRVAT do {
+						set TSO = $$FIELDIN^UTSO(TSO, "EXACTACRVAT", ACRVAT)
+						if (ln.vatintopt = 4) ! (ln.vatintopt = 5) set TSO = $$FIELDIN^UTSO(TSO, "EXACTACRREAL", ACRREAL)
+						}
+					
+					if ACRVATRL , (ln.vatintopt = 5) set TSO = $$FIELDIN^UTSO(TSO, "EXACTACRVATR", ACRVATRL)
+						
+					set ACRVAT = ACRVAT.roundCur(ln.crcd)
+				#ENDIF
+
+				set TAMT = TAMT.roundCur(ln.crcd)
+
+				// Post Interest Income including VAT on Interest Income
+				do POST^LNTRB(.ttx, ln.cid, ETC, (TAMT+ACRVAT), CUVAR2, %UserStation, TSO, , CRCD, , , , , , .lnseg()) quit:ER
+	
+				/*
+				Offset should always be MDR if the transaction is a credit,
+				and MCR for a debit - even for CBLs and DBDs.
+				*/
+				type RecordTRN trn = %CACHE("TRN").getRecord("TRN", "ETC=:ETC")
+		
+				if trn.itc.extract(1) = 1 set OFFSET = "MDR"
+				else  set OFFSET = "MCR"
+		
+				type RecordUTBLGLSC utblglsc = %CACHE("UTBLGLSC").getRecord("UTBLGLSC", "GLSC=:ln.glsc")	
+
+				// Post offset to Loan G/L # (Interest Income)
+				do POST^LNTRB(.ttx, utblglsc.lgli, OFFSET, TAMT, CUVAR2, %UserStation, TSO, , CRCD, ln.cc, , , , , .lnseg()) quit:ER
+
+				// Post offset to Loan G/L # (VAT on Interest Income)
+				#IF (CUVAR.VATPROC) if ACRVAT do POST^LNTRB(.ttx, utblglsc.lglvatinti, OFFSET, ACRVAT, CUVAR2, %UserStation, TSO, , CRCD, ln.cc, , , , , .lnseg()) quit:ER
+				}
+		}
+
+	#IF ('CUVAR.NOSEGMENTS!(CUVAR.NOSEGMENTS=3))!($$SEGUSE^BTTOPTMZ("L"))
+	if ln.segments do {
+		
+		if 'ACRSEGMENT.get().isNull() do SEGACRADJ(.ln, .ttx, .lnseg(), .ACRADJ(,,), ACRSEGMENT) quit
+		
+		type Number SEGMENT = ""
+		for  set SEGMENT = lnseg(SEGMENT).order() quit:SEGMENT.isNull()  do SEGACRADJ(.ln, .ttx, .lnseg(), .ACRADJ(,,), SEGMENT) quit:ER
+		}
+	#ENDIF
+
+	if 'ln.popt.isNull() do LATE2(.ln, .ttx, CUVAR2, LCHGADJ, VATLCHG, .lnseg())
+	
+	// Create accrual adjustments for related escrow accounts if necessary
+	set ESCCID = ""
+	for  set ESCCID = ACRADJ(ESCCID).order() quit:ESCCID.isNull()  do { quit:ER
+		set ACRTYPE = ""
+		for  set ACRTYPE = ACRADJ(ESCCID, ACRTYPE).order() quit:ACRTYPE.isNull()  do { quit:ER
+			if ESCCID = ln.cid quit
+			set TAMT = +ACRADJ(ESCCID, ACRTYPE)
+			do ESCADJ^UANTICDP(.ttx, .ln, .dep(), ESCCID, CUVAR2, ACRTYPE, TAMT) quit:ER
+			}
+		}
+	
+	quit
+
+private SEGACRADJ(RecordLN ln,		// Loan account			/REF:RW
+		RecordTTX ttx,		// Pimary transaction		/NOREQ/REF:R
+		RecordLNSEG lnseg(),	// Loan segments		/REF:RW
+		String ACRADJ(,,),	// Accrual adjustment		/REF:R
+		Number SEGMENT)
+
+	type public Boolean ER
+	type public Cache %CACHE()
+
+	/*
+	 Although these variables are not entirely necessary they will make the
+	 code below much easier to read and reduce the number of $pieces and
+	 $gets in the compiled code.
+	*/
+	type Number CPACR, ONEAGOACR, TWOAGOACR
+
+	type RecordPRODCTL prodctl = %CACHE("PRODCTL").getRecord("PRODCTL", "TYPE=:ln.type")
+	
+	set CPACR = ACRADJ(ln.cid, "CPACR", lnseg(SEGMENT).segment).get().piece("|", 1)
+	set ONEAGOACR = ACRADJ(ln.cid, "ONEAGOACR", lnseg(SEGMENT).segment).get().piece("|", 1)
+	set TWOAGOACR = ACRADJ(ln.cid, "TWOAGOACR", lnseg(SEGMENT).segment).get().piece("|", 1)
+
+	/*
+	 Apply adjustment to the segment accrual values.
+	 The amounts in the lnseg objects are correct.
+	 This will allow the transactions to replace the
+	 adjustment so that the result is no net change.
+	*/
+	if CPACR ! (ONEAGOACR) ! (TWOAGOACR) do {
+		set lnseg(SEGMENT).acr = lnseg(SEGMENT).acr - CPACR - ONEAGOACR - TWOAGOACR
+		set lnseg(SEGMENT).cpacr = lnseg(SEGMENT).cpacr - CPACR
+		set lnseg(SEGMENT).oneagoacr = lnseg(SEGMENT).oneagoacr - ONEAGOACR
+		set lnseg(SEGMENT).twoagoacr = lnseg(SEGMENT).twoagoacr - TWOAGOACR
+
+		// Update loan level values to reflect the adjustment
+		set ln.cpacr = ln.cpacr - CPACR
+		set ln.oneagoacr = ln.oneagoacr - ONEAGOACR
+		set ln.twoagoacr = ln.twoagoacr - TWOAGOACR
+		}
+
+	if CPACR do LNSEGACRADJ(.ln, .ttx, .lnseg(), CPACR, prodctl.dradin, prodctl.cradin, lnseg(SEGMENT).segment) quit:ER
+	if ONEAGOACR do LNSEGACRADJ(.ln, .ttx, .lnseg(), ONEAGOACR, prodctl.drtrin1, prodctl.crtrin1, lnseg(SEGMENT).segment) quit:ER
+	if TWOAGOACR do LNSEGACRADJ(.ln, .ttx, .lnseg(), TWOAGOACR, prodctl.drtrin2, prodctl.crtrin2, lnseg(SEGMENT).segment) quit:ER
+
+	quit
+
+LNSEGACRADJ(RecordLN ln,		// Loan account			/REF:RW
+	    RecordTTX ttx,		// Pimary transaction		/NOREQ/REF:R
+	    RecordLNSEG lnseg(),	// Loan segment			/REF:R
+	    Number ADJAMT,		// Accrual adjustment amount	/NOREQ
+	    String DRETC,		// DR interest tran code	/REQ
+	    String CRETC,		// DR interest tran Code	/REQ
+	    Number SEGMENT)		// Loan Segment Number
+
+	type public Cache %CACHE()
+	type public Boolean ER
+	type public Date CUVAR2
+	type public Number PRCTYP
+	type public String CRCD
+
+	type String ETC, OFFSET, TSO, TCMT
+	type Number TAMT
+
+	if ADJAMT < 0 do {
+		set ETC = CRETC
+		set TAMT = -ADJAMT
+		}
+	else  do {
+		set ETC = DRETC
+		set TAMT = ADJAMT
+		}
+
+	set TSO = $$FIELDIN^UTSO("", "EXACTACR", TAMT)
+	set TSO = $$FIELDIN^UTSO(TSO, "SGAA", 1)
+	set TSO = $$FIELDIN^UTSO(TSO, "SYS", "")
+	set TSO = $$FIELDIN^UTSO(TSO, "SEG", lnseg(SEGMENT).segment)
+	
+	set TAMT = TAMT.roundCur(ln.crcd)
+	
+	if PRCTYP.get() do {
+		// Mass interest index change
+		if PRCTYP = 1 set TCMT = $$TCMT^INDEXMC(lnseg(SEGMENT).index, %SystemDate.toString())
+		// Mass interest matrix change
+		else  if PRCTYP = 2 set TCMT = $$TCMT^MATRIXMC(lnseg(SEGMENT).intmat, %SystemDate.toString())
+		}
+	
+	do POST^LNTRB(.ttx, ln.cid, ETC, TAMT, CUVAR2, %UserStation, TSO, TCMT.get(), CRCD, , , , , , .lnseg()) quit:ER
+
+	/*
+	Offset should always be MDR if the transaction is a credit,
+	and MCR for a debit - even for CBLs and DBDs.
+	*/
+	type RecordTRN trn = %CACHE("TRN").getRecord("TRN", "ETC=:ETC")
+
+	if trn.itc.extract(1) = 1 set OFFSET = "MDR"
+	else  set OFFSET = "MCR"
+
+	type RecordUTBLGLSC utblglsc = %CACHE("UTBLGLSC").getRecord("UTBLGLSC", "GLSC=:ln.glsc")
+
+	// Post offset to Loan G/L # (Interest Income)
+	do POST^LNTRB(.ttx, utblglsc.lgli, OFFSET, TAMT, CUVAR2, %UserStation, TSO, TCMT.get(), CRCD, ln.cc, , , , , .lnseg()) quit:ER
+	
+	quit
+	
+
+LATE2(RecordLN ln,		// Loan account			/REF:RW
+      RecordTTX ttx,		// Primary transaction		/REF:R
+      Date %EffectiveDate,	// Effective Date
+      Number LCHGADJ,		// Late charge adjustment amount
+      Number VATLCHG,		// VAT on Late charge adjustment amount
+      RecordLNSEG lnseg())	// Loan segments		/REF:RW
+
+	// Late charge adjustment
+	
+	type public Cache %CACHE()
+	type public String CTL, LCHGTSO
+	type public Date CUVAR2
+
+	type Boolean DLCAF
+	type Date LCDEJD
+
+	type RecordLNPOPT lnpopt = %CACHE("LNPOPT").getRecord("LNPOPT", "GRP=:ln.grp,POPT=:ln.popt")
+
+	// Daily Late Charge Assessment Flag
+	set DLCAF = ln.dlcaf	
+
+	if ln.dlcaf set LCDEJD = %SystemDate
+	// Late Charge Action Date
+	else  set LCDEJD = ln.lcad
+
+	if 'LCDEJD.isNull() do {
+		// Set up LCHG dayend entry
+		type RecordDAYENDLCHG delchg = Db.getRecord("DAYENDLCHG", "TJD=:LCDEJD,CID=:ln.cid", 1)
+		if delchg.getMode() = 1 quit
+
+		if CTL.extract(1), LCHGADJ do {
+			set delchg.lchg = ""
+			set delchg.lcefd = ln.dist1nd
+			}
+		
+		do delchg.bypassSave()
+		}
+
+	// Quit if not daily
+	if lnpopt.cdf '= 1 quit
+
+	set LCHGADJ = LCHGADJ.roundCur(ln.crcd)
+	set VATLCHG = VATLCHG.roundCur(ln.crcd)
+
+	if LCHGADJ do POSTADJ^LNPTS12(.ln, .ttx, LCHGADJ, VATLCHG, LCHGTSO, .lnseg())
+	if DLCAF set ln.lcla = CUVAR2 - 1
+
+	quit
+
+
+ACCRUAL(RecordLN ln,		// Loan account			/REF:RW
+	Date %SystemDate,	// System date
+	String ACRADJ(,))	// Accrual adjustment amount	/REF:W
+	
+	/*
+	Restate accrual for pre-calculated interest
+
+	This will re-calculate the month-end accrual adjustment for
+	add-on/discount loans by calling OL^LNACR3. LNACR3 table
+	will be updated with the accrual adjustment information, just
+	as it is when QUE011 (month-end accrual adjustment process)
+	runs during dayends. Report SCA010 displays this information.
+	*/
+	
+	type public Boolean ER
+	
+	type Boolean %PLDF
+	
+	// Not an add-on/discount loan
+	if 'ln.iam quit
+	
+	set %PLDF = 0
+
+	type RecordLNACR3 lnacr3 = Db.getRecord("LNACR3", "EFD=:%SystemDate,GRP=:ln.grp,TYPE=:ln.type,CID=:ln.cid", 1)
+
+	do OL^LNACR3(.ln, .lnacr3) quit:ER
+
+	do lnacr3.bypassSave()
+
+	set ACRADJ(ln.cid, "ACR") = lnacr3.adj.roundCur(ln.crcd)
+
+	quit
+
+
+public	RENEW(RecordLN ln)	// Loan account			/REF:R
+
+	/*
+	Returns conversion date if renewal option sequence is null
+
+	RETURNS:
+           . $$  Conversion Date			/TYP=N/REQ/MECH=VAL
+
+	*/
+
+	if ln.cnvdt.isNull() quit 0
+
+	type ResultSet rs = Db.select("ROSEQ", "LNRENEW", "CID=:ln.cid AND CNVAPP=1")
+
+	if rs.next(), (%EffectiveDate > ln.cnvdt) quit ln.cnvdt
+
+	quit 0
+	
+	
+LNINDEX(RecordLN ln,		// Loan account			/REF:R
+	RecordLNSEG lnseg())	// Loan segments		/REF:RW
+
+	// Set up all queues associated with Loan interest rate change 
+	// processing
+	
+	type public Boolean DAILYFRE(,), ER
+	type public Date EVNTJD
+	
+	type String EVNT
+	type Number AF
+	type Date JD
+	
+	#IF ('CUVAR.NOSEGMENTS!(CUVAR.NOSEGMENTS=3))!($$SEGUSE^BTTOPTMZ("L"))
+	
+		// Interest rate change processing for Segmented Account
+		if ln.segments do { quit
+			type Number SEGMENT = ""
+			for  set SEGMENT = lnseg(SEGMENT).order() quit:SEGMENT.isNull()  do { quit:ER
+				
+				set EVNT = "Interest Change (no offset)|LICHND"
+				do INTFRE^UANTIC(.ln, lnseg(SEGMENT).index, lnseg(SEGMENT).intfre, lnseg(SEGMENT).ichnd, EVNT, 1, SEGMENT, .lnseg(SEGMENT)) quit:ER
+				}
+			}
+	#ENDIF
+	
+	// Interest rate change processing for Non-Segmented Account
+	if 'ln.segments do {
+		if 'ln.intoff.isNull() do {
+			set EVNT = "Interest Offset Processing|RUNINTOFF"
+	
+			/*
+			If interest offset processing and daily frequency, queue 
+			interest offset processing event as often as payment changes 
+			(INTFRE^UANTIC will also be queued for entries in INDEX0 table 
+			for daily frequencies)... for non-daily frequencies, 
+			INTFRE^UANTIC will handle RUNICHND events
+			*/
+			set JD = %SystemDate.nextFreqDate(ln.intfre, .AF) quit:ER
+			if AF > 360 do { quit:ER
+	
+				if ln.pcoff do SETQUE(.ln, ln.pcfre, ln.pchnd, ln.pcoff, 0, EVNT, false) quit:ER
+	
+				/*
+				If interest offset different from payment offset, then 
+				also set for the days corresponding to interest offset
+				*/
+				if ln.intoff '= ln.pcoff do SETQUE(.ln, ln.pcfre, ln.pchnd, ln.intoff, 0, EVNT, false) quit:ER
+				}
+			else  do SETQUE(.ln, ln.intfre, ln.ichnd, ln.intoff, 0, EVNT, false) quit:ER
+	
+			// RUNICHND events must be scheduled after RUNINTOFF events 
+			// b/c RUNICHND relies on LNVRCHG records created by RUNINTOFF
+			set EVNT = "Interest Change Date (offset)|RUNICHND"
+			}
+		else  set EVNT = "Interest Change (no offset)|LICHND"
+		
+		type RecordLNSEG lnseg1
+		do INTFRE^UANTIC(.ln, ln.index, ln.intfre, ln.ichnd, EVNT, 0, , .lnseg1) quit:ER
+		}
+
+	quit
+
+
+SETUDI(RecordLN ln,		// Loan Account		/REF:R
+       Date FDT,		// From Date
+       Date TDT)		// To Date
+
+	#IF (CUVAR.VATPROC)
+
+		if (ln.vatintopt '= 4) , (ln.vatintopt '= 5) quit
+
+		type String BINFIND = ln.bilinflcalin
+
+		type ResultSet rs = Db.select("INFLINDXDATE", "UTBLBILINFLR", "INFLINDXNM = :BINFIND  AND (INFLINDXDATE > :FDT OR INFLINDXDATE = :FDT) AND INFLINDXDATE < :TDT")
+
+		// Sets the QUEUE(,,) for RUNUDI
+		while rs.next() do SETQUE(.ln,"",rs.getCol("INFLINDXDATE"),0,0,"RUNUDI", false)
+	#ENDIF
+
+	quit
+
+
+RUNUDI	// Placeholder for "RUNUDI" of the queue QUEUE(,,)
+
+	/*
+	No processing to perform here and this section serves as a 
+	placeholder for in the queue QUEUE(,,) which will cause an accrual 
+	entry to be set up around it. Because the daily Calculate VAT on 
+	real interest uses the current-day and previous-day UDI values for
+	its calculations, accrual date ranges must be broken up according
+	to dates in which UDI has changed.
+	
+	RUNUDI secion will not be called from the EVENTL section and 
+	processing will simply pass through this section if the event name 
+	variable (EVNTNAME) is "RUNUDI".
+	*/
+
+	quit
+	
+private ZSETSUB(RecordLN ln)		// Loan account			/REF:R
+
+	// Subsidy payment
+	
+	if ln.zsubpln.isNull() quit
+		
+	type public Boolean ER
+	type public Cache %CACHE()
+
+	type Date NJD
+	type String EVNT
+	
+	set EVNT ="Govt Subsidy Payment|ZRUNSUB"
+
+	type RecordZUTBLSUBPLN subpln = %CACHE("ZUTBLSUBPLN").getRecord("ZUTBLSUBPLN", "ZSUBPLN = :ln.zsubpln")
+	
+	set NJD=%SystemDate-1
+
+	for  set NJD=NJD.nextFreqDate(subpln.gvacrfre) quit:ER  quit:NJD>subpln.enddt  do SETQUE(.ln, "", NJD, 0, 0, EVNT, false)
+
+	if subpln.enddt do SETQUE(.ln, , subpln.enddt, 0, 0, EVNT, false)
+
+	quit
+	
+private ZRUNSUB(RecordLN ln,		// Loan account			/REF:RW
+		 Date %SystemDate,	// System date
+		 Date CUVAR2)		// Customer variable system date
+
+	// Subsidy payment
+	
+	type public Boolean ER
+	type public String ACRADJ()
+	
+	// Add the monthly subsidy payment, leaving a smaller adjustment amount for section ACRADJ
+	set ACRADJ(ln.cid, "ZSUBACR") = ACRADJ(ln.cid, "ZSUBACR") + ln.zsubacr.roundDec(5)
+	
+	// Generate transactions
+	do EXT^ZSUBPMT(.ln) quit:ER
+
+	quit

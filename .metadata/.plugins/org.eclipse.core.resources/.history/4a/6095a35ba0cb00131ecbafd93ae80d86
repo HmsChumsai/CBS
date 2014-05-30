@@ -1,0 +1,343 @@
+//DO NOT MODIFY  bathc for recordBSpcBlkUnblkSalResult|ZBCHHRIS||||||ZHRIS|||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+
+	kill ^TMP("ZHRIS")
+	do READ
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	do EXTRACT
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	do Runtime.rollback()
+	type String ZOM=""
+	do PROC(SEQ,ZCID)
+
+	quit
+
+EXT(IO out,toTalRec)
+
+	type Number ZSEQ,ZCID
+
+	set ZSEQ=$O(^TMP("ZHRIS","OUT",""))
+	while 'ZSEQ.isNull() do {
+		set ZCID=$O(^TMP("ZHRIS","OUT",ZSEQ,""))
+		while 'ZCID.isNull() do {
+			type String ZDATA
+			set ZDATA = ^TMP("ZHRIS","OUT",ZSEQ,ZCID))
+			do out.write(ZDATA)
+			set ZCID=$O(^TMP("ZHRIS","OUT",ZSEQ,ZCID))
+			set toTalRec=toTalRec+1
+		}
+		set ZSEQ=$O(^TMP("ZHRIS","OUT",ZSEQ))
+	}
+
+	quit
+
+EXTRACT
+
+	type Number toTalRec=0
+	do SYSVAR^SCADRV0()
+	type IO out =Class.new("IO")
+	set out.fileName =$$TRNLNM^%ZFUNC("SCAU_SPOOL")_"/zmk/SHARE.HRIS.RES.BLOCKACC.SAM"
+	set out.openParams ="NEWV/WRITE"
+	set out.recordSize =1024
+	do out.open()
+	do HEADER(.out)
+	do EXT(.out,.toTalRec)
+	do FOOTER(.out,toTalRec)
+	do out.close()
+
+	quit
+
+FOOTER(IO out,i)
+
+	type String ZOM=""
+	set ZARROUT("RecType")="T01"
+	set ZARROUT("TotalRec")=$$PADDING(i,2,15)
+	set ZARROUT("Filler")=$J("",338)
+	set ZOM=ZOM_ZARROUT("RecType")
+	set ZOM=ZOM_ZARROUT("TotalRec")
+	set ZOM=ZOM_ZARROUT("Filler")
+	do out.write(ZOM)
+
+	quit
+
+HEADER(IO out)
+
+	type String ZOM=""
+	type RecordCUVAR cuvar=Db.getRecord("CUVAR")
+	type String ZSTAMP,ZTIM,ZDAT
+	set (ZSTAMP,ZTIM,ZDAT)=""
+
+	type Number MICSEC
+	set MICSEC=""
+
+	set MICSEC=$$GETTIM^%ZFUNC()
+	set MICSEC=MICSEC.extract(MICSEC.length()-6,MICSEC.length()-5)
+
+	set ZDAT=$$DAT^%ZM(%CurrentDate,"YEAR-MM-DD")
+	set ZTIM=$$TIM^%ZM(%CurrentTime,"24:60:SS")
+	set ZSTAMP=ZDAT_"T"_ZTIM
+
+	set ZARROUT("RecType")="H01"
+	set ZARROUT("SysDt")=$$PADDING(ZSTAMP,1,33)
+	set ZARROUT("BusinessDt")=%CurrentDate.toString("YYYY-MM-DD")
+	set ZARROUT("SrcAppId")=$$PADDING(cuvar.zappid,1,5)
+	set ZARROUT("FileType")="AcctInf "
+	set ZARROUT("FileSeqNum")="000001"
+	set ZARROUT("Filler")=$J("",291)
+
+	set ZOM=ZOM_ZARROUT("RecType")
+	set ZOM=ZOM_ZARROUT("SysDt")
+	set ZOM=ZOM_ZARROUT("BusinessDt")
+	set ZOM=ZOM_ZARROUT("SrcAppId")
+	set ZOM=ZOM_ZARROUT("FileType")
+	set ZOM=ZOM_ZARROUT("FileSeqNum")
+	set ZOM=ZOM_ZARROUT("Filler")
+
+	do out.write(ZOM)
+
+
+
+	quit
+
+GENTEST
+
+	type IO out =Class.new("IO")
+	set out.fileName =$$TRNLNM^%ZFUNC("SCAU_SPOOL")_"/TCB_BLOCKACC_RQ.txt"
+	set out.openParams ="NEWV/WRITE"
+	set out.recordSize =1024
+	do out.open()
+
+	set ZHEADER="H01"
+	set ZHEADER=ZHEADER_$J("",33)
+	set ZHEADER=ZHEADER_"2013-12-19"
+	do out.write(ZHEADER)
+	set MsgBody=$J("",51)
+	do out.write(MsgBody_"1"_"0010202388")
+	do out.write(MsgBody_"0"_"0011000029")
+	do out.write(MsgBody_"1"_"0013000654")
+	do out.write(MsgBody_"0"_"0011000037")
+	do out.write("T01"_"000000000000004")
+	do out.close()
+
+	quit
+
+ZREJ(ZSEQ,ZCID,ZCAUSE)
+
+	set ZARROUT("ErrorDesc")=$J("",256)
+	set ZERRCD=$$PADDING("E9999",1,30)
+	set ZARROUT("ErrorCode")=ZERRCD
+	type ResultSet zerdesc = Db.select("ERRDESC","ZUTBLITFERCD","ERRCD=:ZERRCD")
+	while zerdesc.next() do {
+		set ZARROUT("ErrorDesc")=$$PADDING(zerdesc.getCol(1),1,256)
+	}
+	set ZARROUT("RecType")=$E(^TMP("ZHRIS","IN",ZCID),1,3)
+	set ZARROUT("SrcUID")=$E(^TMP("ZHRIS","IN",ZCID),4,43)
+	set ZARROUT("EmployeeID")=$E(^TMP("ZHRIS","IN",ZCID),44,51)
+	set ZARROUT("AcctId")=$E(^TMP("ZHRIS","IN",ZCID),53,62)
+	set ZARROUT("TrxnFlag")=$E(^TMP("ZHRIS","IN",ZCID),52,52)
+	set ZARROUT("BlockCode")=$E(^TMP("ZHRIS","IN",ZCID),63,64)
+	set ZARROUT("BlockNum")=$E(^TMP("ZHRIS","IN",ZCID),65,68)
+
+	set ZOM=$G(ZARROUT("RecType"))
+	set ZOM=ZOM_$G(ZARROUT("SrcUID"))
+	set ZOM=ZOM_$G(ZARROUT("EmployeeID"))
+	set ZOM=ZOM_$$PADDING(ZCID,2,10)
+	set ZOM=ZOM_$G(ZARROUT("TrxnFlag"))
+	set ZOM=ZOM_$G(ZARROUT("BlockCode"))
+	set ZOM=ZOM_$G(ZARROUT("BlockNum"))
+	set ZOM=ZOM_"10"
+	set ZOM=ZOM_ZARROUT("ErrorCode").get()
+	set ZOM=ZOM_ZARROUT("ErrorDesc").get()
+
+
+	set ^TMP("ZHRIS","OUT",ZSEQ,ZCID)=ZOM
+	set ^TMP("ZHRIS","ERRLOG",ZCID)=ZCAUSE
+
+	quit
+
+PROC(ZSEQ,ZCID)
+
+	do SYSVAR^SCADRV0()
+	type Number ZSTATUS
+	type String ZOM
+	set ZOM=""
+	set ZSTATUS="00"
+	set ZBOUND="IN"
+	type RecordZHRIS ZHRIS = Db.getRecord("ZHRIS","ZBOUND,ZSEQ,ZCID")
+	set ZARROUT("RecType")="D01"
+	set ZARROUT("SrcUID")=$E(ZHRIS.DATA,4,43)
+	set ZARROUT("EmployeeID")=$E(ZHRIS.DATA,44,51)
+	set ZARROUT("TrxnFlag")=$E(ZHRIS.DATA,52,52)
+	set ZARROUT("AcctId")=$E(ZHRIS.DATA,53,62)
+	set ZARROUT("BlockCode")=$E(ZHRIS.DATA,63,64)
+	set ZARROUT("BlockNum")="0000"
+
+	if 'Db.isDefined("DEP","CID=:ZCID") do ZREJ(ZCID,"Account Not Found") quit
+	type RecordDEP zdep = Db.getRecord("DEP","CID=:ZCID")
+	if (zdep.grp'="SAV"),(zdep.grp'="DDA") do ZREJ(ZSEQ,ZCID,"ACCOUNT TYPE NOT ALLOW") quit
+	//else zdep.grp'="DDA" do ZREJ(ZCID) quit
+	if zdep.stat'=0 do ZREJ(ZCID) quit
+	if ZARROUT("TrxnFlag")=1 do {
+		if zdep.zsalflg="" do ZREJ(ZSEQ,ZCID,"Cannot Unblock") quit
+		else set zdep.zsalflg=""
+	}
+	else if ZARROUT("TrxnFlag")=0 do {
+		if zdep.zsalflg'="" do ZREJ(ZSEQ,ZCID,"Cannot Block") quit
+		else set zdep.zsalflg="K"
+	}
+
+
+	if ER.get() do ZREJ(ZSEQ,ZCID,RM.get()) quit
+	do zdep.save()
+
+	set ZOM=ZOM_ZARROUT("RecType")
+	set ZOM=ZOM_ZARROUT("SrcUID")
+	set ZOM=ZOM_ZARROUT("EmployeeID")
+	set ZOM=ZOM_ZARROUT("TrxnFlag")
+	set ZOM=ZOM_ZARROUT("AcctId")
+	set ZOM=ZOM_ZARROUT("BlockCode")
+	set ZOM=ZOM_ZARROUT("BlockNum")
+	set ZOM=ZOM_"00"
+	set ZOM=ZOM_$J("",30)
+	set ZOM=ZOM_$J("",256)
+
+	set ^TMP("ZHRIS","OUT",ZSEQ,ZCID)=ZOM
+
+	quit
+
+BALSIGN(zbal)
+
+	type String output
+	if zbal.get()<0 set output="+"
+	else set output="-"
+	quit output
+
+READ
+	type Number i,ZEXIT,toTalRec
+	set (EXIT,i,toTalRec)=0
+
+	type IO in =Class.new("IO")
+	set in.fileName =$$TRNLNM^%ZFUNC("SCAU_SPOOL")_"/zmk/SHARE.HRIS.BLOCKACC.SAM"
+	set in.openParams ="READ"
+	set in.recordSize =1024
+	do in.open()
+
+	for  set REC =in.read() { quit:EXIT
+		type String output
+		type Number ZCID
+		set ZCID=""
+
+		if REC["H01" do {
+			do SYSVAR^SCADRV0()
+			type Date validDate,cbsDate
+			set cbsDate=%SystemDate.toString("YEAR-MM-DD")
+			set validDate=$E(REC,37,46)
+			if validDate'=cbsDate set EXIT=1
+
+		}
+		else if REC["T01" do {
+			set EXIT=1  //quit when reached footer
+			set toTalRec=+$E(REC,4,18)
+		}
+		else do {
+			set i=i+1
+			set ZCID=+$E(REC,53,62)
+			set ^TMP("ZHRIS","IN",i,ZCID)=REC
+		}
+	}
+
+	if toTalRec'=i kill ^TMP("ZHRIS")	//validate total record
+
+	quit
+
+PADDING(array,flg,fixL)
+
+	type String out
+	type Number zlength
+	set out=""
+
+	//Blank padding
+	if flg=1 do {
+		type String in
+		set in=array.get()
+		set zlength=in.length()
+		set out=in_$J("",fixL-zlength)
+		//set out=in_$J("""",fixL-zlength)
+
+	}
+	//Zero padding
+	if flg=2 do {
+		type Number in
+		set in=array.get()
+		set zlength=in.length()
+		set out=in.zero(fixL)
+	}
+	//MainFrame
+	if flg=3 do {
+		type Number in,ZER,zprefix
+		type String ZRM
+		set (ZER,zprefix)=0
+		set ZRM=""
+		set in=array.get()*100
+		do CONVENC^ZITFUTL(1,in,.out,.ZER,.ZRM)
+		if $L(out)<18 do {
+			//set zprefix=18-$L(out)
+			set zprefix=zprefix.zero(18-$L(out))
+			set out=zprefix_out
+		}
+	}
+	if flg=4 do {
+		type Number in
+		set in=array.get()
+		set out=in.zero(fixL,2,0,0)
+	}
+	//Default value for mandatory date
+	if flg=5 do {
+
+		if array.get()="" set out="9999-12-31"
+		else set out=array
+
+	}
+	if flg=6 do {
+		//No decimal,sign representation,Right zero justify
+
+		type Number in,zlength
+		type String pre,suf,ZERO
+		set ZERO=""
+		set in=array.get()
+		if in<0 set in=-in
+		set pre=$P(in,".",1)
+		set pre=pre.zero(3)
+		set suf=$P(in,".",2)
+		set in=pre_"."_suf
+		//set zlength=in.length()
+		//set ZERO=ZERO.zero(fixL-zlength)
+		set zlength=suf.length()
+		set ZERO=ZERO.zero(8-zlength)
+		set out=in_ZERO
+
+
+		//set out=in_$J("0",fixL-zlength)
+	}
+	quit out
+
+
+
+---------- THREXIT ------ Section marker

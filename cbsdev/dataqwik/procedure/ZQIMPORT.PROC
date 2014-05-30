@@ -1,0 +1,38 @@
+//DO NOT MODIFY  Check Import|ZQIMPORT|||||||1
+
+	quit
+	
+CNTD(Date SDATE,Date EDATE)
+	//D CNTD^ZQIMPORT(61858,61859)
+	type String t,etype,ename,tmp
+	set date=SDATE-1
+	kill ^ZMKRET,^ZMKRET2
+	set ext = 0
+	for  set date=$O(^DBIMPORT(date)) quit:(date="")!(date>EDATE)  do {
+	type ResultSet rs=Db.select("IDATE,FNAME,SEQ","DBIMPORTD","IDATE=:date")
+	while rs.next() do {
+		
+		set tmp = $G(^DBIMPORT(rs.getCol("IDATE"),rs.getCol("FNAME"),rs.getCol("SEQ")))
+		if '(tmp.piece("|",1)="EXPORT")& (rs.getCol("SEQ") '=0) do {
+		set etype = tmp.piece("|",1)
+		set ename = tmp.piece("|",2)
+		if $D(^ZMKRET(etype,ename)) set ^ZMKRET(etype,ename)= $G(^ZMKRET(etype,ename))+1
+		else set ^ZMKRET(etype,ename)= 1
+		if $D(^ZMKRET2(etype)) set ^ZMKRET2(etype)= $G(^ZMKRET2(etype))+1
+		else set ^ZMKRET2(etype)=1
+		 
+		quit
+		}	
+			
+	
+	}
+	}
+	write !,"Output :"
+	write !," 1. ^ZMKRET = Summary amount Import group by type and name"
+	write !," 2. ^ZMKRET2 = Summary amount Import group by type"
+	write !
+	//zwrite ^ZMKRET
+	zwrite ^ZMKRET2
+	
+	quit
+	

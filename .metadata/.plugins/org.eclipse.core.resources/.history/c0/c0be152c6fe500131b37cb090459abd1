@@ -1,0 +1,357 @@
+//DO NOT MODIFY  Sync FD (sub level) balance informatio|ZBCHBAFD||||||XDTJ|TJD=:ZTJD||100|32000|ZTJD|0|10000|10000|10|10|0||0|CID|0
+---------- REVHIST ------ Section marker
+
+	26/05/2014 - Nattapon Tu.
+		     Modified to check if date is 3rd friday of month not execute batch
+		     
+	21/04/2014 - Anchalee Ch.
+		     Modified PROC
+		     o Placed "," at front and back of list and ZTYPE before
+		       search sub-string
+		     o Replaced 'ZGRP="CD" by ZGRP'="CD"
+		     o Replaced condition 'DEP.ZMASFLG="" with DEP.ZMASFLG=1.
+		     o Got balance from DEP.BAL and DEP.BALAVL if the account status is closed.
+		     o Replaced balance with ZBAL and replaced available balance with ZBALAVL.
+		     o Replaced DEP.EODBAL by ZBALAVL for field AVL_BAL.
+
+---------- OPEN    ------ Section marker
+
+	kill ^ZBAFD
+	
+	type public Date ZTJD
+	
+	set ZTJD=%SystemDate-1
+	//set %TAB("ZTJD")="/DES=Extract Date/TYP=D/LEN=10"
+	//set %READ="@@%FN,,,ZTJD/REQ"
+	//do ^UTLREAD if VFMQ="Q" set %BatchExit=1 quit
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	//Start 26/05/2014
+	set ZQUIT=0
+	
+	set ZXDAY=$$DOW^SCADAT(ZTJD)
+	set ZXDATE=$$DAY^SCADAT(ZTJD)
+	
+	if (ZXDAY="Friday") do {
+		if ((ZXDATE'<15) & (ZXDATE'>21)) set ZQUIT=1
+	}
+	if ZQUIT.get() quit
+	//End 26/05/2014
+	
+	do EXTRACT
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	//Start 26/05/2014
+	set ZQUIT=0
+	
+	set ZXDAY=$$DOW^SCADAT(ZTJD)
+	set ZXDATE=$$DAY^SCADAT(ZTJD)
+	
+	if (ZXDAY="Friday") do {
+		if ((ZXDATE'<15) & (ZXDATE'>21)) set ZQUIT=1
+	}
+	if ZQUIT.get() quit
+	//End 26/05/2014
+	
+	do Runtime.rollback()
+	
+	type public Date ZTJD
+	
+	do PROC(CID)
+
+PROC(CID)
+
+	
+	do SYSVAR^SCADRV0()
+	set ZSpecType=""
+	type ResultSet KTBMISC = Db.select("PRODTYP","ZUTBLKTBMISC","INTRFACE='ZSPA'")
+	while KTBMISC.next() do {
+		set ZSpecType=KTBMISC.getCol(1)
+	}
+	if $D(^ZBAFD(CID)) quit
+	type String ZOM,ZARROUT
+	set ZOM=""
+
+	type RecordDEP DEP= Db.getRecord("DEP","CID=:CID")
+	
+	set ZGRP=DEP.GRP
+	set ZTYPE=DEP.type
+	
+	//21/04/2014 - Anchalee Ch.
+	//Placed "," at front and back of list and ZTYPE before search sub-string
+	if (","_ZSpecType_",")[(","_ZTYPE_",") quit
+	//Replaced 'ZGRP="CD" by ZGRP'="CD"
+	if ZGRP'="CD" quit
+	//Replaced 'DEP.ZMASFLG="" with DEP.ZMASFLG=1
+	if DEP.ZMASFLG=1 quit
+	//End of 21/04/2014
+	
+	
+	set ZARROUT("AR_ID")=DEP.ZMASTER
+	set ZARROUT("SUB_AR")=DEP.ZSEQ
+	set ZARROUT("DOMC_BR_NO")=DEP.BOO
+	
+	//21/04/2014 - Anchalee Ch.
+	//Got balance from DEP.BAL and DEP.BALAVL if the account status is closed.
+	//Replaced balance with ZBAL and replaced available balance with ZBALAVL.
+	set (ZBAL,ZBALAVL)=0
+	if DEP.ZSTATCD'=4 do {
+		set ZBAL=DEP.EODBAL
+		set ZBALAVL=DEP.EODBALAV
+	}
+	else  do {
+		set ZBAL=DEP.BAL
+		set ZBALAVL=DEP.BALAVL
+	}
+	
+	if ZBAL<0 set ZARROUT("CRN_BAL_SIGN")="-"
+	else set ZARROUT("CRN_BAL_SIGN")="+"
+	set ZARROUT("CRN_BAL")=ZBAL
+	
+	//Replaced DEP.EODBAL by ZBALAVL
+	if ZBALAVL<0  set ZARROUT("AVL_BAL_SIGN")="-"
+	//End of 21/04/2014
+	else set ZARROUT("AVL_BAL_SIGN")="+"
+
+	//Replaced DEP.EODBAL by ZBALAVL
+	set ZARROUT("AVL_BAL")=ZBALAVL
+	//End of 21/04/2014
+	set ZARROUT("DEP_SUB_TERM")=$E(DEP.TRM,1,$L(DEP.TRM)-1)
+	set ZARROUT("UOM_TP_CD")=$E(DEP.TRM,$L(DEP.TRM),$L(DEP.TRM))
+	set ZARROUT("MAT_DT")=DEP.MDT.toString("YYYY-MM-DD")
+	set ZARROUT("COA_PD_FTR_CD")=DEP.ZPRODCD
+	
+	//21/04/2014 - Anchalee Ch.
+	//Made absolute value of CRN_BAL and AVL_BAL
+	if ZARROUT("CRN_BAL")<0 set ZARROUT("CRN_BAL")=-ZARROUT("CRN_BAL")
+	if ZARROUT("AVL_BAL")<0 set ZARROUT("AVL_BAL")=-ZARROUT("AVL_BAL")
+	//End of 21/04/2014
+
+	type ResultSet ZUTBLSTATD = Db.select("ZKBSTATD","ZUTBLSTATD","ZSTATCD=:DEP.ZSTATCD")
+	while ZUTBLSTATD.next() do {
+		set ZARROUT("DEP_SUB_LCS_TP_CD")=ZUTBLSTATD.getCol(1)
+	}
+
+	set ZARROUT("AR_OPN_DT")=DEP.ODT.toString("YYYY-MM-DD")
+	if DEP.MLD="" set ZARROUT("DEP_SUB_OPN_DT")=DEP.ODT.toString("YYYY-MM-DD")
+	else set ZARROUT("DEP_SUB_OPN_DT")=DEP.MLD.toString("YYYY-MM-DD")
+	set ZARROUT("CLS_DT")=DEP.DTC.toString("YYYY-MM-DD")
+	set ZARROUT("EFF_RATE_PCT")=DEP.IRN
+	
+	
+	set ZARROUT("AR_ID")=$$PADDING($G(ZARROUT("AR_ID")),2,10)
+	set ZARROUT("SUB_AR")=$$PADDING($G(ZARROUT("SUB_AR")),2,3)
+	set ZARROUT("DOMC_BR_NO")=$$PADDING($G(ZARROUT("DOMC_BR_NO")),2,4)
+	set ZARROUT("CRN_BAL_SIGN")=$$PADDING($G(ZARROUT("CRN_BAL_SIGN")),1,1)
+	set ZARROUT("CRN_BAL")=$$PADDING($G(ZARROUT("CRN_BAL")),4,15)
+	set ZARROUT("AVL_BAL_SIGN")=$$PADDING($G(ZARROUT("AVL_BAL_SIGN")),1,1)
+	set ZARROUT("AVL_BAL")=$$PADDING($G(ZARROUT("AVL_BAL")),4,15)
+	set ZARROUT("DEP_SUB_TERM")=$$PADDING($G(ZARROUT("DEP_SUB_TERM")),2,4)
+	set ZARROUT("UOM_TP_CD")=$$PADDING($G(ZARROUT("UOM_TP_CD")),1,10)
+	set ZARROUT("MAT_DT")=$$PADDING($G(ZARROUT("MAT_DT")),5,0)
+	set ZARROUT("COA_PD_FTR_CD")=$$PADDING($G(ZARROUT("COA_PD_FTR_CD")),1,9)
+	set ZARROUT("DEP_SUB_LCS_TP_CD")=$$PADDING($G(ZARROUT("DEP_SUB_LCS_TP_CD")),1,10)
+	set ZARROUT("AR_OPN_DT")=$$PADDING($G(ZARROUT("AR_OPN_DT")),5,"")
+	set ZARROUT("DEP_SUB_OPN_DT")=$$PADDING($G(ZARROUT("DEP_SUB_OPN_DT")),5,"")
+	set ZARROUT("CLS_DT")=$$PADDING($G(ZARROUT("CLS_DT")),1,10)
+	set ZARROUT("EFF_RATE_PCT")=$$PADDING($G(ZARROUT("EFF_RATE_PCT")),4,12)
+	set Filler=$$PADDING("",1,66)
+	
+	set ZOM=ZOM_$G(ZARROUT("AR_ID"))
+	set ZOM=ZOM_$G(ZARROUT("SUB_AR"))
+	set ZOM=ZOM_$G(ZARROUT("DOMC_BR_NO"))
+	set ZOM=ZOM_$G(ZARROUT("CRN_BAL_SIGN"))
+	set ZOM=ZOM_$G(ZARROUT("CRN_BAL"))
+	set ZOM=ZOM_$G(ZARROUT("AVL_BAL_SIGN"))
+	set ZOM=ZOM_$G(ZARROUT("AVL_BAL"))
+	set ZOM=ZOM_$G(ZARROUT("DEP_SUB_TERM"))
+	set ZOM=ZOM_$G(ZARROUT("UOM_TP_CD"))
+	set ZOM=ZOM_$G(ZARROUT("MAT_DT"))
+	set ZOM=ZOM_$G(ZARROUT("COA_PD_FTR_CD"))
+	set ZOM=ZOM_$G(ZARROUT("DEP_SUB_LCS_TP_CD"))
+	set ZOM=ZOM_$G(ZARROUT("AR_OPN_DT"))
+	set ZOM=ZOM_$G(ZARROUT("DEP_SUB_OPN_DT"))
+	set ZOM=ZOM_$G(ZARROUT("CLS_DT"))
+	set ZOM=ZOM_$G(ZARROUT("EFF_RATE_PCT"))
+	set ZOM=ZOM_Filler
+
+	set ^ZBAFD(CID)=ZOM
+
+	quit
+	
+ZBREAK
+
+	quit
+
+EXTRACT
+
+	type public Date ZTJD
+	type public Boolean ZFULL
+	type String FILENAME
+
+	type RecordCUVAR cuvar=Db.getRecord("CUVAR")
+	type String ZSTAMP,ZTIM,ZDAT
+	set (ZSTAMP,ZTIM,ZDAT)=""
+
+	type Number MICSEC
+	set MICSEC=""
+
+	set MICSEC=$$GETTIM^%ZFUNC()
+	set MICSEC=MICSEC.extract(MICSEC.length()-6,MICSEC.length()-5)
+
+	set ZDAT=$$DAT^%ZM(%CurrentDate,"YEAR-MM-DD")
+	set ZTIM=$$TIM^%ZM(%CurrentTime,"24:60:SS")
+	set ZSTAMP=ZDAT_"T"_ZTIM_"."_MICSEC_"+07:00"
+	/*
+	set ZFULL=ZFULL.get()
+	if ZFULL set FILENAME="CB2M0004.FD.SAM"
+	else  set FILENAME="CB2D0004.FD.SAM"
+	*/
+	//----------Ravipong 15/05/2014------------
+	// Dymanic File Name/Path
+	set ZFULL=ZFULL.get()
+
+	set ZPFDIR = $$TRNLNM^%ZFUNC("PROFILE_DIR")
+	set ZAPP="176"
+	if ZFULL set ZITFKEY="FD-M"
+	else  set ZITFKEY="FD-D"
+	type RecordZUTBLITFFTP itf = Db.getRecord("ZUTBLITFFTP","ZPFDIR,ZAPP,ZITFKEY",1)
+	set ZFNAME = itf.OUTLFS
+	set ZFNAME = $$CFTPFUNC^ZITFUTL(ZFNAME)
+	set ZOUTPATH = itf.OUTLP
+	set ZOUTPATH = $$CFTPPATH^ZITFUTL(ZOUTPATH)
+
+	set FILENAME=ZFNAME
+
+	type IO out =Class.new("IO")
+	//set out.directory =$$TRNLNM^%ZFUNC("SCAU_SPOOL_CIS")
+	set out.directory =ZOUTPATH
+	//----------End---------------
+	set out.fileName = FILENAME
+	set out.openParams ="NEWV/WRITE"
+	set out.recordSize =1024
+	do out.open()
+
+	set RecType="H01"
+	set SysDt=$$PADDING(ZSTAMP,1,33)
+	set BusinessDt=ZTJD.toString("YYYY-MM-DD")
+	set SrcAppId=$$PADDING(cuvar.zappid,1,5)
+	set FileType="FD      "
+	set FileSeqNum="000001"
+	set Filler=$$PADDING("",1,135)
+
+	set Header=RecType_SysDt_BusinessDt_SrcAppId_FileType_FileSeqNum_Filler
+	do out.write(Header)
+
+	type Number i
+	set i=0
+
+	set ZPOINT=$O(^ZBAFD(""))
+	while 'ZPOINT.isNull() do {
+		type String ZDATA
+		set ZDATA = $G(^ZBAFD(ZPOINT))
+		do out.write(ZDATA)
+		set i=i+1
+		set ZPOINT=$O(^ZBAFD(ZPOINT))
+	}
+	set RecType="T01"
+	set TotalRec=$$PADDING(i,2,15)
+	set TotalSum="000000000000000000"
+	set TotalDebitSum="000000000000000000"
+	set TotalCreditSum="000000000000000000"
+
+	set Footer=RecType_TotalRec_TotalSum_TotalDebitSum_TotalCreditSum
+
+	do out.write(Footer)
+	do out.close()
+
+
+	quit
+	
+PADDING(array,flg,fixL)
+
+	type String out
+	type Number zlength
+	set out=""
+
+	//Blank padding
+	if flg=1 do {
+		type String in
+		set in=array.get()
+		set zlength=in.length()
+		if fixL<zlength set out=$E(in,1,fixL)
+		else set out=in_$J("",fixL-zlength))
+		//set out=in_$J("""",fixL-zlength)
+
+	}
+	//Zero padding
+	if flg=2 do {
+		type Number in
+		set in=array.get()
+		set zlength=in.length()
+		set out=in.zero(fixL)
+	}
+	//MainFrame
+	if flg=3 do {
+		type Number in,ZER,zprefix
+		type String ZRM
+		set (ZER,zprefix)=0
+		set ZRM=""
+		set in=array.get()*100
+		do CONVENC^ZITFUTL(1,in,.out,.ZER,.ZRM)
+		if $L(out)<18 do {
+			//set zprefix=18-$L(out)
+			set zprefix=zprefix.zero(18-$L(out))
+			set out=zprefix_out
+		}
+	}
+	if flg=4 do {
+		type Number in
+		set in=array.get()
+		set out=in.zero(fixL,2,1,0)
+		if $L(out)>fixL
+		set out=$E(out,1,fixL)
+	}
+	//Default value for mandatory date
+	if flg=5 do {
+
+		if array.get()="" set out="9999-12-31"
+		else set out=array
+
+	}
+	if flg=6 do {
+		//No decimal,sign representation,Right zero justify
+
+		type Number in,zlength
+		type String pre,suf,ZERO
+		set ZERO=""
+		set in=array.get()
+		if in<0 set in=-in
+		set pre=$P(in,".",1)
+		set pre=pre.zero(3)
+		set suf=$P(in,".",2)
+		set in=pre_"."_suf
+		//set zlength=in.length()
+		//set ZERO=ZERO.zero(fixL-zlength)
+		set zlength=suf.length()
+		set ZERO=ZERO.zero(8-zlength)
+		set out=in_ZERO
+
+		//set out=in_$J("0",fixL-zlength)
+	}
+	
+	quit out
+	
+---------- THREXIT ------ Section marker

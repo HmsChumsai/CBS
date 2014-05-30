@@ -1,0 +1,77 @@
+//DO NOT MODIFY  TEST|ZBCHTEST||||||DTJFM|TJD=:ZDATE|10|100|32000|ZDATE|0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	kill ^TMP("ZMK")
+	set %TAB("ZDATE")="/DES=DATE Date/REQ/TYP=D/LEN=10"
+	set %READ="@@%FN,,ZDATE/REQ"
+	
+	do ^UTLREAD if VFMQ="Q" set %BatchExit=1 quit 
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	
+	new IOTYP,ZPATH
+	set ZPATH=$$TRNLNM^%ZFUNC("SCAU_SPOOL")
+	type IO io = Class.new("IO")
+	set io.directory=ZPATH
+	set io.fileName="ZMK.txt"
+	set io.openParams="NEWV/WRITE"
+	do io.open()
+	set ext = 0
+	set (TEXT1,TEXT2,TEXT3,tmp1,tmp2)=""
+	set ZMK="ZMK"
+	type ResultSet rs=Db.select("KEY1,KEY2,DATA","TMPRPT2","PID=:ZMK")
+	while rs.next() do { 
+		if (rs.getCol("DATA")=1) do {
+		set TEXT1="Case 1  AccNum:"_rs.getCol("KEY1")_" CusNum:"_rs.getCol("KEY2")	
+		do io.write(TEXT1)
+		}
+		if (rs.getCol("DATA")=2) do {
+		set TEXT2="Case 2  AccNum:"_rs.getCol("KEY1")
+		do io.write(TEXT2)
+		}
+		if (rs.getCol("DATA")=3) do {
+		set TEXT3="Case 3  AccNum:"_rs.getCol("KEY1")_" CusNum:"_rs.getCol("KEY2")
+		do io.write(TEXT3)
+		}
+			
+	}
+	
+	set IOTYP="RMS"
+	do io.close()
+	quit
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	set cnm = ""
+	type RecordDTJFM zdtjfm = Db.getRecord("DTJFM","TJD,CLS,GRP,TYP,CID,TSEQ")
+	type RecordTMPRPT2 tmp = Class.new("RecordTMPRPT2")
+	type RecordACN acn = Db.getRecord("ACN","CID=:zdtjfm.cid")
+	
+	set tmp.pid = "ZMK"
+	
+	if Db.isDefined("DTJNA","TJD=:zdtjfm.tjd,CLS,GRP,TYP,CID=:zdtjfm.cid") do {
+	set tmp.key1 = zdtjfm.cid 
+	set tmp.key2 = acn.acn 
+	set tmp.data = 1
+	}
+	else do {
+	set tmp.key1 = zdtjfm.cid 
+	set tmp.key2 = acn.acn 
+	set tmp.data = 2
+	}
+	
+	do tmp.bypassSave()
+
+	quit
+---------- THREXIT ------ Section marker

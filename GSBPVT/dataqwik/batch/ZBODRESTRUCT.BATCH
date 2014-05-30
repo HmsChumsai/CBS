@@ -1,0 +1,137 @@
+//DO NOT MODIFY  Batch For OD Re-Structure|ZBODREST||||||ZODTIER|||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+	
+	type Date TJD
+	set TJD=%SystemDate.toString("YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"SR_OD_"_TJD_".xls"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	
+	type DbSet ds = Db.selectDbSet("TMPRPT5","KEY1='ZODRESTRUCT'")
+	while ds.next() do {
+		type String ZDATA
+		type RecordTMPRPT5 rpt = ds.getRecord("TMPRPT5")
+		type RecordTMPRPT5 sum = Db.getRecord("TMPRPT5","PID=%ProcessID,KEY1='RPT_SR_OD',KEY2=:rpt.key2,KEY3=:rpt.key3,KEY4=:rpt.key4,KEY5=:rpt.key5",1)
+		set ZDATA=rpt.data
+		set sum.data=ZDATA
+		
+		do sum.save()
+	}
+	
+	quit	
+	
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	do PROC(CID,SEQ)
+	quit
+	
+PROC(CID,SEQ)
+	
+
+	if 'Db.isDefined("DEP","CID=:CID") quit
+	
+	type Number ZBOO,ZACN
+	type String output,ZTAB,MCNTRY,MSTATE,MCITY,ZMSDISCD,ZKTBCCODE
+	type Date ZTJD,Delinquent
+	type RecordDEP dep = Db.getRecord("DEP","CID=:CID")
+	if '(dep.odlim>0),'(dep.ZSTATCD<>4) quit
+	
+	set ZBOO=dep.BOO
+	set ZTYPE=dep.type
+	set ZACN=dep.ACN
+	set ZSTATCD=dep.ZSTATCD
+	set Delinquent = (%SystemDate-dep.DELDT).toString("DD/MM/YEAR")
+	set ZTJD=%SystemDate.toString("DD/MM/YEAR")
+	set ZTAB=$C(9)
+	
+	type RecordZODTIER ZODTIER = Db.getRecord("ZODTIER","CID,SEQ")
+	type RecordCIF cif = Db.getRecord("CIF","ACN=:ZACN")
+	
+	set ZKTBCCODE=cif.ZKTBCCODE
+	set MCNTRY=cif.MCNTRY
+	set MSTATE=cif.MSTATE
+	set MCITY=cif.MCITY
+	set ZMSDISCD=cif.ZMSDISCD
+	
+	type RecordUTBLBRCD UTBLBRCD 		= Db.getRecord("UTBLBRCD","BRCD=:ZBOO")
+	type RecordZUTBLKTBCUST ZUTBLKTBCUST 	= Db.getRecord("ZUTBLKTBCUST","KTBCCODE=:ZKTBCCODE")
+	type RecordACNADDR ACNADDR 		= Db.getRecord("ACNADDR","CID=:CID")
+	type RecordZUTBLSDISTCD ZUTBLSDISTCD 	= Db.getRecord("ZUTBLSDISTCD","MCNTRY,MSTATE,MCITY,ZMSDISCD")
+	type RecordZUTBLDIST ZUTBLDIST 		= Db.getRecord("ZUTBLDIST","MCNTRY,MSTATE,MCITY")
+	type RecordSTBLCNTRY1 STBLCNTRY1 	= Db.getRecord("STBLCNTRY1","MCNTRY,MSTATE")
+	type RecordZUTBLSTATD ZUTBLSTATD	= Db.getRecord("ZUTBLSTATD","ZSTATCD")
+	
+	
+	set output.piece(ZTAB,1)	= ZBOO
+	set output.piece(ZTAB,2)	= UTBLBRCD.DESC
+	set output.piece(ZTAB,3)	= ZACN
+	set output.piece(ZTAB,4)	= ZUTBLKTBCUST.DESC
+	set output.piece(ZTAB,5)	= cif.nam
+	set output.piece(ZTAB,6)	= ACNADDR.AD1
+	set output.piece(ZTAB,7)	= ACNADDR.AD2
+	set output.piece(ZTAB,8)	= ACNADDR.AD3
+	set output.piece(ZTAB,9)	= ACNADDR.AD4
+	set output.piece(ZTAB,10)	= cif.MZIP
+	set output.piece(ZTAB,11)	= ZUTBLSDISTCD.DESC 
+	set output.piece(ZTAB,12)	= ZUTBLDIST.DES
+	set output.piece(ZTAB,13)	= STBLCNTRY1.DESC
+	set output.piece(ZTAB,14)	= cif.HPH
+	set output.piece(ZTAB,15)	= cif.BPH
+	set output.piece(ZTAB,16)	= cif.APH
+	set output.piece(ZTAB,17)	= dep.type
+	set output.piece(ZTAB,18)	= dep.CID
+	set output.piece(ZTAB,19)	= ZODTIER.CLAMT
+	set output.piece(ZTAB,20)	= dep.BAL
+	set output.piece(ZTAB,21)	= dep.BALAVL
+	set output.piece(ZTAB,22)	= ZUTBLSTATD.DES
+	set output.piece(ZTAB,23)	= dep.DTC
+	set output.piece(ZTAB,24)	= dep.HLDAMT
+	set output.piece(ZTAB,25)	= ""
+	set output.piece(ZTAB,26)	= dep.ZRFACR
+	set output.piece(ZTAB,27)	= dep.ACR
+	set output.piece(ZTAB,28)	= dep.RESINT
+	set output.piece(ZTAB,29)	= dep.ZLCHG
+	set output.piece(ZTAB,30)	= dep.ZAR
+	set output.piece(ZTAB,31)	= dep.ZSP
+	set output.piece(ZTAB,32)	= dep.DELDT
+	set output.piece(ZTAB,33)	= SEQ
+	set output.piece(ZTAB,34)	= ZODTIER.RATECMP
+	set output.piece(ZTAB,35)	= ZODTIER.STDT
+	set output.piece(ZTAB,36)	= ZODTIER.EXPDT
+	set output.piece(ZTAB,37)	= dep.darcls
+	set output.piece(ZTAB,38)	= dep.ZCCLSTDR
+	set output.piece(ZTAB,39)	= dep.ZRINT
+	set output.piece(ZTAB,40)	= dep.ZASINT
+	set output.piece(ZTAB,41)	= dep.ZCLTOT
+	set output.piece(ZTAB,42)	= dep.INP
+	set output.piece(ZTAB,43)	= dep.SNDT
+	set output.piece(ZTAB,44)	= dep.ODLD
+	set output.piece(ZTAB,45)	= dep.ODFACN
+	set output.piece(ZTAB,46)	= ZTJD
+	set output.piece(ZTAB,47)	= dep.ZLCHGRATE
+	set output.piece(ZTAB,48)	= Delinquent
+	set output.piece(ZTAB,49)	= dep.ZRSTR
+	
+	type RecordTMPRPT5 tmp = Db.getRecord("TMPRPT5","PID=:%ProcessID,KEY1='ZODRESTRUCT',KEY2=:ZBOO,KEY3=:ZTYPE,KEY4=:CID,KEY5=:SEQ",1)
+	set tmp.DATA=output
+	do tmp.save()
+	
+	quit
+	
+	
+---------- THREXIT ------ Section marker

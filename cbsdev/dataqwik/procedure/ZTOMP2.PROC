@@ -1,0 +1,727 @@
+//DO NOT MODIFY  TEST|ZTOMP2|||||||1
+
+ 
+
+	S X="K  " X X
+ 	type String %UCLS //OVR(), RJ(), SPV()
+ 	type Number BRCD, PTRC
+	set TLO=$I
+ 	do SYSVAR^SCADRV0()
+ 	set %UCLS="BRMGR"
+ 	set %UserID = 1025
+ 	set BRCD = 0
+	type RecordTTX ttx()
+	set ttx(1) = Class.new("RecordTTX")
+	set ttx(1).cid = 90000000048
+	//set ttx(1).etc = "ZPETE"
+	//set ttx(1).itc = 1
+	set ttx(1).etc = "FPWTC"
+	set ttx(1).itc = 0
+	set ttx(1).tamt = 200000
+	set ttx(1).tcmt = "withdrawal"
+	set ttx(1).bcrcd = "THB"
+	set ttx(1).crcd="THB"
+	
+	set ttx(2) = Class.new("RecordTTX")
+	set ttx(2).cid = 10000
+	set ttx(2).etc = "CO"
+	set ttx(2).itc = 1
+	set ttx(2).tamt = 1000.00
+	set ttx(2).crcd="THB"
+	set ttx(2).bcrcd = "THB"
+	set TRNINPUT("updTTX") = 1
+	
+	do Runtime.start("CS")
+	do TRNSET^TRNDRV(.ttx(),%SystemDate,BRCD,1,.PTRC,.RJ(),.SPV(),.OVR(),,1,.TRNINPUT())
+
+	#BYPASS
+	ZWR
+	ZWR ^HIST(6141528,*)
+	#ENDBYPASS
+	do Runtime.rollback()
+	//set x = ts.copyTran(ttx(2))
+
+	quit
+
+PWD
+
+ 	type String %UCLS //OVR(), RJ(), SPV()
+ 	type Number BRCD, PTRC
+ 	do SYSVAR^SCADRV0()
+ 	set %UCLS="SCA"
+ 	set %UserID = 9999999999
+ 	set BRCD = 1
+	type RecordTTX ttx()
+	set ttx(1) = Class.new("RecordTTX")
+	set ttx(1).cid = 90003014355
+	//set ttx(1).etc = "ZPETE"
+	//set ttx(1).itc = 1
+	set ttx(1).etc = "FPWTC"
+	set ttx(1).itc = 0
+	set ttx(1).tamt = 5000.00
+	set ttx(1).tcmt = "withdrawal"
+	set ttx(1).bcrcd = "THB"
+	set ttx(1).crcd="THB"
+	
+	set ttx(2) = Class.new("RecordTTX")
+	set ttx(2).cid = 10502100
+	set ttx(2).etc = "CO"
+	set ttx(2).itc = 1
+	set ttx(2).tamt = 5000.00
+	set ttx(2).crcd="THB"
+	set ttx(2).bcrcd = "THB"
+	set TRNINPUT("updTTX") = 1
+	
+	do Runtime.start("CS")
+	do TRNSET^TRNDRV(.ttx(),%SystemDate,BRCD,1,.PTRC,.RJ(),.SPV(),.OVR(),,1,.TRNINPUT())
+
+	#BYPASS
+	ZWR
+	ZWR ^HIST(90003014355,*)
+	#ENDBYPASS
+	do Runtime.rollback()
+	//set x = ts.copyTran(ttx(2))
+
+	quit
+
+ FWCH	type String %UCLS //OVR(), RJ(), SPV()
+ 	type Number BRCD, PTRC
+ 	do SYSVAR^SCADRV0()
+ 	set %UCLS="BRSENIOR"
+ 	set %UserID = 16816
+ 	set BRCD = 6
+	type RecordTTX ttx()
+	set ttx(1) = Class.new("RecordTTX")
+	set ttx(1).cid = 90006018694
+	//set ttx(1).etc = "ZPETE"
+	//set ttx(1).itc = 1
+	set ttx(1).etc = "FWCH"
+	set ttx(1).itc = 0
+	set ttx(1).tamt = 299000.00
+	set ttx(1).tcmt = "withdrawal"
+	set ttx(1).bcrcd = "THB"
+	set ttx(1).crcd="THB"
+	
+	set ttx(2) = Class.new("RecordTTX")
+	set ttx(2).cid = 10502100
+	set ttx(2).etc = "CO"
+	set ttx(2).itc = 1
+	set ttx(2).tamt = 299000.00
+	set ttx(2).crcd="THB"
+	set ttx(2).bcrcd = "THB"
+	set TRNINPUT("updTTX") = 1
+	
+	do Runtime.start("CS")
+	do TRNSET^TRNDRV(.ttx(),%SystemDate,BRCD,1,.PTRC,.RJ(),.SPV(),.OVR(),,1,.TRNINPUT())
+
+	#BYPASS
+	ZWR
+	ZWR ^HIST(90006018694,*)
+	#ENDBYPASS
+	do Runtime.rollback()
+	//set x = ts.copyTran(ttx(2))
+
+	quit
+
+
+POST(RecordDEP thisdep, RecordTTX thisttx, RecordTRN thistrn)
+
+	type public String CLOSE(), TRNDRVI(,)
+	set ER = 1, RM="force reject"
+	
+	set TRNDRVI("ZFSN","CLOSE") = "D CLOSE^ZPETE"
+	set CLOSE(thisdep.cid) = ""
+	quit
+	
+CLOSE	
+	type public String CLOSE()
+	write !
+	zwr CLOSE
+	quit
+	
+TRN	
+	type public String TRNDRVI
+	if TRNDRVI("TNIS").exists() do {
+		type String nod
+		for set nod = TRNDRVI("TNIS",nod).order() quit:nod.isNull()  do {
+			type String pgm
+			set pgm = TRNDRVI("TNIS",nod)
+			xecute pgm
+		}
+	}
+	quit
+test(String TRNSET)
+
+	type DbSet ds = Db.selectDbSet("UTBLTRNSET","TRNSET=:TRNSET")
+	while ds.next() do {
+		type RecordUTBLTRNSET trnset = ds.getRecord()
+		write !,trnset.trnset
+		write !,trnset.seq
+		write !,trnset.trnfield
+		write !,trnset.fixedval
+	}
+	quit
+	
+TEST1	
+	type RecordDEP dep = Db.getRecord("DEP","CID=6137687")
+	do POST^ZAGWODEP(.dep)
+	quit
+	
+
+TEST2
+	type RecordTTX ttx = Db.getRecord("TTX","TJD=55666,BRCD=1,UID=1, TSEQ=1001")
+	do ttx.setStoredValue("TransSeq",3)
+	do ttx.save()	
+	quit
+	
+
+
+TEST4
+	do SYSVAR^SCADRV0()
+	set ER=0, RM=""
+	type DbSet ds = Db.selectDbSet("DEP","GRP='CD' AND STAT=0 AND MDT is not null AND BAL>0 AND IRN>0")
+	if 'ds.next() quit
+	
+	type RecordDEP dep = ds.getRecord("DEP")
+	type RecordTTX ttx = Class.new("RecordTTX")
+	
+	for i=1:1:10 set %SystemDate = %SystemDate + 1 do {
+		do GETIPDA^UIC(.dep, .ttx)
+		set dep.ipda = ""
+		write !,dep.posacr
+	}
+	quit
+	
+TEST5
+	type Number tot = 0
+	type DbSet ds = Db.selectDbSet("ACN","CC=9602 AND GLSC IN ('20AA','20MM')")
+	while ds.next() do {
+		type RecordACN acn = ds.getRecord("ACN")
+		set tot = tot+acn.daa
+	}
+	write !,tot
+	quit
+
+		
+TEST6
+	type IO ioout
+	set ioout=Class.new("IO")
+	set ioout.fileName="spool/pete/ELEMENTS.TXT"
+	set ioout.openParams="READ"
+	
+	catch zerror@"LOGERR" {
+		write !,"component ",zerror.component
+		write !,"type ",zerror.type
+		write !,"context ",zerror.context
+		write !,"description ",zerror.description
+		write !,"ident ",zerror.ident
+		write !,"severity ",zerror.severity
+		write !,"thrown at ",zerror.thrownAt
+		
+		do ioout.close()
+		if zerror.ident '= "IOEOF" throw zerror
+		quit
+	}
+
+	do ioout.open()
+	
+	for  set REC=ioout.read() do {
+		
+		write zzl
+	
+	}
+	quit
+
+TEST7
+	type IO ioout
+	set ioout=Class.new("IO")
+	set ioout.fileName="spool/pete/ELEMENTS.TXT"
+	set ioout.openParams="READ"
+
+	/*	
+	catch zerror@"LOGERR" {
+		write !,"component ",zerror.component
+		write !,"type ",zerror.type
+		write !,"context ",zerror.context
+		write !,"description ",zerror.description
+		write !,"ident ",zerror.ident
+		write !,"severity ",zerror.severity
+		write !,"thrown at ",zerror.thrownAt
+		
+		do ioout.close()
+		if zerror.ident '= "IOEOF" throw zerror
+		quit
+	}
+	*/
+	do ioout.open()
+	
+	for  set REC=ioout.read() quit:ETYP.get()  do {
+		
+		//write zzl
+	
+	}
+	quit
+	
+public LOGERR(Error zerror)
+	if zerror.type = "%PSL-E-IOEOF" quit	// don't log if EOF condition
+	do LOGERR^UTLERR(.zerror)
+	quit
+	
+READ	
+	set io="spool/pete/READ.TXT" 
+	o io:newv
+	s x="Z",y=""
+	type DbSet ds = Db.selectDbSet("DBTBL25D","PROCID LIKE 'Z%' AND CODE LIKE '%.read()%'")
+	while ds.next() do {
+		type RecordDBTBL25D rec = ds.getRecord("DBTBL25D")
+		use io
+		write !,rec.procid,?15,rec.code
+	}
+
+
+	type DbSet ds = Db.selectDbSet("LNBIL1","CID=:CID")
+	while ds.next() do { quit:'LSTDR.isNull()
+	
+		type RecordLNBIL1 lnbil1 = ds.getRecord("LNBIL1")
+		
+		type Number columnNumber = 1
+		for CNT = 2:1:20 quit:'LSTDT.isNull()  do {
+			type String columnName
+			
+			set columnName = "PE0"_columnNumber
+			set PYMTEL = lnbil1.@columnName
+			if $E(PYMTEL)="I",+$P(PYMTEL,"#",4)>0 set LSTDT=$P(PYMTNOD,"#",3)
+			set columnNumber = columnNumber + 1
+		}
+	}
+	
+SQLER	// test SQL error trapping 
+	do SYSVAR^SCADRV0()
+	set ER = 0
+	set RM = ""
+	set x = "BUFFER ADD ZPETE INSERT INTO DEP (CID) VALUES (11223)"
+	
+	
+	set er = $$^SQL(x,.Y,.STAT,.DATA)
+	
+	zwr
+	read "press a key",*z
+		
+	set x = "BUFFER COMMIT ZPETE"
+	set er = $$^SQL(x,.Y,.STAT,.DATA)
+	set STAT = $$SQLCOD^PBSMSQL(STAT.get(), .ER)
+	if ER set RETVAL=$$ERRRPLY^PBSMSQL quit
+	write #
+	zwr
+	quit
+	
+DTX	// locate DTX records that are missing DTJ records
+
+	type DbSet ds = Db.selectDbSet("DTX","JNLID='DTJ'")
+	while ds.next() do {
+		
+		type RecordDTX dtx = ds.getRecord("DTX")
+		
+		type ResultSet rs = Db.select("TJD,CID,TSEQ","DTJ","TJD=:dtx.spd and cid=:dtx.cid and tseq = :dtx.tseq")
+		if rs.isEmpty() write !,dtx.spd,?10,dtx.pid,?20,dtx.seq
+	}
+	quit
+	
+CDCKB
+
+	/*
+	
+^HIST(6119026,39225)=61629|1|CDCKB|25000000.00||BR0091009A\0|ZBOC#700~ZCHKHD#CHK
+#^0~ZCID#6119026~ZCK#1773089~ZCKEF#25000000~ZDDATE#25/09/2552~ZDOC#00~ZEXP1#6163
+2~ZFLTHD#FLT#^25000000~ZHLDCON#77~ZICID#1113029290~ZPB#1~ZPBKCD#14~ZPBRCD#111~ZR
+#--CL|:ZICID:1113029290 ECS/In-Provice EXP: 28/09/2552||45224|91|113002|480213||
+||THB|1|||||41480619.8|1|25000000.00|||||||THB||25000000.00||
+	*/
+ 	type String %UCLS //OVR(), RJ(), SPV()
+ 	type Number BRCD, PTRC
+ 	do SYSVAR^SCADRV0()
+ 	set %UCLS="SCA"
+ 	set %UserID = 9999999999
+ 	set BRCD = 0
+	type RecordTTX ttx()
+	set ttx(1) = Class.new("RecordTTX")
+	set ttx(1).cid = 6119026
+	set ttx(1).etc = "CDCKB"
+	set ttx(1).itc = 1
+	set ttx(1).tamt = 25000000.00
+	set ttx(1).tcmt = ":ZICID:1113029290 ECS/In-Provice EXP: 28/09/2552"
+	set ttx(1).bcrcd = "THB"
+	set ttx(1).crcd="THB"
+	set ttx(1).tso = "ZBOC#700~ZCHKHD#CHK#^0~ZCID#6119026~ZCK#1773089~ZCKEF#25000000~ZDDATE#25/09/2552~ZDOC#00~ZEXP1#61632~ZFLTHD#FLT#^25000000~ZHLDCON#77~ZICID#1113029290~ZPB#1~ZPBKCD#14~ZPBRCD#111~ZR#--C"
+	set ttx(1).tlo = "BR0091009A\0"
+	
+	set ttx(2) = Class.new("RecordTTX")
+	set ttx(2).cid = 16509000
+	set ttx(2).etc = "MDR"
+	set ttx(2).itc = 0
+	set ttx(2).tamt = 25000000.00
+	set ttx(2).crcd="THB"
+	set ttx(2).bcrcd = "THB"
+	set TRNINPUT("updTTX") = 1
+	
+	do Runtime.start("CS")
+	do TRNSET^TRNDRV(.ttx(),%SystemDate,BRCD,1,.PTRC,.RJ(),.SPV(),.OVR(),,1,.TRNINPUT())
+	#BYPASS
+	zwr
+	zwr ^HIST(6119026,*)
+	#ENDBYPASS
+	do Runtime.rollback()
+	quit
+	
+DBSDD	// benchmark DBSDD changes to eliminate the use of the Db.getSchemaTable
+	// method in favor of Db.getRecord.
+	type Number xxx
+	
+	set start = $H.piece(",",2)
+	for xxx=1:1:1000 do DBSDDOLD(.fsn,"LN") if '(xxx#50) write !,xxx
+	set end = $H.piece(",",2)
+	write !,"old method: "_(end-start)
+	
+	kill fsn
+	
+	set start = $H.piece(",",2)
+	for xxx=1:1:1000 do DBSDDNEW(.fsn,"LN") if '(xxx#50) write !,xxx
+	set end = $H.piece(",",2)
+	write !,"new method: "_(end-start)
+	
+	quit
+	
+DBSDDOLD(  String fsn(),	// File header array [*]	/MECH=REFARR:RW
+	   String file,		// Table name
+	   String vdd())	// Dictionary records		/NOREQ/MECH=REFARR:RW
+	   
+	/*
+	Add a file header to the fsn(file) array
+
+	This subroutine loads file information into a record (fsn) to be used
+	by compilers and other utilities that require included information.
+	
+	KEYWORDS:	Data Dictionary
+	
+	ARGUMENT NOTES:
+		. fsn(file)	File Attributes Record	/NOREQ/MECH=REF:W
+	
+	  Local_Array|Global|Keys (nolits)|Record_Type|Location|Filer name|nolog|
+	     1          2          3           4          5       6     7
+	  Ref_TLD|Ref_UID|Delimiter|library|Existed indicator|Ref_TIM|system name
+	     8       9        10       11       12              13      14                                 
+	
+	EXAMPLES:
+	
+		fsn("CUVAR")="A(|^CUVAR(||10|2|"
+		fsn("DBTBL1D")="fDBTBL1D(|^DBTBL(%LIBS,1,FID,9,DI|%LIBS,FID,DI|1|2|^DBSDFF(%O)"
+		fsn("DEP")="DEP(|^ACN(CID|CID|10|1|^DEPFILE(%O)"
+		fsn("HIST")="fHIST(|^HIST(CID,TSEQ|CID,TSEQ|1|1|"
+	*/
+	
+	type public Boolean ER
+	type public String RM
+	
+	type Number I
+	type String acckeys, glref, keys, lvn, X
+
+	if file.get().isNull() do { quit
+		
+		set ER = 1
+		// Invalid NULL parameter for File
+		set RM = $$^MSG(8615)
+	}
+	
+	type SchemaTable tableinfo
+	
+	/* 31/03/10 Pete Chenard.  Following line commented. It uses the 
+	   Db.getSchemaTable method to populate fsn array.  That method does
+	   much more processing that we need to set up fsn.  Instead, use a ccombination
+	   of $$getPslTable^UCXDD and Db.getRecord("DBTBL1").  This grestly imrpoves
+	   performance. */
+	set ER = '$$getTableInfo^DBSDD(file, .tableinfo)
+	//set tableinfo = {SchemaTable}$$getPslTbl^UCXDD(file,0)	
+	if ER.get() set RM = $$^MSG(1337,file) quit	// Invalid file name ~p1
+	//type RecordDBTBL1 dbtbl1 = Db.getRecord("DBTBL1","%LIBS='SYSDEV',FID=:file",1)
+
+	set acckeys = tableinfo.primaryKeys
+	set keys = ""
+	for I = 1:1:acckeys.length(",") do {
+		
+		type String key = acckeys.piece(",", I)
+		
+		if '(key.isLiteral() ! key.beginsWith("$")) set keys = keys_key_","
+	}
+	set keys = keys.extract(1, keys.length() - 1)
+	
+	if fsn.get().isNull() do {
+		
+		set lvn = tableinfo.fileShortName
+		if 'lvn.isLike("%(%") set lvn = lvn_"("
+	}
+	else  set lvn = ""
+	
+	set glref = tableinfo.global
+	if (glref.piece("(", 2) = """*""") set glref = glref.piece("(", 1))_"("	// CUVAR
+		
+	set X = lvn_"|"_glref_"|"_keys_"|"_tableinfo.recordType_"|"_tableinfo.networkLocation
+	set X = X_"|"_tableinfo.filerPGM_"|"_tableinfo.isAutoLog_"|"_tableinfo.dateCreated_"|"_tableinfo.userCreated
+	set X = X_"|"_tableinfo.columnDelimiter_"|SYSDEV|"_tableinfo.existsNode_"|"_tableinfo.timeCreated
+	
+	set fsn(file) = X
+	
+	quit
+
+	
+	quit
+	
+DBSDDNEW(  String fsn(),	// File header array [*]	/MECH=REFARR:RW
+	   String file,		// Table name
+	   String vdd())	// Dictionary records		/NOREQ/MECH=REFARR:RW
+	   
+	/*
+	Add a file header to the fsn(file) array
+
+	This subroutine loads file information into a record (fsn) to be used
+	by compilers and other utilities that require included information.
+	
+	KEYWORDS:	Data Dictionary
+	
+	ARGUMENT NOTES:
+		. fsn(file)	File Attributes Record	/NOREQ/MECH=REF:W
+	
+	  Local_Array|Global|Keys (nolits)|Record_Type|Location|Filer name|nolog|
+	     1          2          3           4          5       6     7
+	  Ref_TLD|Ref_UID|Delimiter|library|Existed indicator|Ref_TIM|system name
+	     8       9        10       11       12              13      14                                 
+	
+	EXAMPLES:
+	
+		fsn("CUVAR")="A(|^CUVAR(||10|2|"
+		fsn("DBTBL1D")="fDBTBL1D(|^DBTBL(%LIBS,1,FID,9,DI|%LIBS,FID,DI|1|2|^DBSDFF(%O)"
+		fsn("DEP")="DEP(|^ACN(CID|CID|10|1|^DEPFILE(%O)"
+		fsn("HIST")="fHIST(|^HIST(CID,TSEQ|CID,TSEQ|1|1|"
+	*/
+	
+	type public Boolean ER
+	type public String RM
+	
+	type Number I
+	type String acckeys, glref, keys, lvn, X
+
+	if file.get().isNull() do { quit
+		
+		set ER = 1
+		// Invalid NULL parameter for File
+		set RM = $$^MSG(8615)
+	}
+	
+	type SchemaTable tableinfo
+	
+	/* 31/03/10 Pete Chenard.  Following line commented. It uses the 
+	   Db.getSchemaTable method to populate fsn array.  That method does
+	   much more processing that we need to set up fsn.  Instead, use a ccombination
+	   of $$getPslTable^UCXDD and Db.getRecord("DBTBL1").  This grestly imrpoves
+	   performance. */
+	//set ER = '$$getTableInfo(file, .tableinfo)
+	set tableinfo = {SchemaTable}$$getPslTbl^UCXDD(file,0)	
+	if ER.get() set RM = $$^MSG(1337,file) quit	// Invalid file name ~p1
+	type RecordDBTBL1 dbtbl1 = Db.getRecord("DBTBL1","%LIBS='SYSDEV',FID=:file",1)
+
+	set acckeys = tableinfo.primaryKeys
+	set keys = ""
+	for I = 1:1:acckeys.length(",") do {
+		
+		type String key = acckeys.piece(",", I)
+		
+		if '(key.isLiteral() ! key.beginsWith("$")) set keys = keys_key_","
+	}
+	set keys = keys.extract(1, keys.length() - 1)
+	
+	if fsn.get().isNull() do {
+		
+		set lvn = dbtbl1.fsn
+		if 'lvn.isLike("%(%") set lvn = lvn_"("
+	}
+	else  set lvn = ""
+	
+	set glref = tableinfo.global
+	if (glref.piece("(", 2) = """*""") set glref = glref.piece("(", 1))_"("	// CUVAR
+		
+	set X = lvn_"|"_glref_"|"_keys_"|"_tableinfo.recordType_"|"_dbtbl1.netloc
+	set X = X_"|"_tableinfo.filerPGM_"|"_tableinfo.isAutoLog_"|"_tableinfo.dateCreated_"|"_tableinfo.userCreated
+	set X = X_"|"_tableinfo.columnDelimiter_"|SYSDEV|"_tableinfo.existsNode_"|"_tableinfo.timeCreated_"|"_dbtbl1.syssn
+	
+	set fsn(file) = X
+	
+	quit
+
+TEST10	// scan history for out of sequence TJD
+
+	do SYSVAR^SCADRV0()
+	type String % = 9.char()
+	set io="spool/ZHIST.TXT"
+	open io:newv
+	
+	type ResultSet rs = Db.select("DISTINCT CID","HIST",,"CID ASC")
+	while rs.next() do {
+
+		type Number CID, OLDTSEQ = ""
+		type Date OLDTJD = ""
+		set CID = rs.getCol("CID")
+		
+		type ResultSet rs1 = Db.select("TSEQ,TJD,TSO,TCMT","HIST","CID=:CID","TSEQ")
+		while rs1.next() do {
+			if OLDTJD.isNull() set OLDTJD = rs1.getCol("TJD"), OLDTSEQ = rs1.getCol("TSEQ") quit
+			
+			if rs1.getCol("TJD") < OLDTJD do {
+				use io
+				write !,CID,%
+				write rs1.getCol("TSEQ"),%
+				write rs1.getCol("TJD"),%
+				write OLDTSEQ,%
+				write OLDTJD,%
+				write rs1.getCol("TSO"),%
+				write rs1.getCol("TCMT")
+				use 0
+				write "."
+			}
+			set OLDTJD = rs1.getCol("TJD")
+			set OLDTSEQ = rs1.getCol("TSEQ")
+		}
+	}
+	close io
+	quit
+	
+		
+TSO(String tso)
+
+	type String ZTMP, ZTSO()
+	write !,tso
+	do OUT^UTSO(.ZTSO(), tso)
+	do IN^UTSO(.ZTSO(),.ZTMP)
+	set tso = ZTMP
+	write !,tso
+	quit
+	
+		
+TSO1	/*
+
+	^TTX(61832,0,9999999999,1001)=16037596|000001|CK|10002.00||NEWS_BOOK\0|ZBOC#700~
+ZCID#274542~ZCK#19~ZDDATE#16/04/2553~ZDOC#00~ZEXP1#61835~ZHC#CB1~ZHLDCON#16~ZICI
+D#6142060~ZPB#1~ZPBKCD#6~ZPBRCD#0~ZR#--CB||61832|55848|0|1001|9999999999||||THB|
+1.0000000||||||1|10002.00|||||||THB||10002
+                        1002)=274542|100001|SDCK|10002.00||NEWS_BOOK\0|ZBOC#700~
+ZCID#274542~ZCK#19~ZDDATE#16/04/2553~ZDOC#00~ZEXP1#61835~ZHLDCON#16~ZICID#614206
+0~ZPB#1~ZPBKCD#6~ZPBRCD#0~ZR#--CB|:ZICID:6142060#CB EXP: 19/04/2553|61832|55848|
+0|1002|9999999999||||THB|1.0000000|||||141591|1|10002.00|||||||THB||10002
+	*/
+	
+	type String %UCLS //OVR(), RJ(), SPV()
+ 	type Number BRCD, PTRC
+ 	do SYSVAR^SCADRV0()
+ 	set %UCLS="BRSENIOR"
+ 	set %UserID = 16816
+ 	set BRCD = 6
+	type RecordTTX ttx()
+	set ttx(1) = Class.new("RecordTTX")
+	set ttx(1).cid = 16037596
+	//set ttx(1).etc = "ZPETE"
+	//set ttx(1).itc = 1
+	set ttx(1).etc = "CK"
+	set ttx(1).itc = 0
+	set ttx(1).tamt = 10002.00
+	set ttx(1).tcmt = "CHECK"
+	set ttx(1).bcrcd = "THB"
+	set ttx(1).crcd="THB"
+	set ttx(1).tso ="ZBOC#700~ZCID#274542~ZCK#20~ZDDATE#16/04/2553~ZDOC#00~ZEXP1#61835~ZHC#CB1~ZHLDCON#16~ZICID#6142060~ZPB#1~ZPBKCD#6~ZPBRCD#0~ZR#--CB"
+	
+	set ttx(2) = Class.new("RecordTTX")
+	set ttx(2).cid = 274542
+	set ttx(2).etc = "SDCK"
+	set ttx(2).itc = 1
+	set ttx(2).tamt = 10002.00
+	set ttx(2).crcd="THB"
+	set ttx(2).bcrcd = "THB"
+	set ttx(2).tcmt = ":ZICID:6142060#CB EXP: 19/04/2553"
+	set ttx(2).tso ="ZBOC#700~ZCID#274542~ZCK#20~ZDDATE#16/04/2553~ZDOC#00~ZEXP1#61835~ZHLDCON#16~ZICID#6142060~ZPB#1~ZPBKCD#6~ZPBRCD#0~ZR#--CB"
+	set TRNINPUT("updTTX") = 1
+	
+	do Runtime.start("CS")
+	kill ^ZCBLOG("FLG")
+	
+	do TRNSET^TRNDRV(.ttx(),%SystemDate,BRCD,1,.PTRC,.RJ(),.SPV(),.OVR(),,1,.TRNINPUT())
+
+	#BYPASS
+	ZWR
+	ZWR ^HIST(274542,*)
+	#ENDBYPASS
+	
+	
+	do TSO2
+	
+	do Runtime.rollback()
+	//set x = ts.copyTran(ttx(2))
+
+	quit
+
+TSO2	/*
+
+	^TTX(61832,0,9999999999,1001)=16037596|000001|CK|10002.00||NEWS_BOOK\0|ZBOC#700~ZCID#274542~ZCK#20~ZDDATE#16/04/2553~ZDOC#00~ZEXP1#61835~ZHC#CB1~ZHLDCON#16~ZICID#6142060~ZPB#1~ZPBKCD#6~ZPBRCD#0~ZR#--CB||61832|55848|0|1001|9999999999||||THB|
+1.0000000||||||1|10002.00|||||||THB||10002
+                        1002)=274542|100001|SDCK|10002.00||NEWS_BOOK\0|ZBOC#700~
+ZCID#274542~ZCK#19~ZDDATE#16/04/2553~ZDOC#00~ZEXP1#61835~ZHLDCON#16~ZICID#614206
+0~ZPB#1~ZPBKCD#6~ZPBRCD#0~ZR#--CB|:ZICID:6142060#CB EXP: 19/04/2553|61832|55848|
+0|1002|9999999999||||THB|1.0000000|||||141591|1|10002.00|||||||THB||10002
+	*/
+	
+	type String %UCLS //OVR(), RJ(), SPV()
+ 	type Number BRCD, PTRC
+ 	do SYSVAR^SCADRV0()
+ 	set %UCLS="BRSENIOR"
+ 	set %UserID = 16816
+ 	set BRCD = 6
+	type RecordTTX ttx()
+	set ttx(1) = Class.new("RecordTTX")
+	set ttx(1).cid = 16037596
+	//set ttx(1).etc = "ZPETE"
+	//set ttx(1).itc = 1
+	set ttx(1).etc = "CK"
+	set ttx(1).itc = 000001
+	set ttx(1).tamt = -10002.00
+	set ttx(1).tcmt = "CHECK"
+	set ttx(1).bcrcd = "THB"
+	set ttx(1).crcd="THB"
+	set ttx(1).tso="ZBOC#700~ZCID#274542~ZCK#20~ZDDATE#16/04/2553~ZDOC#00~ZEXP1#61835~ZHC#CB1~ZHLDCON#16~ZICID#6142060~ZPB#1~ZPBKCD#6~ZPBRCD#0~ZR#--CB~EC#1001"
+	
+	set ttx(2) = Class.new("RecordTTX")
+	set ttx(2).cid = 274542
+	set ttx(2).etc = "SDCK"
+	set ttx(2).itc = 100001
+	set ttx(2).tamt = -10002.00
+	set ttx(2).crcd="THB"
+	set ttx(2).bcrcd = "THB"
+	set ttx(2).tcmt = ":ZICID:6142060#CB EXP: 19/04/2553"
+	set ttx(2).tso ="ZBOC#700~ZCID#274542~ZCK#20~ZDDATE#16/04/2553~ZDOC#00~ZEXP1#61835~ZHLDCON#16~ZICID#6142060~ZPB#1~ZPBKCD#6~ZPBRCD#0~ZR#--CB~REV#44~EC#1002"
+	set TRNINPUT("updTTX") = 1
+	
+	//do Runtime.start("CS")
+	//kill ^ZCBLOG("FLG")
+	
+	do TRNSET^TRNDRV(.ttx(),%SystemDate,BRCD,1,.PTRC,.RJ(),.SPV(),.OVR(),,1,.TRNINPUT())
+
+	#BYPASS
+	ZWR
+	ZWR ^HIST(274542,*)
+	#ENDBYPASS
+	//do Runtime.rollback()
+	//set x = ts.copyTran(ttx(2))
+			
+	quit
+
+FEP	// run FETPFILE
+	catch error@"LOGERR^UTLERR" {
+		write "*****"
+	}
+	do ^FEPTFILE
+	quit

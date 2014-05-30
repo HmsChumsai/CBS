@@ -1,0 +1,369 @@
+//DO NOT MODIFY  Testing procedure|ZQII|||||||1
+
+ADDStaff
+	new Name,ID,DEP,POS,SAL,AGE
+	for  read "Do you want to add new staff? [Y/N]",ans  quit:(ans="N")!(ans="n")  do {
+		write !,"Add new staff"
+		write !
+		read "Name :",Name
+		write !
+		read "Department :",DEP
+		write !
+		read "Position :",POS
+		write !
+		read "Salary :",SAL
+		write !
+		read "AGE :",AGE
+		set ID=$O(^ZIKQ(""),-1)
+		if ID="" set ID=1
+		else  set ID=ID+1
+		set ^ZIKQ(ID)=Name
+		set ^ZIKQ(ID,1)=DEP_"|"_POS_"|"_SAL
+		set ^ZIKQ(ID,2)=AGE
+		write !,"New staff ID:"_ID_"was added"
+		write !
+	}
+	quit
+
+Update
+	new ID,Name,DEP,SAL,POS,AGE
+	for  read "Do you want to update data? [Y/N]",ans  quit:(ans="N")!(ans="n")  do {
+		write !
+		read "Please input Staff ID: ",ID
+		write !
+		type RecordZIKQ zikq=Db.getRecord("ZIKQ","ID")
+		set N=zikq.NAME
+		set P=zikq.POS
+		set S=zikq.SAL
+		set A=zikq.AGE
+		set D=zikq.DEP
+		write "1.Change Name",!
+		write "2.Change/Update Position",!
+		write "3.Change/Update Department",!
+		write "4.Change/Update Salary",!
+		write "5.Update Age",!
+		write "6.Delete staff",!
+		read "Please input Number which you want to change: ",X
+		write !
+		if X=1 do {
+			read "Name :",Name
+			set ^ZIKQ(ID)=Name
+		}
+		else  if X=2  do {
+			read "Position :",POS
+			set ^ZIKQ(ID,1)=D_"|"_POS_"|"_S
+		}
+		else  if X=3  do {
+			read "Department :",DEP
+			set ^ZIKQ(ID,1)=DEP_"|"_P_"|"_S
+		}
+		else  if X=4  do {
+			read "Salary :",SAL
+			set ^ZIKQ(ID,1)=D_"|"_P_"|"_SAL
+		}
+		else  if X=5  do {
+			read "AGE :",AGE
+			set ^ZIKQ(ID,2)=AGE
+		}
+		else  do {
+			read "Are you sure to delete staff [Y/N]",ansD
+			if (ansD="Y")!(ansD="y")  do {
+				kill ^ZIKQ(ID)
+				write !,"Delete Staff ID: "_ID_" complete",!
+			}
+			quit
+		}
+		write !
+	}
+	quit
+
+
+Hw(ZD,ZCID)
+	set TSUM=0
+	set SEQ=0
+
+	if '(Db.isDefined("ACN","CID=:ZCID")) write !,"Account "_ZCID_" is not defined!!",! quit
+	type ResultSet acn=Db.select("ACCTNAME","ACN","CID=:ZCID")
+	while acn.next()  do {
+		set ZNAME=acn.getCol("ACCTNAME")
+	}
+	type ResultSet dtj=Db.select("TJD,CID,TYPE,CLS,GRP,TOT,TSEQ","DTJ","TJD=:ZD and CID=:ZCID")
+	while dtj.next()  do {
+		set ZDATE=dtj.getCol("TJD")
+		set DATE=$$DAT^%ZM(ZDATE,"YEARMMDD")
+		set ZCID=dtj.getCol("CID")
+		set ZTYPE=dtj.getCol("TYPE")
+		set ZClass=dtj.getCol("CLS")
+		set ZGRP=dtj.getCol("GRP")
+		set ZSUM=dtj.getCol("TOT")
+		set ZTSEQ=dtj.getCol("TSEQ")
+		set TSUM=TSUM+ZSUM
+		if ZTSEQ'="" set SEQ=SEQ+1
+	}
+	type String LEN=TSUM.length()
+	type String SUM=TSUM.ZERO(LEN,4,0,0)
+	set ASUM=$$NUM^%ZM(SUM,2,".,")
+	write !
+	write "DATE: "_DATE
+	write !
+	write "ACCOUNT: "_ZCID_"-"_ZNAME
+	write !
+	write "Class,GRP,Type: "_ZClass_" "_ZTYPE_" "_ZGRP
+	write !
+	write "Summary Amount: "_ASUM
+	write !
+	write "Number of Transaction in Date: "_SEQ
+
+	quit
+
+Hw2(ZD,ZCID)
+	set TSUMC=0
+	set TSUMD=0
+	set SEQC=0
+	set SEQD=0
+
+	if '(Db.isDefined("ACN","CID=:ZCID")) write !,"Account "_ZCID_" is not defined!!",! quit
+	type ResultSet acn=Db.select("ACCTNAME,TYPE,CLS,GRP","ACN","CID=:ZCID")
+	while acn.next()  do {
+		set ZNAME=acn.getCol("ACCTNAME")
+		set ZTYPE=acn.getCol("TYPE")
+		set ZClass=acn.getCol("CLS")
+		set ZGRP=acn.getCol("GRP")
+	}
+	type ResultSet hist=Db.select("ITC1,TJD,CID,TOT,TSEQ,ETC","HIST","CID=:ZCID AND TJD=:ZD")
+	while hist.next()  do {
+		if (hist.getCol("ITC1")=1)&(hist.getCol("ETC")'="")  do {
+
+			set SEQC=SEQC+1
+			set TSUMC=TSUMC+hist.getCol("TOT")
+			set ZDATE=hist.getCol("TJD")
+			set DATE=$$DAT^%ZM(ZDATE,"YEARMMDD")
+			set ZCID=hist.getCol("CID")
+		}
+		else  if (hist.getCol("ITC1")=0)&(hist.getCol("ETC")'="")  do {
+			set SEQD=SEQD+1
+			set TSUMD=TSUMD+hist.getCol("TOT")
+			set ZDATE=hist.getCol("TJD")
+			set DATE=$$DAT^%ZM(ZDATE,"YEARMMDD")
+			set ZCID=hist.getCol("CID")
+		}
+	}
+
+
+	type String LENC=TSUMC.length()
+	type String SUMC=TSUMC.ZERO(LENC,4,0,0)
+	set CSUM=$$NUM^%ZM(SUMC,2,".,")
+
+	type String LEND=TSUMD.length()
+	type String SUMD=TSUMD.ZERO(LEND,4,0,0)
+	set DSUM=$$NUM^%ZM(SUMD,2,".,")
+
+	set ASUM=TSUMC-TSUMD
+	type String LENA=ASUM.length()
+	type String SUM=ASUM.ZERO(LENA,4,0,0)
+	set TSUM=$$NUM^%ZM(SUM,2,".,")
+
+	set SSUM=SEQC+SEQD
+
+	write !
+	write "DATE: "_DATE
+	write !
+	write "ACCOUNT: "_ZCID_"-"_ZNAME
+	write !
+	write "Class,GRP,Type: "_ZClass_" "_ZTYPE_" "_ZGRP
+	write !
+	write "Summary Amount: Credit "_CSUM_" - Debit "_DSUM_"="_TSUM
+	write !
+	write "Number of Transaction in Date: Credit "_SEQC_" + Debit "_SEQD_"="_SSUM
+
+
+Hw3(ZDATE,ZEDATE)
+	for i=ZDATE:1:ZEDATE do {
+		set SEQC=0
+		set SEQD=0
+		set SEQL=0
+		type ResultSet dtjna=Db.select("TJD,CID,CLS","DTJNA","TJD=:i")
+		while dtjna.next()  do {
+			set ZClass=dtjna.getCol("CLS")
+			if ZClass="*"  do {
+				set SEQC=SEQC+1
+			}
+			else  if ZClass="D"  do {
+				set SEQD=SEQD+1
+			}
+			else  set SEQL=SEQL+1
+		}
+
+		set DATE=$$DAT^%ZM(dtjna.getCol("TJD"),"YEARMMDD")
+		write !
+		write "DATE: "_DATE
+		write !
+		write "Number of Customer open: "_SEQC
+		write !
+		write "Number of Deposit Acount open: "_SEQD
+		write !
+		write "Number of Loan Acount open: "_SEQL
+	}
+	quit
+
+Hw4(ZDATE)
+	set SEQ=1
+	type ResultSet dtjna=Db.select("TJD,CID,ACN,CLS","DTJNA","TJD=:ZDATE")
+	while dtjna.next() do {
+		if dtjna.getCol("CLS")="*"  do {
+			set ZACCT=dtjna.getCol("CID")
+			set ZCustNum=dtjna.getCol("ACN")
+			write "Account Customer"
+			write !
+			write SEQ_". "_ZCustNum_":"_ZACCT
+			write !
+			set SEQ=SEQ+1
+		}
+		else  if dtjna.getCol("CLS")="D"  do {
+			set ZACCT=dtjna.getCol("CID")
+			set ZCustNum=dtjna.getCol("ACN")
+			write "Account Deposit"
+			write !
+			write SEQ_". "_ZCustNum_":"_ZACCT
+			write !
+			set SEQ=SEQ+1
+		}
+		else  do {
+			set ZACCT=dtjna.getCol("CID")
+			set ZCustNum=dtjna.getCol("ACN")
+			write "Account Loan"
+			write !
+			write SEQ_". "_ZCustNum_":"_ZACCT
+			write !
+			set SEQ=SEQ+1
+		}
+
+	}
+	quit
+
+Hw5(ZDATE,ZEDATE)
+	//D Hw5^ZQII(61943,61944)
+
+	for i=ZDATE:1:ZEDATE do {
+		type ResultSet dtjna=Db.select("TJD,CID,CLS,ACN","DTJNA","TJD=:i")
+		while dtjna.next() do {
+			if dtjna.getCol("CLS")="*"  do {
+				set ZCust=dtjna.getCol("CID")
+				if '($$Ck^ZQII(ZCust,i)) do {
+				write ZCust,!			
+			}
+		}
+		}
+	}
+	quit 	
+Ck(A,B)
+	
+	type String CK
+	set CK=0
+	type ResultSet dtjna=Db.select("TJD,CID,ACN,CLS","DTJNA","TJD=:B")
+		while dtjna.next() do { quit:CK
+			if (dtjna.getCol("CLS")'="*")&(dtjna.getCol("ACN")=A)  do {
+			set CK=1
+			quit
+		}
+		}
+	quit CK
+	
+Hw6(Date ZDATE, Date ZEDATE, String ZDTCIFL(), String ZCIFL())
+	/* 
+	D Hw6^ZQII(61943,61944,.ZDTCIFL,.ZCIFL)
+	ZWR ZDTCIFL
+	ZWR ZCIFL
+	set ZDTCIFL(61943,29963038)=""
+	set ZDTCIFL(61943,29963039)=""
+	set ZDTCIFL(61944,29963043)=""
+	set ZDTCIFL(61944,29963042)=""
+	
+	set ZCIFL(29963038)="61943"
+	set ZCIFL(29963039)="61943"
+	set ZCIFL(29963043)="61944"
+	set ZCIFL(29963042)="61944"
+	*/
+	for i=ZDATE:1:ZEDATE do {
+		type ResultSet dtjna=Db.select("TJD,CID,CLS,ACN","DTJNA","TJD=:i")
+		while dtjna.next() do {
+			if dtjna.getCol("CLS")="*"  do {
+				set ZCust=dtjna.getCol("CID")
+				if '($$Ck^ZQII(ZCust,i)) do {
+				set ZDTCIFL(i,ZCust)=i_","_ZCust
+				set ZCIFL(ZCust)=i 		
+			}
+		}
+		}
+	}
+	quit 	
+	
+Hw7(String ZDTCIFL(), String ZCIFL())
+	//D Hw6^ZQII(61943,61944,.ZDTCIFL,.ZCIFL)
+	//d Hw7^ZQII(.ZDTCIFL,.ZCIFL)
+	//zwr ZDTCIFL,ZCIFL
+	
+	/*while $O(ZDTCIFL(key1,""))  do {
+		set DTCIFL=$O(ZDTCIFL(key1,""))
+		set PRDTCIFL=ZCIFL(DTCIFL)
+		write "AA "_PRDTCIFL,!
+		
+	}*/
+	
+	set key1=$O(ZDTCIFL(""))
+	set key2=$O(ZCIFL(""))
+	
+	write key1,!
+	write key2,!
+	//write keyE,!
+	//set keyB=$O(ZDTCIFL(key1,""))
+	//write keyB,!
+	set A=$Q(ZDTCIFL(""))
+	write A,!
+	//set B=$O(A)
+	//write B,!
+	/*while i do { quit:i
+		while $O(ZDTCIFL(key1,"")) do {
+		set keyB=$O(ZDTCIFL(key1,""))
+		set X=ZDTCIFL(key1,keyB)
+		write X,!
+		set i=1
+		if $O(ZDTCIFL(key1,keyB)) do {
+			set X=ZDTCIFL(key1,keyB)
+			write X,!
+			if '($O(ZDTCIFL(key1,keyB))) do {
+			set X=ZDTCIFL(key1,keyB)
+			write X,!
+		
+		}
+	}
+	*/		
+
+	/*
+	while $O(ZCIFL(key2)) do {
+		set Z=ZCIFL(key2)
+		write Z,!
+		set key2=$O(ZCIFL(key2))
+		//write key2
+		if '($O(ZCIFL(key2)))  do {
+			set Z=ZCIFL(key2)
+			write Z
+			
+		}
+	}*/
+	
+	
+	quit 
+	
+	
+	
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,182 @@
+//DO NOT MODIFY  Batch For Stamp Duty|ZBCHSTAM||||||DTJ|||100|32000|ZTJD|0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	do Db.delete("TMPRPT3","KEY1='DUTYSTAMP'")
+	do Db.delete("TMPRPT3","KEY1='SUMDUTYSTAMP'")
+	
+	new %TAB,%READ
+	set %TAB("ZTJD")="/DES=DATE/REQ/TYP=D/LEN=10"
+	set %READ="@@%FN,,ZTJD"
+	do ^UTLREAD if VFMQ="Q" quit
+	
+	type IO io=Class.new("IO")
+	set ZEXTDAT=ZTJD.toString("YEARMMDD")
+	set io.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/FCDSP_FCDD2294_NEWFCD_"_ZEXTDAT_".TXT"
+	set io.openParams="NEWV/WRITE"
+	do io.open()
+	do io.close()
+	
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	
+	type Number DUTYAMT
+	type IO io=Class.new("IO")
+	type Date ZEXTDAT,zdate
+	set ZEXTDAT=ZTJD
+	set zdate=ZTJD
+	set zdate=zdate.toString("YYMMDD")
+	set ZEXTDAT=ZEXTDAT.toString("YEARMMDD")
+	set io.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/FCDSP_FCDD2294_NEWFCD_"_ZEXTDAT_".TXT"
+	set io.openParams="NEWV/WRITE"
+	do io.open()
+	set DUTYAMT=$$FEEAMT^ZFEEUTL("XDUTY",0,1)
+	
+	type DbSet ds2=Db.selectDbSet("TMPRPT3","KEY1='DUTYSTAMP'")
+	while ds2.next() do {
+		type Number BRCD,AMOUNT,TOTAL,ZHUB
+		type String THRDATA,SUMDATA
+		type RecordTMPRPT3 rpt2=ds2.getRecord("TMPRPT3")
+		
+		set ZPID=rpt2.PID
+		set ZKEY2=rpt2.key2
+		set ZKEY3=rpt2.key3
+		
+		type RecordTMPRPT3 sum=Db.getRecord("TMPRPT3","PID=:%ProcessID,KEY1='SUMDUTYSTAMP',KEY2=:rpt2.key2,KEY3=:rpt2.key3",1)
+
+		set THRDATA=rpt2.data
+		set SUMDATA=sum.data
+		set ZHUB=THRDATA.piece("|",2)
+		set TOTAL=SUMDATA.piece("|",1)+THRDATA.piece("|",1)
+		//set TOTAL=TOTAL*DUTYAMT
+		set sum.data=TOTAL_"|"_ZHUB
+		do sum.save()
+		//do Db.delete("TMPRPT3","PID=:ZPID AND KEY1='DUTYSTAMP' AND KEY2=:ZKEY2 AND KEY3=:ZKEY3")
+	}
+		
+			
+	type ResultSet rs = Db.select("KEY3,DATA","TMPRPT3","PID=:%ProcessID AND KEY1='SUMDUTYSTAMP' AND KEY2=:ZTJD")
+	while rs.next() do {
+		type String tWRITE,ZDATA,ZDATA
+		type Number ZBRCD,ZAMT,ZHUB
+		
+		
+		set ZBRCD=rs.getCol(1)
+		set ZDATA=rs.getCol(2)
+		set ZAMT=ZDATA.piece("|",1)
+		set ZBAL=ZAMT*DUTYAMT
+		set ZAMT=ZAMT.zero(7,0,1,0)
+		set ZBAL=ZBAL.zero(17,2,1,0)
+		/*
+		while '(17-ZBAL.length())=0 do {
+			set ZBAL="0"_ZBAL
+		}
+		
+		while '(7-ZAMT.length())=0 do {
+			set ZAMT="0"_ZAMT
+		}
+		*/
+		set ZHUB=ZDATA.piece("|",2)
+		if ZHUB.isNull() set ZHUB="0000"
+		else set ZHUB=ZDATA.zero(4,2,1,0)
+		
+
+		
+		set tWRITE=zdate_"00080"_ZBRCD_"2645022"_"00000000000000000"_"00000000000000000"_ZBAL_ZHUB_ZAMT_zdate_"          "
+		do io.write(tWRITE)
+		//do Db.delete("TMPRPT3","PID=:%ProcessID AND KEY1='SUMDUTYSTAMP' AND KEY2=:ZTJD AND KEY3=:ZBRCD")
+	
+	}
+	
+	do io.close()
+	//do Db.fastDelete("TMPRPT3","KEY1='SUMDUTYSTAMP'")
+	//do Db.fastDelete("TMPRPT3","KEY1='DUTYSTAMP'")
+	
+	quit
+	
+---------- THRINIT ------ Section marker
+
+	
+
+	
+	//type String ZETC()
+	
+	type ResultSet rsETC = Db.select("ETC","ZUTBLTRCD","DUTYFLG=1")
+	while rsETC.next() do {
+		set ZETC(rsETC.getCol(1)) =  rsETC.getCol(1)
+	}
+
+	quit
+	
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	
+	do CHECKETC(ZTJD)
+	
+	quit
+
+CHECKETC(ZTJD)
+	
+	type Number EXIT
+
+	type DbSet ds = Db.selectDbSet("DTJ","TJD=:ZTJD AND DATETIME=:DATETIME AND CID=:CID AND TSEQ=:TSEQ")
+	
+	while ds.next() do {
+		
+		type RecordDTJ zdtj=ds.getRecord("DTJ")
+
+		//if (zdtj.ITC6=1)!(zdtj.TAMT<0) quit
+		if (zdtj.TAMT<0) quit
+		
+		type RecordHIST hist=Db.getRecord("HIST","CID=:CID,TSEQ=:TSEQ")
+		
+		if (hist.ITC6=1) quit
+		write !,zdtj.tjd_"|"_zdtj.tseq
+		set ZBRCD=zdtj.brcd
+		
+		//Fill 0 to ZBRCD 
+		set ZBRCD=ZBRCD.zero(4,0,1,0)
+		/*
+		while '(4-ZBRCD.length())=0 do {
+			set ZBRCD="0"_ZBRCD
+		}
+		*/
+		//Loop though TEMP ETC
+		if $G(ZETC(zdtj.etc))=zdtj.etc do PROC(ZTJD,ZBRCD)
+		
+	}
+			
+	quit
+	
+	
+PROC(ZTJD,ZBRCD)	
+
+	type String ZDATA,tmpdata
+	type Number ZHUB,zcount
+	set zcount=0
+	type RecordTMPRPT3 tmp = Db.getRecord("TMPRPT3","PID=:%ProcessID,KEY1='DUTYSTAMP',KEY2=:ZTJD,KEY3=:ZBRCD",1)
+	set tmpdata = tmp.data
+	set zcount = tmpdata.piece("|",1)
+	set zcount = zcount+1
+	set ZHUB=""
+	
+	if Db.isDefined("ZUTBLBRCD","BRCD=:ZBRCD") do {
+		type RecordZUTBLBRCD zbr = Db.getRecord("ZUTBLBRCD","BRCD=:ZBRCD")
+		set ZHUB=zbr.ZHUB	
+	}
+	set ZDATA = zcount_"|"_ZHUB
+	set tmp.data = ZDATA
+	do tmp.save()
+	
+	quit
+	
+---------- THREXIT ------ Section marker

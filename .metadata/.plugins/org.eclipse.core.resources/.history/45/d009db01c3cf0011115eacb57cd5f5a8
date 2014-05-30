@@ -1,0 +1,50 @@
+//DO NOT MODIFY  Batch For Stamp Duty|ZBCHSTAM||||||DTJ|||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+	ResultSet rs = Db.select("TMPRPT2","
+---------- THRINIT ------ Section marker
+	
+	type String ZETC()
+	type ResultSet rsETC = Db.select("ETC","ZUTBLTRCD","DUTYFLG=1")
+	while rsETC.next() do {
+		set ZETC(rsETC.getCol(1)) =  ""
+	}
+
+	
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+	
+	type Number zcount,EXIT
+	set EXIT=1
+	DbSet ds = Db.selectDbSet("DTJ","TJD=:ZTJD")
+	while ds.next() do {
+		RecordDTJ zdtj=rs.getRecord()
+		if (zdtj.ITC6=1)!(zdtj.TAMT<0) quit
+		set ZPOINT=$O(ZETC("")
+		while 'ZPOINT.isNull() { do
+			if zdtj.ETC=ZPOINT set EXIT=0 quit
+			set ZPOINT=$O(ZETC(ZPOINT))
+		}
+		if EXIT quit
+		
+		set ZBRCD=zdtj.brcd
+		RecordTMPRPT2 tmp = Db.getRecord("TMPRPT2","PID=:%ProcessID,KEY1='DUTYSTAMP',KEY2=:ZTJD,KEY3=:ZBRCD",1)
+		set zcount = tmp.data
+		set zcount = zcount+1
+		set tmp.data = zcount
+		do tmp.save()
+	}
+		
+		
+		
+---------- THREXIT ------ Section marker

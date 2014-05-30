@@ -1,0 +1,83 @@
+//DO NOT MODIFY  Conversion-Extract Report|ZEXTREPO|||||||1
+ /*
+ORIG: Ravipong.ch - 15/12/2011
+DESC: Convertion-Extractiom Report
+ */
+
+	new ZDATA1,ZDATA2,ZDATA3
+	set TAB = $C(9)
+	set ZDATA1="BOO"_TAB_"COLTYP"_TAB_"CTRSTATUS"_TAB_"SUMCTR"_TAB_"SUMCTRAMT"
+	//set ZDATA2="ACN"_"|"_"CTRCT"
+	//set ZDATA3="CTRCT"_"|"_"COLL"_"|"_"CCSTAT"_"|"_"PLDGVAL"_"|"_"RELDATE"
+	
+	set FILELOG1=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"CONV1_CMSRPT.XLS"
+	//set FILELOG2=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"ZEXTCTRCT_CIF.TXT"
+	//set FILELOG3=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"ZEXTCTRCT_COL.TXT"
+
+
+ 	type IO io1=Class.new("IO")
+        set io1.fileName=FILELOG1
+        set io1.openParams="NEWV/WRITE"
+        set io1.recordSize=200
+   	/*
+        type IO io2=Class.new("IO")
+        set io2.fileName=FILELOG2
+        set io2.openParams="NEWV/WRITE"
+        set io2.recordSize=200
+        
+        type IO io3=Class.new("IO")
+        set io3.fileName=FILELOG3
+        set io3.openParams="NEWV/WRITE"
+        set io3.recordSize=200
+       
+        do io1.open()
+   	*/
+   	//do io2.open()
+	//do io3.open()
+	
+	//write header
+	do io1.write(ZDATA1)
+	//do io2.write(ZDATA2)
+	//do io3.write(ZDATA3)
+        set TAB=$C(9)       
+        
+        /*
+        set ZORDER=$O(^ZCONVCNT(""))
+        set ZBORDER=$O(^ZCONVCNT(ZORDER,""))
+        set ZTYPORDER=$O(^ZCONVCNT(ZORDER,ZBORDER,""))
+        set ZSTATORDER=$O(^ZCONVCNT(ZORDER,ZBORDER,ZTYPORDER,""))
+       
+        while '^ZCONVCNT(ZORDER,ZBORDER,ZTYPORDER,ZSTATORDER,0).isNull() do {
+        
+         	
+        if ^ZCONV2_CMSRPT(ZBORDER,ZTYPORDER,ZSTATORDER).isNull() do {
+        	set ^ZCONV2_CMSRPT(ZBORDER,ZTYPORDER,ZSTATORDER)= $P(^ZCONVCNT(ZORDER,ZBORDER,ZTYPORDER,ZSTATORDER,0),"|",10)_"|"_1
+        	}
+        if  '^ZCONV2_CMSRPT(ZBORDER,ZTYPORDER,ZSTATORDER).isNull() do {
+        	set ZSUMAMT = $P(^ZCONV2_CMSRPT(ZBORDER,ZTYPORDER,ZSTATORDER),"|",1)
+        	set ZSUMCTR $P(^ZCONV2_CMSRPT(ZBORDER,ZTYPORDER,ZSTATORDER),"|",2)
+        	set ZAMT = $P(^ZCONVCNT(ZORDER,ZBORDER,ZTYPORDER,ZSTATORDER,0),"|",10)
+        	
+        	set ^ZCONV2_CMSRPT(ZBORDER,ZTYPORDER,ZSTATORDER)= (ZSUMAMT+ZAMT)_"|"_(ZSUMCTR+1) 	
+       
+          }
+        */
+         set EXIT=0
+         set ZORDER=$O(^ZCONVCNT(""))
+         while $D(^ZCONVCNT(ZORDER)) do { quit:EXIT
+         	set ZBOO 	= $P(^ZCONVCNT(ZORDER,0),"|",1)
+         	set ZTYP 	= $P(^ZCONVCNT(ZORDER,0),"|",3)
+         	set ZSTAT 	= $P(^ZCONVCNT(ZORDER,0),"|",9)
+         	set ZAMT	= $P(^ZCONVCNT(ZORDER,0),"|",11)
+         	if '$D(^ZCMSRPT2(ZBOO,ZTYP,ZSTAT)) set ^ZCMSRPT2(ZBOO,ZTYP,ZSTAT)= 1_TAB_ZAMT
+         	else do {
+         	set ^ZCMSRPT2(ZBOO,ZTYP,ZSTAT).piece(TAB,1) = ^ZCMSRPT2(ZBOO,ZTYP,ZSTAT).piece(TAB,1)+1
+         	set ^ZCMSRPT2(ZBOO,ZTYP,ZSTAT).piece(TAB,2) = ^ZCMSRPT2(ZBOO,ZTYP,ZSTAT).piece(TAB,2)+ZAMT
+         	}
+         	set ZORDER=$O(^ZCONVCNT(ZORDER))
+         	if ZORDER.isNull() set EXIT=1 quit
+         	}
+         do io1.write(^ZCMSRPT2)
+         do io1.close()
+
+      		

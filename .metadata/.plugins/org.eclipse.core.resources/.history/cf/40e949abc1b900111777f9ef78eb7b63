@@ -1,0 +1,1973 @@
+//DO NOT MODIFY  Extract Master Table From CBS-LOR|ZLOREXTR|||||||1
+
+ 	/*
+ORIG: Ravipong Chumsai Na Ayuthaya  - 08/05/2012
+DESC: Extract Master Table From CBS-LOR
+	*/
+	
+	quit
+	
+EXTRACTALL
+	
+	do SYSVAR^SCADRV0()
+	do AGENT
+	do ARRPUR
+	do BRCD
+	//do BUDGETSETUP
+	do CAMPR
+	do CAMPSET
+	do CAMPSETPR
+	do CC
+	do CCNTR
+	do CNTRY
+	do CNTRY1
+	do COMLINE
+	do CRCD
+	do DIST
+	do DISTCD
+	do DLACD
+	do DOB
+	do EDUC
+	do EFTINST
+	do HRC
+	do IC
+	do ID
+	do INDEX
+	do INDEX1
+	do ISICGC
+	do ISICSD
+	do ISICTS
+	do LNAPASHLD
+	do LNAPESTYP
+	do LNAPRSTAT
+	do LNAPRTYP
+	do LNBD
+	do LNBD1
+	do LOC
+	do MF
+	do MINISTRY1
+	do MINISTRY2
+	do MINISTRY3
+	do MKTAUTH
+	do MKTCD
+	do MKTCDSETUP
+	do MOU
+	do MS
+	do MTCAMP
+	do NATION
+	do PCM
+	do PERCONS
+	do RELIGION
+	do RFLG
+	do PRODCTL
+	do PRODLNK
+	do PRODLNKCFG
+	do PRODRLDT
+	do PRODRTDT
+	do RELIGION
+	do RPAYMETH
+	do SDISTCD
+	do SMECD
+	do SOC
+	do SPLEND 
+	do STATD
+	do STBLBUSOPT
+	do STBLCLS
+	do STBLCNTRY
+	do STBLCNTRY1
+	do STBLGRP
+	do STBLGRPSET
+	do SUBT
+	do SUBTSET
+	do TITLE
+	do UHHOLD
+	do ZUTBLLNAPESOWN
+
+	
+	quit
+
+
+
+CCNTR
+
+	type String tWRITE
+	//////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/UTBLCCNTR_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "COST_CENTER_ID"_"|"_"DESCRIPTION"_"|"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLCCNTR")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output=""
+		set output.piece("|",1) = ds.getRecord().CC
+		set output.piece("|",2) = ds.getRecord().DESC_"|"
+		do io1.write(output)
+		}
+	do io1.write(i_"|")
+	do io1.close()
+	quit
+	
+CNTRY	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/STBLCNTRY_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "COUNT_CODE"_"|"_"DESCRIPTION"_"|"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("STBLCNTRY")
+	while ds.next() do {
+		
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().CNTRY
+		set output.piece("|",2) = ds.getRecord().DESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()			
+	quit
+	
+
+DISTCD
+	type String tWRITE
+	//////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/MT_LAND_SUB_DISTRICT_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "COUNTRY_CODE|PROVINCE_CODE|DISTRICT_CODE|SUB_DISTRICT_CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLSDISTCD")
+	while ds.next() do {
+		
+		type String output
+		set i=i+1		
+		set output.piece("|",1) = ds.getRecord().CNTRY
+		set output.piece("|",2) = ds.getRecord().STATE
+		set output.piece("|",3) = ds.getRecord().DIST
+		set output.piece("|",4) = ds.getRecord().SUBDIST
+		set output.piece("|",5) = ds.getRecord().DESC
+		set output.piece("|",6) = ""
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+
+	
+CNTRY1	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/STBLCNTRY1_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CNTRY_CD"_"|"_"PROV_CD"_"|"_"PROV_NAME"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("STBLCNTRY1")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().CNTRY
+		set output.piece("|",2) = ds.getRecord().STATE
+		set output.piece("|",3) = ds.getRecord().DESC
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+
+
+
+	
+STATD
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLSTATD_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLSTATD")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().ZSTATCD
+		set output.piece("|",2) = ds.getRecord().DES_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+		
+		
+	quit
+
+HRC
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/UTBLHRC_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLHRC")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().HRCODE		
+		set output.piece("|",2) = ds.getRecord().HRCDESC_"|"
+		set output.piece("|",2) = ds.getRecord().FMDESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+		
+UHHOLD		
+	
+	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/UHHOLD_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UHHOLD")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().KEY	
+		set output.piece("|",2) = ds.getRecord().DESC
+		set output.piece("|",2) = ds.getRecord().FMDESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+		
+		
+	quit
+
+AGENT
+	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/AGENT_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN|ASSIGNED_BRANCH_CODE|OWNER_BRANCH_CODE|MOU_UNIT_CODE"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("AGENT")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().AGENT
+		set output.piece("|",2) = ds.getRecord().ZAGNAME
+		set output.piece("|",3) = ""
+		set output.piece("|",4) = ds.getRecord().ZABRCD
+		set output.piece("|",5) = ds.getRecord().ZOBRCD
+		set output.piece("|",6) = ds.getRecord().ZMOU
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+		
+		
+	quit
+	
+
+LNAPASHLD
+	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLLNAPASHLD_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLLNAPASHLD")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().CODE
+		set output.piece("|",2) = ds.getRecord().DESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+	
+EFTINST	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/UTBLEFTINST_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLEFTINST")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().KEY
+		set output.piece("|",2) = ds.getRecord().NAM
+		set output.piece("|",3) = ds.getRecord().FMDESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+	
+DOB	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLDOB_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLDOB")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().ZDOBCD
+		set output.piece("|",2) = ds.getRecord().DESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+	
+ZUTBLLNAPESOWN
+	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLLNAPESOWN_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLLNAPESOWN")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().CODE
+		set output.piece("|",2) = ds.getRecord().DESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+		
+	do io1.close()	
+	quit
+	
+LNAPESTYP
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLLNAPESTYP_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLLNAPESTYP")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().CODE
+		set output.piece("|",2) = ds.getRecord().DESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+		
+	do io1.close()	
+	quit
+	
+	
+COMLINE
+	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLCOMLINE_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLCOMLINE")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().COMLINE
+		set output.piece("|",2) = ds.getRecord().DES_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+	
+	quit
+	
+STBLCNTRY
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/STBLCNTRY_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("STBLCNTRY")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().CNTRY
+		set output.piece("|",2) = ds.getRecord().DESC
+		set output.piece("|",3) = ds.getRecord().FMDESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+	
+STBLCNTRY1
+	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/STBLCNTRY1_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "COUNTRY_CODE|PROVINCE_CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("STBLCNTRY1")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().CNTRY
+		set output.piece("|",2) = ds.getRecord().STATE	
+		set output.piece("|",3) = ds.getRecord().DESC
+		set output.piece("|",4) = ds.getRecord().FMDESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+	
+DIST
+	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/MT_LAND_DISTRICT_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "COUNTRY_CODE|PROVINCE_CODE|DISTRICT_CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLDIST")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().CNTRY
+		set output.piece("|",2) = ds.getRecord().STATE	
+		set output.piece("|",3) = ds.getRecord().DIST
+		set output.piece("|",4) = ds.getRecord().DES_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+	
+SDISTCD
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLSDISTCD_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "COUNTRY_CODE|PROVINCE_CODE|DISTRICT_CODE|SUB_DISTRICT_CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLSDISTCD")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().CNTRY
+		set output.piece("|",2) = ds.getRecord().STATE	
+		set output.piece("|",3) = ds.getRecord().DIST
+		set output.piece("|",4) = ds.getRecord().SUBDIST_"|"
+		set output.piece("|",4) = ds.getRecord().DESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+CRCD
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/CRCD_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("CRCD","CO='GSB'")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output=""
+		set output.piece("|",1) = ds.getRecord().CRCD
+		set output.piece("|",2) = ds.getRecord().DESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+
+CC	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/UTBLCC_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLCC")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output=""
+		set output.piece("|",1) = ds.getRecord().CCODE
+		set output.piece("|",2) = ds.getRecord().DESC_"|"
+		set output.piece("|",3) = ds.getRecord().FMDESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+	quit
+		
+EDUC
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/UTBLEDUC_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLEDUC")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().EDUC
+		set output.piece("|",2) = ds.getRecord().DESC
+		set output.piece("|",3) = ds.getRecord().FMDESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+
+LNAPRTYP
+	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/MT_HOUSE_TYPE_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLLNAPRTYP")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().CODE
+		set output.piece("|",2) = ds.getRecord().DESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+	
+ID	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/UTBLID_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLID")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().IDTYP
+		set output.piece("|",2) = ds.getRecord().DES
+		set output.piece("|",3) = ds.getRecord().FMDESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+	
+IC
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/UTBLIC_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLIC")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().INC
+		set output.piece("|",2) = ds.getRecord().DESC
+		set output.piece("|",3) = ds.getRecord().FMDESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+	
+ISICSD	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLISICSD_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "ISIC_1_CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLISICSD")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().ISICSD
+		set output.piece("|",2) = ds.getRecord().TDES
+		set output.piece("|",3) = ds.getRecord().DES_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+	
+ISICGC
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLISICGC_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "ISIC_1_CODE|ISIC_2_CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLISICGC")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().ISICSD
+		set output.piece("|",2) = ds.getRecord().ISICGC
+		set output.piece("|",3) = ds.getRecord().TDES
+		set output.piece("|",4) = ds.getRecord().DES_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+	
+ISICTS
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLISICTS_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "ISIC_1_CODE|ISIC_2_CODE|ISIC_3_CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLISICTS")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().ISICSD
+		set output.piece("|",2) = ds.getRecord().ISICGC
+		set output.piece("|",3) = ds.getRecord().ISICTS
+		set output.piece("|",4) = ds.getRecord().TDES
+		set output.piece("|",5) = ds.getRecord().DES_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+	
+	
+LNAPRSTAT	
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLLNAPRSTAT_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLLNAPRSTAT")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().CODE
+		set output.piece("|",2) = ds.getRecord().DESC
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+	
+MF
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/UTBLMF_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLMF")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().MF
+		set output.piece("|",2) = ds.getRecord().DESC
+		set output.piece("|",3) = ds.getRecord().FMDESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+	
+MS
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/UTBLMS_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLMS")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().MAR
+		set output.piece("|",2) = ds.getRecord().DESC
+		set output.piece("|",3) = ds.getRecord().FMDESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+	
+MINISTRY1
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLMINISTRY1_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "MINISTRY_1_CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLMINISTRY1")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().ZMINISTRYCD1
+		set output.piece("|",2) = ds.getRecord().DESC
+		set output.piece("|",3) = ""
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+	
+MINISTRY2
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLMINISTRY2_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "MINISTRY_2_CODE|MINISTRY_1_CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLMINISTRY2")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().ZMINISTRYCD2
+		set output.piece("|",2) = ds.getRecord().ZMINISTRYCD1
+		set output.piece("|",3) = ds.getRecord().DESC
+		set output.piece("|",4) = ""
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+	
+MINISTRY3
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLMINISTRY3_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "MINISTRY_3_CODE|MINISTRY_2_CODE|DESC_TH|MINISTRY_1_CODE|DESC_EN|"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLMINISTRY3")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().ZMINISTRYCD3
+		set output.piece("|",2) = ds.getRecord().ZMINISTRYCD2
+		set output.piece("|",3) = ds.getRecord().DESC
+		set output.piece("|",4) = ""
+		set output.piece("|",5) = ds.getRecord().ZMINISTRYCD1
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+	
+MOU	
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLMOU_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLMOU")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().CODE
+		set output.piece("|",2) = ds.getRecord().DESC
+		set output.piece("|",3) = ""
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+	
+NATION
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLNATION_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLNATION")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().NATCD
+		set output.piece("|",2) = ds.getRecord().TDES
+		set output.piece("|",3) = ds.getRecord().DESC
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+
+LOC
+	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLOC_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "OCCUPATION_CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLOC")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().OCC
+		set output.piece("|",2) = ds.getRecord().ABBR
+		set output.piece("|",3) = ds.getRecord().TDES
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+
+SOC
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLSOC_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "OCCUPATION_CODE|SUB_OCCUPATION_CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLSOC")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().OCC
+		set output.piece("|",2) = ds.getRecord().SOCC
+		set output.piece("|",3) = ds.getRecord().TDES
+		set output.piece("|",4) = ds.getRecord().DES
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()	
+		
+	quit
+
+RPAYMETH
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLRPAYMETH_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN|AGENT_FLAG"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLRPAYMETH")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().CODE
+		set output.piece("|",2) = ds.getRecord().DESC
+		set output.piece("|",3) = ""
+		set output.piece("|",4) = ds.getRecord().ZAGENT
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()		
+	quit
+	
+STBLBUSOPT
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/STBLBUSOPT_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN|"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("STBLBUSOPT")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().BD
+		set output.piece("|",2) = ds.getRecord().DESC
+		set output.piece("|",3) = ""
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()		
+	quit
+	
+PERCONS
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLPERCONS_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN|PRODUCT_TYPE_CODE"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLPERCONS")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().CODE
+		set output.piece("|",2) = ds.getRecord().DESC
+		set output.piece("|",3) = ""
+		set output.piece("|",4) = ds.getRecord().TYPE
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()		
+	quit
+	
+STBLCLS
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/STBLCLS_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN|"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("STBLCLS")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().CLS
+		set output.piece("|",2) = ds.getRecord().DES
+		set output.piece("|",3) = ""
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()		
+	quit
+
+ARRPUR	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLARRPUR_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "PURPOSE_ARRANGEMENT_CODE|DESC_TH|DESC_EN|PRODUCT_GROUP_CODE"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLARRPUR")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().CODE
+		set output.piece("|",2) = ds.getRecord().DESC
+		set output.piece("|",3) = ""
+		set output.piece("|",4) = ds.getRecord().GRP
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()		
+	quit
+
+RELIGION
+	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLRELIGION_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLRELIGION")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().ZRELIGIONCD
+		set output.piece("|",2) = ds.getRecord().DESC
+		set output.piece("|",3) = ""
+		//set output.piece("|",4) = ds.getRecord().GRP
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()		
+	quit
+	
+SPLEND	
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLSPLEND_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLSPLEND")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().CODE
+		set output.piece("|",2) = ds.getRecord().DESC
+		set output.piece("|",3) = ""
+		//set output.piece("|",4) = ds.getRecord().GRP
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()		
+	quit
+
+SMECD
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLSMECD_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLSMECD")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().CODE
+		set output.piece("|",2) = ds.getRecord().DESC
+		set output.piece("|",3) = ""
+		//set output.piece("|",4) = ds.getRecord().GRP
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()		
+	quit
+	
+TITLE
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLTITLE_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN|TYPE"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLTITLE")
+	while ds.next() do {
+		type String output
+		set i=i+1
+		set output.piece("|",1) = ds.getRecord().TITLECD
+		set output.piece("|",2) = ds.getRecord().DESC
+		set output.piece("|",3) = ds.getRecord().PERSFLG
+		set output.piece("|",4) = ds.getRecord().ENGFLG
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")	
+	do io1.close()
+			
+	quit
+	
+BRCD
+	
+	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/zmk/UTBLBRCD_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|COST_CENTER_CODE|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLBRCD")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().BRCD
+		set output.piece("|",2) = ds.getRecord().DESC
+		set output.piece("|",3) = ds.getRecord().CCDEF
+		set output.piece("|",4) = ds.getRecord().FMDESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+	
+PCM
+	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/MT_PAYMENT_CALCULATION_METHOD_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN|"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLPCM")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().PCM
+		set output.piece("|",2) = ds.getRecord().DESC
+		set output.piece("|",3) = ds.getRecord().FMDESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+	
+DLACD
+		
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLDLACD_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN|"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLDLACD")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().ZDLACD
+		set output.piece("|",2) = ds.getRecord().DESC
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+	
+STBLGRP	
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/MT_PRODUCT_GROUP_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN|STATUS|CREATED_DT|CREATED_BY|UPDATED_DT|UPDATED_BY|DELETED_DT|DELETED_BY"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("STBLGRP")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().GRP
+		set output.piece("|",2) = ds.getRecord().DES
+		set output.piece("|",3) = ds.getRecord().FMDESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+
+STBLGRPSET
+	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/MT_PRODUCT_GROUP_SETUP_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "PRODUCT_CLASS_CODE|PRODUCT_GROUP_CODE|DESC_TH|DESC_EN|"
+	set i=0
+	type ResultSet ds = Db.select("CLS,GRP,DES,FMDESC","STBLGRP",,"DES DISTINCT")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getCol(1)
+		set output.piece("|",2) = ds.getCol(2)
+		set output.piece("|",3) = ds.getCol(3)
+		set output.piece("|",4) = ds.getCol(4)
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+	
+INDEX
+	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/INDEX_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN|"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("INDEX")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().INDEX
+		set output.piece("|",2) = ds.getRecord().DES
+		set output.piece("|",3) = ds.getRecord().FMDESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+	
+INDEX1
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/INDEX1_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN|"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("INDEX1")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().INDEX
+		set output.piece("|",2) = ds.getRecord().EFD
+		set output.piece("|",3) = ds.getRecord().RATE_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+	
+
+	
+PRODCTL
+	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/MT_PRODUCT_TYPE_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|PRODUCT_GROUP_CODE|DESC_TH|DESC_EN|"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("PRODCTL")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().TYPE
+		set output.piece("|",2) = ds.getRecord().GRP
+		set output.piece("|",3) = ds.getRecord().DES_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+	
+SUBT
+	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/MT_PRODUCT_SUBTYPE_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN|"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLSUBT")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().KEY
+		set output.piece("|",2) = ds.getRecord().DESC
+		set output.piece("|",3) = ds.getRecord().FMDESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+MTCAMP
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/MT_CAMPAIGN_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN|"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLCAMPAIGN")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().CODE
+		set output.piece("|",2) = ds.getRecord().DESC
+		set output.piece("|",3) = ds.getRecord().ENGDESC_"|"
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+	
+MKTCD
+	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/MT_MARKET_CODE_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN|"
+	do io1.write(tWRITE)
+	set i=0
+	type ResultSet ds = Db.select("CODE,DESC","ZUTBLMKTCD",,"CODE DISTINCT")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getCol(1)
+		set output.piece("|",2) = ds.getCol(2)
+		set output.piece("|",3) = ""
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+	
+MKTCDSETUP
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLMKTCD_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "PRODUCT_GROUP_CODE|PRODUCT_SUB_TYPE_CODE|MARKET_CODE_CODE|DESC_TH|DESC_EN|PEOPLE_BANK_CUSTOMER_FLAG|LP_TEACHER_FLAG|LP_MEMBER_FLAG|BANK_EMPLOYEE_FLAG|DLA_TYPE_CODE"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLMKTCD")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().GRP
+		set output.piece("|",2) = ds.getRecord().SUBT
+		set output.piece("|",3) = ds.getRecord().CODE
+		set output.piece("|",4) = ds.getRecord().DESC
+		set output.piece("|",5) = ds.getRecord().ZPPBNKMEMFLG
+		set output.piece("|",6) = ds.getRecord().ZHLPTEACHFLG
+		set output.piece("|",7) = ds.getRecord().ZHLPMEMFLG
+		set output.piece("|",8) = ds.getRecord().ZEMPID
+		set output.piece("|",9) = ds.getRecord().ZDLACD
+			
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+	/*	
+BUDGETSETUP
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/TR_MARKETCODE_SETUP_BUDGET_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "PRODUCT_GROUP_CODE|MARKET_CODE_CODE|ORIGINAL_BUDGET|REVISE_BUDGET"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLMKTCD")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		//set output.piece("|",1) = ds.getRecord().PRODCD
+		//set output.piece("|",2) = ds.getRecord().MKTCD
+		// output.piece("|",3) = ds.getRecord().ORIBUD
+		//set output.piece("|",4) = ds.getRecord().REVBUD
+
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+	*/
+
+CAMPSET
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/MR_CAMPAIGN_SETUP_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CAMPAIGN_CODE|COLL_TYPE_ID|PRODUCT_SUB_TYPE_CODE"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLCAMSET")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().CODE
+		set output.piece("|",2) = ds.getRecord().COLL
+		set output.piece("|",3) = ds.getRecord().SUBT
+
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+	
+CAMPSETPR
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/MR_CAMPAIGN_SETUP_PERIOD_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CAMPAIGN_CODE|COLL_TYPE_ID|PRODUCT_SUB_TYPE_CODE|INTEREST_CODE"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLCAMSP")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().CODE
+		set output.piece("|",2) = ds.getRecord().COLL
+		set output.piece("|",3) = ds.getRecord().SUBT
+		set output.piece("|",3) = ds.getRecord().INT
+
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+	
+	
+SUBTSET
+	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/UTBLSUBT_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "PRODUCT_GROUP_CODE|PRODUCT_SUB_TYPE_CODE|DESC_TH|DESC_EN|ROUND_UP_INSTL"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLSUBT")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().GRP
+		set output.piece("|",2) = ds.getRecord().KEY
+		set output.piece("|",3) = ds.getRecord().DESC
+		set output.piece("|",4) = ds.getRecord().FMDESC_"|"
+		set output.piece("|",5) = ds.getRecord().ZPMTRND
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+	/*	
+MKTCD
+	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLMKTCD_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "PRODUCT_GROUP_CODE|PRODUCT_SUB_TYPE_CODE|MARKET_CODE_CODE|DESC_TH|DESC_EN|PEOPLE_BANK_CUSTOMER_FLAG|LP_TEACHER_FLAG|LP_MEMBER_FLAG|BANK_EMPLOYEE_FLAG|DLA_TYPE_CODE|"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLSUBT")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().GRP
+		set output.piece("|",2) = ds.getRecord().KEY
+		set output.piece("|",3) = ds.getRecord().DES
+		set output.piece("|",4) = ds.getRecord().FMDESC_"|"
+		set output.piece("|",5) = ds.getRecord().ZPMTRND
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+	
+
+	*/
+MKTAUTH
+	
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/ZUTBLMKTAUTH_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "MARKET_CODE_CODE|BRANCH_CODE"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLMKTAUTH")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().ZMKTCD
+		set output.piece("|",2) = ds.getRecord().BRCD
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+	
+		
+
+	
+	
+	
+	
+PRODLNKCFG
+
+	type String tWRITE
+	////set ZEXTDAT = $$DAT^%ZM(TJD,"YEARMMDD")
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/CFG_RULE_COLUMN_MAPPING_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "MARKET_CODE_CODE|BRANCH_CODE"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLPRODLNK")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().COLNAME
+
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+	
+PRODLNK
+
+	type String tWRITE
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/CFG_RULE_COLUMN_MAPPING_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "COLUMN_NAME|PRODUCT_TYPE_CODE|MARKET_SEG_LEVEL|SEG_ID|RESULTS_ID|REULE_ID"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLPRODLNK")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().COLNAME
+		set output.piece("|",1) = ds.getRecord().TYPE
+		set output.piece("|",1) = ds.getRecord().MARSEG
+		set output.piece("|",1) = ds.getRecord().SEGID
+		set output.piece("|",1) = ds.getRecord().RESULTSID
+		set output.piece("|",1) = ds.getRecord().RULEID
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit	
+
+	
+PRODRTDT
+
+	type String tWRITE
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/UTBLPRODRTDT_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "COLUMN_NAME|RESULTS_ID|DECISION|DEFAULT_CODE|LIST|RANGE_MIN|RANGE_MAX"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLPRODRTDT")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		
+		set output.piece("|",1) = ds.getRecord().COLNAME
+		set output.piece("|",2) = ds.getRecord().RESULTSID
+		set output.piece("|",3) = ds.getRecord().DECISION
+		set output.piece("|",4) = ds.getRecord().DEFAULT
+		set output.piece("|",5) = ds.getRecord().LIST
+		set output.piece("|",6) = ds.getRecord().RANGEMIN
+		set output.piece("|",7) = ds.getRecord().RANGEMAX
+		
+		do io1.write(output)
+		}
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+	
+PRODRLDT
+
+	type String tWRITE
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/UTBLPRODRLDT_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "RULE_ID|DECISION|CONDITION"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLPRODRLDT")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().RULEID
+		set output.piece("|",2) = ds.getRecord().DECISION
+		set output.piece("|",3) = ds.getRecord().TEST
+
+		
+		do io1.write(output)
+		
+	}
+	
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+	
+LNBD
+
+	type String tWRITE
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/UTBLNBD_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN|SUNDAY|MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLNBD")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().NBDC
+		set output.piece("|",2) = ds.getRecord().CALDES
+		set output.piece("|",3) = ds.getRecord().FMDESC
+		set output.piece("|",4) = ds.getRecord().SUN
+		set output.piece("|",5) = ds.getRecord().MON
+		set output.piece("|",6) = ds.getRecord().TUE
+		set output.piece("|",7) = ds.getRecord().WED
+		set output.piece("|",8) = ds.getRecord().THU
+		set output.piece("|",9) = ds.getRecord().FRI
+		set output.piece("|",10) = ds.getRecord().SAT
+		
+
+		
+		do io1.write(output)
+		
+	}
+	
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+
+LNBD1
+
+	type String tWRITE
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/UTBLNBD1_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CALENDAR_NBD_CODE|NON_BUSINIESS_DT"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLNBD1")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().NBDC
+		set output.piece("|",2) = ds.getRecord().NBD.toString("DD/MM/YEAR")	
+		
+		do io1.write(output)
+		
+	}
+	
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+	
+RFLG
+
+	type String tWRITE
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/MT_CONSTRAINT_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "CODE|DESC_TH|DESC_EN"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("UTBLRFLG")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().RFLG
+		set output.piece("|",2) = ds.getRecord().DESC	
+		set output.piece("|",3) = ds.getRecord().FMDESC
+		
+		do io1.write(output)
+		
+	}
+	
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+	
+CAMPR
+
+	type String tWRITE
+	type IO io1=Class.new("IO")
+	set io1.fileName=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")_"/"_"zmk/MR_CAMPAIGN_REL_"_ZEXTDAT_".txt"
+	set io1.openParams="NEWV/WRITE"
+	do io1.open()
+	set tWRITE = "PRODUCT_SUB_TYPE_CODE|MARKET_CODE_CODE|CAMPAIGN_CODE"
+	do io1.write(tWRITE)
+	set i=0
+	type DbSet ds = Db.selectDbSet("ZUTBLCAMREL")
+	while ds.next() do {
+		set i=i+1
+		type String output
+		set output.piece("|",1) = ds.getRecord().SUBTCD
+		set output.piece("|",2) = ds.getRecord().MKTCD
+		set output.piece("|",3) = ds.getRecord().CODE
+		
+		do io1.write(output)
+		
+	}
+	
+	do io1.write("Total "_i_"|")
+	do io1.close()
+			
+	quit
+
+	
+	
+	
+
+	
+	
+	
+	
+
+	
+	
+
+
+
+
+	
+		
+	
+	
+	
+	
+
+	
+	
+
+
+
+
+
+	

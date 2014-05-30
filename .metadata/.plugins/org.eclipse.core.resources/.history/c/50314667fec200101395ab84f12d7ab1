@@ -1,0 +1,501 @@
+//DO NOT MODIFY  TEST|ZMKORN|||||||1
+
+
+
+
+
+
+HW1(DATE,CID)
+	// HW1^ZMKORN(61906,2280056100)
+	
+	type Number CD,d,s,t,c,g,ti
+	type String n
+	set n = ""
+	set ti=0
+	set s = 0
+ 
+	
+	type ResultSet rst=Db.select("TJD,DATETIME,CID,GRP,BRCD,ITC1,TOT,TYPE,CLS","DTJ","CID=:CID AND TJD=:DATE")
+	while rst.next() do { 
+		set CD = rst.getCol(3)
+		set d = rst.getCol(1)
+		set s = s+rst.getCol(7)
+		set t = rst.getCol(8)
+		set c = rst.getCol(9)
+		set g = rst.getCol(4)
+		set ti = ti+1
+		}
+		
+	type ResultSet rs=Db.select("ACCTNAME","ACN","CID=:CID")
+		while rs.next() do { 
+		set n = rs.getCol(1)
+		
+		}
+	write "Result form d HW1^ZMKORN(61906,2280056100)",!	
+	write "Date "_d,!
+	write	"Account : ",CD," - ",n,!
+	write	"Class,GRP,TYPE :",c,",",g,",",t,!
+	
+	write	"Summary Amount :",s,!
+	write	"Number of Transaction in DATE : ",ti
+	quit
+HW2(DATE,CID)
+	
+	
+	type Number COUNTD,COUNTC,AMOUNT
+	set (COUNTD,COUNTC,AMOUNT)=0
+	type ResultSet rsdtj=Db.select("ITC1,TOT,ETC","HIST","TJD=:DATE AND CID=:CID")
+	while rsdtj.next() do {
+		if $$CHKTRCD^ZMKORN(rsdtj.getCol("ETC"))'=1  do {
+		if rsdtj.getCol("ITC1")=1 set COUNTC=COUNTC+1
+		if rsdtj.getCol("ITC1")=0 set COUNTD=COUNTD+1
+		set AMOUNT=AMOUNT+rsdtj.getCol("TOT")
+		}
+	}
+	type RecordACN acn=Db.getRecord("ACN","CID=:CID")	
+	write !,"Result form d HW2^ZMKORN(61906,2280056100)",!
+	write !,"Date : "_$$DAT^%ZM(DATE,"YEARMMDD")
+	write !,"Account : "_CID_"-"_acn.acctname
+	write !,"Class,GRP,TYPE : "_acn.cls_","_acn.grp_","_acn.type
+	write !,"Summary Amount : "_AMOUNT.zero($L(AMOUNT),4,0)
+	
+	type Number SUM
+	set SUM=COUNTC+COUNTD
+	write !,"Number of Transaction in DATE : Debit "_COUNTD_" + Credit "_COUNTC_"="_SUM
+	quit
+	
+CHKTRCD(TRCD)
+
+	type String Fee
+	set Fee = 1
+	type ResultSet rsdtj=Db.select("FEE","ZUTBLTRCD","ETC=:TRCD")
+	
+	while rsdtj.next() do {
+		
+		set Fee = rsdtj.getCol(1)
+		
+		}	
+	quit Fee
+	
+HW3(Date FDATE, Date TDATE)
+	// D HW3^ZMKORN(61942,61944)
+	
+	/*
+	FROM DTJNA
+
+	Date : YEARMMDD
+	Number of Customer Open : XXX
+	Number of Deposit Account Open  : XXX
+	Number of Loan Account Open  : XXX
+
+
+	Date : YEARMMDD
+	Number of Customer Open : XXX
+	Number of Deposit Account Open  : XXX
+	Number of Loan Account Open  : XXX
+
+	*/
+	for i=FDATE:1:TDATE do {
+		
+	do PRNTNACN^ZMKORN(i)
+	
+	}
+	
+	quit
+
+PRNTNACN(DATE)
+	type Number COUNTC,COUNTD,COUNTL
+	set (COUNTC,COUNTD,COUNTL)=0
+	type ResultSet rs=Db.select("CLS,GRP,TYP,CID","DTJNA","TJD=:DATE")
+
+	while rs.next() do {
+		
+		if rs.getCol("CLS")="*" set COUNTC=COUNTC+1
+		if rs.getCol("CLS")="D" set COUNTD=COUNTD+1
+		if rs.getCol("CLS")="L" set COUNTL=COUNTL+1
+		
+		
+	}
+	write !,"Date : "_$$DAT^%ZM(DATE,"YEARMMDD")
+	write !,"Number of Customer Open : "_COUNTC
+	write !,"Number of Deposit Account Open  : "_COUNTD
+	write !,"Number of Loan Account Open  : "_COUNTL
+	
+	quit
+	
+HW4(Date ZDATE)
+	/* D HW4^ZMKORN(61942)
+		
+	Date : YEARMMDD
+		1. CusNum1:AccNum11,AccNum12
+		2. CusNum2:AccNum21,AccNum22
+	*/
+	type String c,acc
+	set c = "*"
+	set acc = ""
+	write !,"Date : "_$$DAT^%ZM(ZDATE,"YEARMMDD")
+	type ResultSet rs=Db.select("CLS,CID","DTJNA","TJD=:ZDATE AND CLS=:c")
+	type Number i
+	set i=1
+	
+	while rs.next() do {
+	
+		set acc =$$PRNT^ZMKORN(rs.getCol("CID"),ZDATE)
+		write !,i_". "_rs.getCol("CID")_":"_acc
+		set i=i+1
+		
+	}
+	
+	quit
+
+PRNT(ID,ZDATE)
+	// w $$PRNT^ZMKORN(29963040,61944)
+	type String re
+	set re =""
+	type ResultSet rs=Db.select("CLS,CID,ACN","DTJNA","TJD=:ZDATE ")
+	
+	while rs.next() do {	
+		
+		if rs.getCol("CLS")'="*" & (rs.getCol("ACN")=ID) do {
+		set re=re_rs.getCol("CID")
+		}	
+	}
+	
+	quit re
+HW5(Date FDATE, Date TDATE)
+	// d HW5^ZMKORN(61940,61944)
+	
+	for i=FDATE:1:TDATE do {
+	type ResultSet rs=Db.select("CLS,CID,ACN","DTJNA","TJD=:i")
+	while rs.next() do {
+		if rs.getCol("CLS")="*" do { 
+		if '($$CHKCIF^ZMKORN(rs.getCol("CID"),i)) do {
+		write !,"Date : "_$$DAT^%ZM(i,"YEARMMDD")
+		write !,"Non D/L Account :"_rs.getCol("CID")
+		quit
+		}
+		}
+	
+	}
+	
+	}
+	quit
+CHKCIF(ID,ZDATE)
+	
+	type String found
+	set found=0
+	type ResultSet rs=Db.select("CLS,CID,ACN","DTJNA","TJD=:ZDATE ")
+	while rs.next() do { quit:found	
+		
+		if rs.getCol("CLS")'="*" & (rs.getCol("ACN")=ID) do {
+		set found=1
+		quit
+		}
+	}
+	
+	quit found
+	
+HW6(Date FDATE, Date TDATE, String ZDTCIFL(), String ZCIFL())
+
+	/*
+	d HW6^ZMKORN(61900,61944,.ZDTCIFL,.ZCIFL)
+	//d HW6^ZMKORN(61943,61944,.ZDTCIFL,.ZCIFL)
+	for i=FDATE:1:TDATE do {
+	type ResultSet rs=Db.select("CLS,CID,ACN","DTJNA","TJD=:i")
+	while rs.next() do {
+		if rs.getCol("CLS")="*" do { 
+		type String found
+		set found=0
+		type ResultSet rst=Db.select("CLS,CID,ACN","DTJNA","TJD=:i ")
+			while rst.next() do { quit:found	
+			if rst.getCol("CLS")'="*" & (rst.getCol("ACN")'=rs.getCol("CID")) do {
+			write !,"Date : "_$$DAT^%ZM(i,"YEARMMDD")
+			write !,"Non D/L Account :"_rs.getCol("CID")
+			set ZDTCIFL(i,rs.getCol("CID"))=""
+			set ZCIFL(rs.getCol("CID"))=i
+			set found=1
+			quit
+		}	
+	}
+		}
+	
+	}
+	
+	}
+	
+	quit
+	*/
+	
+	for i=FDATE:1:TDATE do {
+	type ResultSet rs=Db.select("CLS,CID,ACN","DTJNA","TJD=:i")
+	while rs.next() do {
+		if rs.getCol("CLS")="*" do { 
+		if '($$CHKCIF^ZMKORN(rs.getCol("CID"),i)) do {
+		write !,"Date : "_$$DAT^%ZM(i,"YEARMMDD")
+		write !,"Non D/L Account :"_rs.getCol("CID")
+		set ZDTCIFL(i,rs.getCol("CID"))="("_i_","_rs.getCol("CID")_")"
+		set ZCIFL(rs.getCol("CID"))=i
+		quit
+		}
+		}
+	
+	}
+	
+	}
+	quit
+HW7(String ZDTCIFL(), String ZCIFL()) 
+	//d HW7^ZMKORN(.ZDTCIFL,.ZCIFL)
+	set root1 = $O(ZDTCIFL(""))
+	set root12 = $O(ZDTCIFL(root1,""))
+	set root2 = $O(ZCIFL(""))
+	
+	while $O(ZDTCIFL(root1,root12)) do {
+	set tmp = $G(ZDTCIFL(root1,root12))
+	write !,"ZDTCIFL("_root1_","_root12_") = "_tmp
+	set root12 = $O(ZDTCIFL(root1,root12))
+	if '($O(ZDTCIFL(root1,root12))) do {
+	set tmp = ZDTCIFL(root1,root12) 
+	write !,"ZDTCIFL("_root1_","_root12_") = "_tmp
+	set root1 = $O(ZDTCIFL(root1))
+	set root12 = $O(ZDTCIFL(root1,""))
+	}
+	}
+	
+	
+	
+	while $O(ZCIFL(root2)) do {
+	set tmp = ZCIFL(root2)
+	write !,"ZCIFL("_root2_") = "_tmp
+	set root2 = $O(ZCIFL(root2))
+	if '($O(ZCIFL(root2))) do {
+	set tmp = ZCIFL(root2)
+	write !,"ZCIFL("_root2_") = "_tmp
+	}
+	}
+	
+	quit
+HW8(Date FDATE,Date TDATE)
+	
+	set cus="*"
+	set found=0
+	//d HW8^ZMKORN(61940,61944)
+	type ResultSet rs=Db.select("CLS,CID,ACN,TJD","DTJNA","TJD>=:FDATE AND TJD<=:TDATE","CLS DESC")
+	while rs.next() do {
+		
+		if (rs.getCol("CLS")'="*") do {
+		set ACN(rs.getCol("TJD"),rs.getCol("ACN")) = 1
+		quit
+		}
+		
+		if (rs.getCol("CLS")="*") do {
+		if $D(ACN(rs.getCol("TJD"),rs.getCol("CID")))'=1 do {
+		write !,"Date : "_rs.getCol("TJD") //_$$DAT^%ZM(rs.getCol("TJD"),"YEARMMDD")
+		write !,"Non D/L Account :"_rs.getCol("CID")
+		quit
+		}
+		quit
+		}
+	
+	
+	quit
+HW9(String ZDTCIFL(), String ZCIFL())
+	//d HW9^ZMKORN(.ZDTCIFL,.ZCIFL)
+	set root1 = $O(ZDTCIFL(""))
+	set root12 = $O(ZDTCIFL(root1,""))
+	set root2 = $O(ZCIFL(""))
+	
+	type RecordZUTBLMKORN lncpn = Class.new("RecordZUTBLMKORN")
+		
+	while $O(ZDTCIFL(root1,root12)) do {
+	set tmp = $G(ZDTCIFL(root1,root12))
+	set lncpn.tjd = root1
+	set lncpn.cif = root12
+	do lncpn.bypassSave()
+	write !,"ZDTCIFL("_root1_","_root12_") = "_tmp
+	
+	set root12 = $O(ZDTCIFL(root1,root12))
+	if '($O(ZDTCIFL(root1,root12))) do {
+	set tmp = ZDTCIFL(root1,root12)
+	set lncpn.tjd = root1
+	set lncpn.cif = root12
+	do lncpn.bypassSave() 
+	write !,"ZDTCIFL("_root1_","_root12_") = "_tmp
+	set root1 = $O(ZDTCIFL(root1))
+	set root12 = $O(ZDTCIFL(root1,""))
+	}
+	}
+	quit
+	
+HW10(ZUTBL)
+	// d HW10^ZMKORN(ZUTBLMKORN)
+	type IO io = Class.new("IO")
+	set io.directory="/cbsdev/spool"
+	set io.fileName="TEST.txt"
+	set io.openParams="NEWV/WRITE"
+	set io.timeout=5
+
+	do io.open()
+	type String TEXT
+	set TEXT = ""
+	type ResultSet rs=Db.select("TJD,CIF",ZUTBL)
+	while rs.next() do {
+	set TEXT="ZDTCIFL("_rs.getCol("TJD")_","_rs.getCol("CIF")_") = "
+	do io.write(TEXT)
+	}
+
+
+	do io.close()
+	quit
+CNTDBIMPORT(Date SDATE,Date EDATE)
+	//d CNTDBIMPORT^ZMKORN(61858,61859)
+	type String t,etype,ename,tmp
+	set date=SDATE-1
+	kill ^ZMKRET,^ZMKRET2
+	set ext = 0
+	for  set date=$O(^DBIMPORT(date)) quit:(date="")!(date>EDATE)  do {
+	type ResultSet rs=Db.select("IDATE,FNAME","DBIMPORT","IDATE=:date")
+	while rs.next() do {
+			set t = $O(^DBIMPORT(rs.getCol("IDATE"),rs.getCol("FNAME"),""))
+			while $O(^DBIMPORT(rs.getCol("IDATE"),rs.getCol("FNAME"),t)) do { 
+			set tmp = $G(^DBIMPORT(rs.getCol("IDATE"),rs.getCol("FNAME"),t))
+			if '(tmp.piece("|",1)="EXPORT") do {
+			set etype = tmp.piece("|",1)
+			set ename = tmp.piece("|",2)
+			if $D(^ZMKRET(etype,ename)) set ^ZMKRET(etype,ename)= $G(^ZMKRET(etype,ename))+1
+			else set ^ZMKRET(etype,ename)=1
+			if $D(^ZMKRET2(etype)) set ^ZMKRET2(etype)= $G(^ZMKRET2(etype))+1
+			else set ^ZMKRET2(etype)=1
+			//set t = $O(^DBIMPORT(rs.getCol("IDATE"),rs.getCol("FNAME"),t))
+			quit
+			}
+			set t = $O(^DBIMPORT(rs.getCol("IDATE"),rs.getCol("FNAME"),t))
+		}	
+	
+	}	
+	}
+	//do ZMK2^ZMKORN
+	quit
+ZMK2()
+	type String tmp,ret
+	
+	set tmp = $O(^ZMKRET2(""))
+	while $O(^ZMKRET2(tmp)) do {
+	set ret = ^ZMKRET2(tmp)
+	write !,"^ZMKRET2("_tmp_") = "_ret
+	set tmp = $O(^ZMKRET2(tmp))
+	if '($O(^ZMKRET2(tmp))) do {
+	set ret = ^ZMKRET2(tmp)
+	write !,"^ZMKRET2("_tmp_") = "_ret
+	}
+	}
+	quit
+CNT(Date SDATE,Date EDATE)
+	//d CNT^ZMKORN(61858,61859)
+	type String t,etype,ename,tmp
+	set date=SDATE-1
+	kill ^ZMKRET,^ZMKRET2
+	
+	type ResultSet rs=Db.select("IDATE,FNAME","DBIMPORT","IDATE>=:SDATE AND IDATE<=:EDATE")
+	while rs.next() do {
+			set t = $O(^DBIMPORT(rs.getCol("IDATE"),rs.getCol("FNAME"),""))
+			while $O(^DBIMPORT(rs.getCol("IDATE"),rs.getCol("FNAME"),t)) do { 
+			set tmp = $G(^DBIMPORT(rs.getCol("IDATE"),rs.getCol("FNAME"),t))
+			if '(tmp.piece("|",1)="EXPORT") do {
+			set etype = tmp.piece("|",1)
+			set ename = tmp.piece("|",2)
+			if $D(^ZMKRET(etype,ename)) set ^ZMKRET(etype,ename)= $G(^ZMKRET(etype,ename))+1
+			else set ^ZMKRET(etype,ename)=1
+			if $D(^ZMKRET2(etype)) set ^ZMKRET2(etype)= $G(^ZMKRET2(etype))+1
+			else set ^ZMKRET2(etype)=1
+			//set t = $O(^DBIMPORT(rs.getCol("IDATE"),rs.getCol("FNAME"),t))
+			quit
+			}
+			set t = $O(^DBIMPORT(rs.getCol("IDATE"),rs.getCol("FNAME"),t))
+	}
+	}
+	quit
+TEST(Date SDATE,Date EDATE)	
+	//d TEST^ZMKORN(61858,61859)
+	type ResultSet rs=Db.select("*","DBIMPORT","IDATE>=:SDATE AND IDATE<=:EDATE")
+	while rs.next() do {
+  	type Number nCols
+
+  	// create Row object from ResultSet, get it's column list
+  	type Row rRow = rs.getRow()
+  	type String sColList = rRow.getColumns()
+
+  	for nCols = 1:1:sColList.length(",") do {
+
+	// format: Type1 Name1,Type2 Name2
+    	type String sColDef = sColList.piece(",",nCols)
+    	type String sColTyp = sColDef.piece(" ")	// data type
+    	type String sColNam = sColDef.piece(" ",2)	// col. name
+    	write sColNam, " (", sColTyp,"):",?20,rRow.@sColNam,!
+  	}
+  	write !
+	}
+	
+	quit
+CNTD(Date SDATE,Date EDATE)
+	//d CNTD^ZMKORN(61858,61859)
+	type String t,etype,ename,tmp
+	set date=SDATE-1
+	kill ^ZMKRET,^ZMKRET2
+	set ext = 0
+	for  set date=$O(^DBIMPORT(date)) quit:(date="")!(date>EDATE)  do {
+	type ResultSet rs=Db.select("IDATE,FNAME,SEQ,DELFLAG","DBIMPORTD","IDATE=:date")
+	while rs.next() do {
+		
+		set tmp = $G(^DBIMPORT(rs.getCol("IDATE"),rs.getCol("FNAME"),rs.getCol("SEQ")))
+		if '(tmp.piece("|",1)="EXPORT")& (rs.getCol("SEQ")'=0) & (rs.getCol("DELFLAG")'="1")) do {
+		set etype = tmp.piece("|",1)
+		set ename = tmp.piece("|",2)
+		if $D(^ZMKRET(etype,ename)) set ^ZMKRET(etype,ename)= $G(^ZMKRET(etype,ename))+1
+		else set ^ZMKRET(etype,ename)= 1
+		if $D(^ZMKRET2(etype)) set ^ZMKRET2(etype)= $G(^ZMKRET2(etype))+1
+		else set ^ZMKRET2(etype)=1
+		 
+		quit
+		}	
+			
+	
+	}
+	zwrite ^ZMKRET
+	zwrite ^ZMKRET2
+	
+	quit
+SUSTEST(DATE SDATE)
+	//d SUSTEST^ZMKORN(61944)
+	type ResultSet rs=Db.select("TJD,TSEQ,TIME","DTJ","CID=:90000000541","TSEQ DESC")
+	while rs.next() do { 
+
+		
+		type RecordHIST hist=Db.getRecord("HIST","CID=:90000000541,TSEQ=rs.getCol(2)")
+	
+		write !,"dtj.tjd = "_rs.getCol("TJD")
+		write !,"hist.tjd = "_hist.tjd
+		write !,"dtj.time = "_rs.getCol("TIME")
+		write !,"hist.time = "_hist.time
+		
+	}
+		
+	quit
+HISTTR(CID,SEQ)
+		//d HISTTR^ZMKORN(90005757960,41)
+		type RecordHIST hist=Db.getRecord("HIST","CID=:CID,TSEQ=SEQ")
+		
+		type ResultSet rs = Db.select("CID,DATETIME,TJD,TSEQ,TRC,BRCD,UID","DTJ","CID=:hist.cid AND TSEQ=:hist.tseq")
+		while rs.next() do {
+		write !,"DTJ("_rs.getCol("TJD")_","_rs.getCol("DATETIME")_","_rs.getCol("CID")_","_rs.getCol("TSEQ")_") ="_rs.getCol("TRC")_"|"_rs.getCol("BRCD")_"|"_rs.getCol("UID")
+			type ResultSet rst = Db.select("TJD,TSEQ,TRC,BRCD,UID","DTJ","TJD=:rs.getCol(3) AND TSEQ=:hist.trc")
+			while rst.next() do {
+			write !,"TTX("_rst.getCol("TJD")_","_rst.getCol("BRCD")_","_rst.getCol("UID")_","_rst.getCol("TSEQ")_") ="_rst.getCol("TRC")_"|"_rst.getCol("BRCD")_"|"_rst.getCol("UID")
+		}
+		}
+		
+		quit
+		
+	
+	
+	
+	

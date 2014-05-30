@@ -1,0 +1,3046 @@
+//DO NOT MODIFY  CAP Customer Inquiry|ZCAPCIF|||||||1
+
+
+ /*	 ORIG: Pete Chenard - April 18, 2011
+	 DESC: CAP Interfaces
+
+	
+	 ---- Comments --------------------------------------------------------
+	This procedure contains labels that process each of the CAP interfaces.
+	These interfaces include:
+	
+		CIF Search (individual)
+		CIF Search (corporate)
+		Deposit Hold Inquiry
+		Maintain CIF (individual)
+		Maintain CIF (corporate)
+		Create Loan Account
+		Collateral Inquiry (brief)
+		Collateral Inquiry (full detail)
+		Add Collateral Record
+		Update Collateral
+		Customer Exposure by CIF#
+		Auto Debit Current Account
+		Auto Debit Savings Account
+		Account Relationship
+		
+	The labels for each of these services is stored in ZUTBLTRAN table.  ZMRPC777
+	references that table to get the appropriate label^routine to call to
+	process the incoming request.
+	
+	This procedure is called only by ZMRPC777.
+	
+	Refer to ZMRPC777.proc for specifics about that procedure.	
+	
+	
+	 ---- Revision History ------------------------------------------------
+	04/18/11 - Pete Chenard
+		   Created.
+	-----------------------------------------------------------------------*/
+
+	#WARN * OFF
+ 	quit
+ 	
+CUSTIND(String input)
+	/* Modified By Ravipong Chumsai Na Ayuthaya 18/09/11 */
+	//w $$CUSTIND^ZCAPCIF("||||||||||P|CI||1817||||0|20|0|")
+ /* ***************************************************************************
+ 	CAP Customer Inquiry (individual)
+ 	
+ 	Search for and return customer data for all customer records that
+ 	match the input criteria.  There is a limit of 20 records maximum
+ 	to be returned.
+ 	
+ 	Refer to the spreadsheet Profile-to-CAP_data_mapping_asof_interface_20110105_PT for
+ 	details of the input and output records.
+ 
+  
+
+   Customer search / inquiry
+	
+	Input Arguments:
+	
+	   input	"|" delimited string	/REQ/VAL/READ
+	   
+	   	custType	Customer Type ("P" for personal)			Required
+	   	inqType		Inquiry Type ("CI" Citizen ID; "PP" passport)		Required
+	   	typeID		Value for Citizen Card or passport			Not Required
+	   	custNum		Customer Number						Required if CI Num and passport are null
+	   	custName	Customer Name						Not Required
+	   	custSurname	Customer Surname					Not Required
+	   	searchCond	Search Condition (how is this used?)			Not Required
+	   	
+	   
+	Returns:
+	
+	   output	"|" delimited string containing customer properties.  Note that there are some columns that
+	   		are returned multiple times.  This is intentional.
+	   	
+	  
+																	*/
+	
+	type public Number ER = 0
+	type public String RM = ""
+	type String custName, custNum, custSurname, custType, header, inqType, output, searchCond, typeValue
+	type String respCode = "0000", respDesc = ""
+	type Number ACN = "", CNT = 0, recordCount = 0,recordCifCount=0,recordHhCount=0
+	type String WHERE=""
+	
+	set header 		= input.piece("|",1,10)	// Common header
+	set custType 		= input.piece("|",11)	// Customer Type: P=personal; C=Corporate
+	set inqType 		= input.piece("|",12)	// Inquiry Type: "CI"=citizen ID card; "PP"=passport)
+	set typeValue 		= input.piece("|",13)	// Citizen ID number or passport number
+	set custNum 		= input.piece("|",14)	// Customer Number
+	set custName 		= input.piece("|",15)	// Customer Name
+	set custSurname 	= input.piece("|",16)	// Customer surname
+	set searchCond 		= input.piece("|",17)	// Search condition (not currently used)
+	set sTart		= input.piece("|",18)	
+	set cOunt		= input.piece("|",19)
+	set toTal		= input.piece("|",20)
+	set output =""
+	
+	/* Search for the customer based on customer citizenship card ID, passport number, or
+	   customer number.
+	   
+	   Get the customer number from the database and use that for the main select statement below */
+	
+	
+	// Base search on citizenship ID number
+	if inqType = "CI" do {
+		// Search by customer citizen ID card
+		if 'typeValue.isNull() do {
+			type ResultSet rs = Db.select("ACN","CIF","ZCIZID=:typeValue")
+			if 'rs.next() set ER = 1, RM = "Customer Citizenship ID Not Found: "_ typeValue quit
+			set ACN = rs.getCol("ACN")
+			set WHERE = "ZCIZID='"_typeValue_"'"
+		}
+		
+		// if no citizenship ID was passed in, use customer number, if it was passed in
+		else  if 'custNum.isNull() do {
+			type RecordCIF cif = Db.getRecord("CIF","ACN=:custNum")
+			if 'cif.getMode() set ER = 1, RM = "Invalid Customer Number "_custNum quit
+			set ACN = cif.acn
+			set WHERE = "ACN="_ACN
+		}
+		
+		// otherwise return an error indicating there is missing input data.
+		else  set ER = 1, RM = "Customer Number or Identifier Required" quit
+	}
+	
+	// Base search on passport number
+	else  if inqType = "PP" do {
+		// search by customer passport number
+		if 'typeValue.isNull() do {
+			type ResultSet rs = Db.select("ACN","CIF","PASNUM=:typeValue")
+			if 'rs.next() set ER = 1, RM = "Passport Number Not Found: "_ typeValue quit
+			set ACN = rs.getCol("ACN")
+			set WHERE = "PASNUM='"_typeValue_"'"
+			
+		}
+		
+		// if no passport number/citicen ID was passed in, use customer number, if it was passed in.
+		else  if 'custNum.isNull() do {
+			type RecordCIF cif = Db.getRecord("CIF","ACN=:custNum")
+			if 'cif.getMode() set ER = 1, RM = "Invalid Customer Number "_custNum quit
+			set ACN = cif.acn
+			set WHERE = "ACN="_ACN
+		}
+		
+	}
+	
+
+		
+		
+	
+	
+	// build WHERE clause based on the type of request this is.
+	if custNum.isNull(),custSurname.isNull(),custName.isNull() set ER = 1, RM =  "Customer Number or Identifier Required" quit
+	
+	
+	
+	
+	if 'custName.isNull() do {
+	
+	if searchCond.isNull() set ER = 1, RM ="Language Identifier Required" quit 
+	
+	if searchCond="EN" do {
+	if 'WHERE.isNull() set WHERE = WHERE_" AND ZEFNAME LIKE '%"_custName_"%'" 
+	else set WHERE = "ZEFNAME LIKE '%"_custName_"%'" 
+		}
+	
+	if searchCond="TH" do { 
+	if 'WHERE.isNull() set WHERE = WHERE_" AND NAM LIKE '%"_custName_"%'" 
+	else set WHERE = "NAM LIKE '%"_custName_"%'" 
+		}
+	}
+	
+	if 'custSurname.isNull() do {
+	
+	if searchCond.isNull() set ER = 1, RM ="Language Identifier Required" quit 
+	
+	if searchCond="EN" do {
+	if 'WHERE.isNull() set WHERE = WHERE_" AND ZELNM LIKE '%"_custSurname_"%'" 
+	else set WHERE = "ZELNM LIKE '%"_custSurname_"%'" 
+		}
+	if searchCond="TH" do {
+	if 'WHERE.isNull() set WHERE =WHERE_" AND LNM LIKE '%"_custSurname_"%'" 
+	else set WHERE = "LNM LIKE '%"_custSurname_"%'" 
+		}
+	}
+	
+	if custType = "P" set WHERE = WHERE_" AND PERS=0"
+	if custType = "C" set WHERE = WHERE_" AND PERS=1"
+	if WHERE.isNull() set ER = 1, RM =inqType_" : is not a valid Inquiry Type :" quit
+
+	do {
+		// We need to determine if we have more than 1 record in the result set.  If we have more than 1, then
+		//  build the output using the Personal List section of the record layout.  If we only have 1 record, then
+		// build the output using the personal detail section of the layout.
+
+		type String exe()
+		
+		
+		type ResultSet recCifCount = Db.select("ACN","CIF",WHERE)
+		while recCifCount.next() do {	
+		type ResultSet recHhCount = Db.select("COUNT(HEADACN)","CIFHH","ACN=:recCifCount.getCol(1)")
+		if recHhCount.next() set recordHhCount=recHhCount.getCol(1)
+		}
+						
+	}
+	
+	
+		
+	
+	
+	do {
+		catch error@"LOGERR" {
+			set respCode = "1999"	// default failure code
+			set respDesc = error.description
+			quit
+			}
+
+		set exit=0
+		// We need to determine if we have more than 1 record in the result set.  If we have more than 1, then
+		//   build the output using the Personal List section of the record layout.  If we only have 1 record, then
+		// build the output using the personal detail section of the layout.
+
+		
+		set ztmp=""
+		type DbSet ds = Db.selectDbSet("CIF",WHERE)
+		set CNT=0
+		set zwait=0
+		set sendFLG=0
+		if (cOunt'=0),(toTal>0) set zwait=1
+		while ds.next() do { quit:exit
+		set i=0
+		type RecordCIF cif = ds.getRecord()
+		type ResultSet cifhh = Db.select("HEADACN,HHTYP,RELATE,HHST","CIFHH","ACN=:cif.acn")
+		//1st time inquiry
+		if (toTal=0),(cOunt'=0) do {	
+												
+				set output.piece("|",1) = cif.acn
+				set output.piece("|",2) = cif.ztitle			// title
+				if (searchCond="EN") set output.piece("|",3)= cif.zenam
+				else set output.piece("|",3) = cif.xname		// name
+				set output.piece("|",4) = inqType			// Passport or citizen card
+				set output.piece("|",5) = cif.zcizid			// citizen id
+				set output.piece("|",7) = cif.crcd			// currency code
+				set output.piece("|",8) = cif.boo			// Branch or ownership
+				set output.piece("|",9) = cif.type			// customer type
+				set output.piece("|",13) = cif.dob.toString("DD/MM/YEAR")	// d	
+			
+				//Affiliation INFO
+				while cifhh.next() do { quit:exit
+				set recordCount=recordCount+1
+				set zhh=output
+				type RecordUHHOLD htype = Db.getRecord("UHHOLD","KEY=:cifhh.getCol(2)")
+				set zhh.piece("|",100) = htype.desc 
+				type RecordCIF hcif = Db.getRecord("CIF","ACN=:cifhh.getCol(1)")
+				set zhh.piece("|",101) = $S(cifhh.getCol(2)=cif.acn:1,1:0)
+				set zhh.piece("|",102) = hcif.xname
+				type RecordUTBLHRC hrel = Db.getRecord("UTBLHRC","HRCODE=:cifhh.getCol(3)")
+				set zhh.piece("|",103) = hrel.HRCDESC
+				set zhh =zhh_124.char()		
+				if (cOunt'=0) do {
+				set ztmp=ztmp_zhh
+				set sendFLG=sendFLG+1
+				set cOunt=cOunt-1
+				}
+				
+				}
+				
+				
+				//Quit if CIFHH is available(Already recorded) 
+				if recordHhCount=0 do {
+				
+				set output.piece("|",100) =""
+				set output.piece("|",101) =""
+				set output.piece("|",102) =""
+				set output.piece("|",103) =""
+				
+				if (cOunt'=0) do {
+				set recordCount=recordCount+1
+				set ztmp=ztmp_output_124.char()
+				set sendFLG=sendFLG+1
+				set cOunt=cOunt-1
+				}
+			
+				}	
+			}
+			
+		if (zwait) do {	
+				set output.piece("|",1) = cif.acn
+				set output.piece("|",2) = cif.ztitle			// title
+				if (searchCond="EN") set output.piece("|",3)= cif.zenam
+				else set output.piece("|",3) = cif.xname		// name			// name
+				set output.piece("|",4) = inqType			// Passport or citizen card
+				set output.piece("|",5) = cif.zcizid			// citizen id
+				set output.piece("|",7) = cif.crcd			// currency code
+				set output.piece("|",8) = cif.boo			// Branch or ownership
+				set output.piece("|",9) = cif.type			// customer type
+				set output.piece("|",13)= cif.dob.toString("DD/MM/YEAR")	// d	
+				//Affiliation INFO
+				while cifhh.next() do { quit:exit
+				set CNT=CNT+1
+				set recordCount=toTal
+				if (sTart'>CNT) do {
+				set zhh=output
+				type RecordUHHOLD htype = Db.getRecord("UHHOLD","KEY=:cifhh.getCol(2)")
+				set zhh.piece("|",100) = htype.desc 
+				type RecordCIF hcif = Db.getRecord("CIF","ACN=:cifhh.getCol(1)")
+				set zhh.piece("|",101) = $S(cifhh.getCol(2)=cif.acn:1,1:0)
+				set zhh.piece("|",102) = hcif.xname
+				type RecordUTBLHRC hrel = Db.getRecord("UTBLHRC","HRCODE=:cifhh.getCol(3)")
+				set zhh.piece("|",103) = hrel.HRCDESC
+				set zhh =zhh_124.char()
+				set ztmp=ztmp_zhh
+				set sendFLG=sendFLG+1
+				set cOunt=cOunt-1
+				if cOunt=0 set exit=1 set zwait=0
+				}
+				
+				}
+				
+				if recordHhCount=0 do {
+				set CNT=CNT+1
+				set recordCount=toTal
+				set output.piece("|",100) =""
+				set output.piece("|",101) =""
+				set output.piece("|",102) =""
+				set output.piece("|",103) =""
+				
+				if (sTart'>CNT) do {
+				set ztmp=ztmp_output_124.char()
+				set sendFLG=sendFLG+1
+				set cOunt=cOunt-1
+				if cOunt=0 set exit=1 set zwait=0
+				}
+				}
+		}
+		//Return indicated CIF
+		if (sTart=0),(cOunt=0),(toTal=0) do {
+				type String mar=cif.mar, sex=cif.sex, educ=cif.educ, zrescd=cif.zrescd, own=cif.own, zocc=cif.zocc, zsocc=cif.zsocc, zposcd=cif.zposcd, emplno=cif.emplno, zoffcd=cif.zoffcd, mf=cif.mf, zresunit=cif.zresunit
+				type String zisicsd=cif.zisicsd, zisicgc=cif.zisicgc,  zisicts=cif.zisicts, inc=cif.inc, nation=cif.nation, zrrt=cif.zrrt, zkycstat=cif.zkycstat, dlstate=cif.dlstate, ccode=cif.ccode
+				type String pcntry=cif.pcntry, pstate=cif.pstate, pdist=cif.pcity, psubdist=cif.zpsdiscd, priv=cif.priv, cd1=cif.ZMINISTRYCD1, cd2=cif.ZMINISTRYCD2, cd3=cif.ZMINISTRYCD3
+				type String mcntry=cif.mcntry, mstate=cif.mstate, mdist=cif.mcity, msubdist=cif.zmsdiscd, cc=cif.cc, relicd=cif.ZRELIGIONCD
+				type String zocntry=cif.zocntry, zostate=cif.zostate, zodist=cif.zocity, zosubdist=cif.zosdiscd, dobcd=cif.zdobcd
+				if 'ztmp.isNull() quit
+ 				if custNum="" set ER = 1, RM =  "Customer Number Required" quit
+				set output.piece("|",1) = cif.acn
+				set output.piece("|",2) = cif.pers
+				set output.piece("|",3) = cif.ztitle
+				set output.piece("|",4) = cif.fname
+				set output.piece("|",5) = cif.lnm
+				set output.piece("|",6) = cif.mname
+				set output.piece("|",7) = cif.zetitle
+				set output.piece("|",8) = cif.zefname
+				set output.piece("|",9) = cif.zelnm
+				set output.piece("|",10) = cif.zemname
+				set output.piece("|",11) = cif.pad1
+				set output.piece("|",12) = cif.pad2
+				set output.piece("|",13) = cif.pad3
+				
+				set output.piece("|",14) = Db.getOneRow("DESC","ZUTBLSDISTCD","pcntry,pstate,pdist,psubdist")
+				set output.piece("|",15) = Db.getOneRow("DES","ZUTBLDIST","pcntry,pstate,pdist")
+				set output.piece("|",16) = Db.getOneRow("DESC","STBLCNTRY1","pcntry,pstate")
+				set output.piece("|",17) = cif.pzip
+				set output.piece("|",18) = Db.getOneRow("DESC","STBLCNTRY","pcntry")
+				set output.piece("|",19) = cif.mad1
+				set output.piece("|",20) = cif.mad2
+				set output.piece("|",21) = cif.mad3
+				
+				set output.piece("|",22) = Db.getOneRow("DESC","ZUTBLSDISTCD","mcntry,mstate,mdist,msubdist")
+				set output.piece("|",23) = Db.getOneRow("DES","ZUTBLDIST","mcntry,mstate,mdist")
+				set output.piece("|",24) = Db.getOneRow("DESC","STBLCNTRY1","mcntry,mstate")
+				set output.piece("|",25) = cif.mzip
+				set output.piece("|",26) = Db.getOneRow("DESC","STBLCNTRY","mcntry")
+				set output.piece("|",27) = cif.zoad1
+				set output.piece("|",28) = cif.zoad2
+				set output.piece("|",29) = cif.zoad3
+				
+				set output.piece("|",30) = Db.getOneRow("DESC","ZUTBLSDISTCD","zocntry,zostate,zodist,zosubdist")
+				set output.piece("|",31) = Db.getOneRow("DES","ZUTBLDIST","zocntry,zostate,zodist")
+				set output.piece("|",32) = Db.getOneRow("DESC","STBLCNTRY1","zocntry,zostate")
+				set output.piece("|",33) = cif.zozip
+				set output.piece("|",34) = Db.getOneRow("DESC","STBLCNTRY","zocntry")
+								
+				set output.piece("|",35) = Db.getOneRow("DESC","UTBLMS","mar")
+				set output.piece("|",36) = Db.getOneRow("DESC","UTBLSEX","sex")
+				set output.piece("|",37) = cif.dob.toString("DD/MM/YEAR")
+				set output.piece("|",38) = Db.getOneRow("TDES","ZUTBLNATION","nation")
+				if 'educ.isNull(),Db.isDefined("UTBLEDUC","educ") set output.piece("|",39) = Db.getOneRow("DESC","UTBLEDUC","educ")
+				if 'zrescd.isNull(),Db.isDefined("STBLCNTRY","zrescd") set output.piece("|",40) = Db.getOneRow("DESC","STBLCNTRY","zrescd")
+				if 'own.isNull(),Db.isDefined("UTBLOWN","own") set output.piece("|",41) = Db.getOneRow("DESC","UTBLOWN","own")
+				set output.piece("|",42) = cif.dep
+				if 'zocc.isNull(),Db.isDefined("ZUTBLOC","zocc") set output.piece("|",43) = Db.getOneRow("TDES","ZUTBLOC","zocc")
+				if 'zocc.isNull(),'zsocc.isNull(),Db.isDefined("ZUTBLSOC","zocc,zsocc") set output.piece("|",44) = Db.getOneRow("TDES","ZUTBLSOC","zocc,zsocc")
+				if 'zposcd.isNull(),Db.isDefined("ZUTBLPOSITN","zposcd") set output.piece("|",45) = Db.getOneRow("DESC","ZUTBLPOSITN","zposcd")
+				if 'emplno.isNull(),Db.isDefined("UTBLEMPLOYER","emplno") set output.piece("|",46) = Db.getOneRow("FMDESC","UTBLEMPLOYER","emplno")
+				if 'zisicsd.isNull(),Db.isDefined("ZUTBLISICSD","zisicsd") set output.piece("|",47) = Db.getOneRow("TDES","ZUTBLISICSD","zisicsd")
+				if 'zisicsd.isNull(),'zisicgc.isNull(),Db.isDefined("ZUTBLISICGC","zisicsd,zisicgc") set output.piece("|",48) = Db.getOneRow("TDES","ZUTBLISICGC","zisicsd,zisicgc")
+				if 'zisicsd.isNull(),'zisicgc.isNull(),'zisicts.isNull(),Db.isDefined("ZUTBLISICTS","zisicsd,zisicgc,zisicts") set output.piece("|",49) = Db.getOneRow("TDES","ZUTBLISICTS","zisicsd,zisicgc,zisicts")
+				if 'inc.isNull(),Db.isDefined("UTBLIC","inc") set output.piece("|",50) = Db.getOneRow("DESC","UTBLIC","inc")
+				set output.piece("|",51) = cif.hph
+				set output.piece("|",52) = cif.aph
+				set output.piece("|",53) = cif.bph
+				set output.piece("|",54) = cif.bphext
+				set output.piece("|",55) = cif.faxnum
+				set output.piece("|",56) = $S(cif.zvipflg=1:"Yes",cif.zvipflg=0:"No")
+				set output.piece("|",57) = cif.extcif
+				set output.piece("|",58) = cif.dod.toString("YEAR/MM/DD")
+				set output.piece("|",59) = cif.email
+				if 'zrrt.isNull(),Db.isDefined("ZUTBLRRT","zrrt") set output.piece("|",60) =  Db.getOneRow("DESC","ZUTBLRRT","zrrt")
+				set output.piece("|",61) = cif.atn
+				set output.piece("|",62) = cif.zcrrtdt.toString("YEAR/MM/DD")
+				if 'zkycstat.isNull(),Db.isDefined("ZUTBLKYCSTAT","zkycstat") set output.piece("|",63) = Db.getOneRow("DESC1","ZUTBLKYCSTAT","zkycstat")
+				set output.piece("|",64) = cif.zstfid
+				set output.piece("|",65) = $S(cif.znfa<0:"-",1:"+")	//Net Fixed Asset (exclude Land) Sign "-" for minus, "+" for plus
+				set output.piece("|",66) = cif.znfa
+				set output.piece("|",67) = $S(cif.as<0:"-",1:"+")	//Annual Sales Sign "-" for minus, "+" for plus
+				set output.piece("|",68) = cif.as
+				set output.piece("|",69) = cif.ne
+				
+				set output.piece("|",70) = $S(cif.ta<0:"-",1:"+")	//Total Assets Sign "-" for minus, "+" for plus
+				set output.piece("|",71) = cif.ta
+				set output.piece("|",72) = cif.lfu.toString("YEAR/MM/DD")
+				set output.piece("|",73) = $S(cif.nw<0:"-",1:"+") 	//NetWorthSign
+				set output.piece("|",74) = cif.nw
+				set output.piece("|",75) = $S(cif.cre<0:"-",1:"+")	//CreditLineSign
+				set output.piece("|",76) = cif.cre
+				set output.piece("|",77) = cif.fye.toString("MM/DD")
+				set output.piece("|",78) = cif.govt
+				set output.piece("|",79) = cif.con
+				set output.piece("|",80) = cif.zextbnk
+				set output.piece("|",81) = cif.boo
+				set output.piece("|",82) = cif.co
+				set output.piece("|",83) = cif.zktbccode
+				set output.piece("|",84) = cif.zipc
+				set output.piece("|",85) = cif.zcizid
+				set output.piece("|",86) = cif.taxid
+				set output.piece("|",87) = cif.dlnum
+				if 'pcntry.isNull(),'dlstate.isNull(),Db.isDefined("STBLCNTRY1","pcntry,dlstate") set output.piece("|",88) = Db.getOneRow("DESC","STBLCNTRY1","pcntry,dlstate")
+				set output.piece("|",89) = cif.dlexpdt.toString("YEAR/MM/DD")
+				set output.piece("|",90) = cif.pasnum
+				set output.piece("|",91) = cif.pci
+				set output.piece("|",92) = cif.ped.toString("YEAR/MM/DD")
+				set output.piece("|",93) = cif.zbotnum
+				set output.piece("|",94) = cif.zgovnum
+				set output.piece("|",95) = cif.zovrseaj
+				set output.piece("|",96) = cif.zciflg
+				set output.piece("|",97) = cif.zboiflg
+				set output.piece("|",98) = cif.zjin
+				set output.piece("|",99) = cif.zjrdate.toString("YEAR/MM/DD")
+				set output.piece("|",100) = cif.zswiftcd
+				set output.piece("|",101) = cif.zficd
+				set output.piece("|",102) = cif.zfiasscd
+				set output.piece("|",103) = cif.zintovgov
+				set output.piece("|",104) = cif.zothjid
+				set output.piece("|",105) = cif.oit
+				set output.piece("|",106) = cif.issr
+				set output.piece("|",107) = cif.oin
+				set output.piece("|",108) = cif.oed.toString("YEAR/MM/DD")
+				if 'ccode.isNull(),Db.isDefined("UTBLCC","ccode") set output.piece("|",109) = Db.getOneRow("DESC","UTBLCC","ccode")
+				if 'zoffcd.isNull(),Db.isDefined("ZUTBLOFFICER","zoffcd") set output.piece("|",110) = Db.getOneRow("EMPNAME","ZUTBLOFFICER","zoffcd")
+				if 'mf.isNull(),Db.isDefined("UTBLMF","mf") set output.piece("|",111) = Db.getOneRow("DESC","UTBLMF","mf")
+				if 'zresunit.isNull(),Db.isDefined("UTBLCCNTR","zresunit") set output.piece("|",112) = Db.getOneRow("DESC","UTBLCCNTR","zresunit")
+				if 'priv.isNull(),Db.isDefined("STBLCIFPRIV","priv") set output.piece("|",113) = Db.getOneRow("DES","STBLCIFPRIV","priv")
+				set output.piece("|",114) = cif.sol
+				set output.piece("|",115) = cif.martel
+				set output.piece("|",116) = cif.marem
+				set output.piece("|",117) =cif.mardm
+				set output.piece("|",118) = cif.agent
+				set output.piece("|",119) = cif.locale
+				set output.piece("|",120) = cif.brreg
+				set output.piece("|",121) = cif.shhld
+				set output.piece("|",122) = $S(cif.cusamt<0:"-",1:"+")
+				set output.piece("|",123) = cif.cusamt
+				set output.piece("|",124) = cif.cusdate.toString("YEAR/MM/DD")
+				set output.piece("|",125) = cif.plan
+				set output.piece("|",126) = cif.crcd
+				set output.piece("|",127) = cif.rflgc
+				set output.piece("|",128) = cif.dao.toString("YEAR/MM/DD")
+				set output.piece("|",129) = cif.fmld.toString("YEAR/MM/DD")
+				set output.piece("|",130) = cif.convcif
+				set output.piece("|",131) = cif.zrbnam
+				set output.piece("|",132) = cif.zrbtnam
+				set output.piece("|",133) = cif.zcikey
+				set output.piece("|",134) = cif.zciupddat.toString("YEAR/MM/DD")
+				set output.piece("|",135) = cif.zciby
+				set output.piece("|",136) = cif.zcirip1
+				set output.piece("|",137) = cif.zciipt1
+				set output.piece("|",138) = cif.zcirit
+				set output.piece("|",139) = cif.zdataset.toString("YEAR/MM/DD")
+				set output.piece("|",140) = cif.zmoufl
+				if Db.isDefined("ZKYCPEP","ACN=:cif.acn") set output.piece("|",141) = 1	
+				else set output.piece("|",141) = ""		
+				if Db.isDefined("ZKYCTRR","ACN=:cif.acn") set output.piece("|",142) = 1	
+				else set output.piece("|",142) = ""
+				
+				set output.piece("|",143) = cif.ZCIZMDT.toString("YEAR/MM/DD")
+				set output.piece("|",144) = cif.ZCIZSDT
+				set output.piece("|",145) = cif.ZCIZCEN
+				set output.piece("|",146) = cif.ZPPBNKMEMFLG
+				if 'cc.isNull(),Db.isDefined("UTBLCCNTR","cc") set output.piece("|",147) = Db.getOneRow("DESC","UTBLCCNTR","cc")
+				set output.piece("|",148) = cif.DLISDT.toString("YEAR/MM/DD")
+				set output.piece("|",149) = cif.PISDT.toString("YEAR/MM/DD")
+				if 'relicd.isNull(),Db.isDefined("ZUTBLRELIGION","relicd") set output.piece("|",150) = Db.getOneRow("DESC","ZUTBLRELIGION","relicd")
+				set output.piece("|",151) = cif.ZEMPID
+				if 'dobcd.isNull(),Db.isDefined("ZUTBLDOB","dobcd") set output.piece("|",152) = Db.getOneRow("DESC","ZUTBLDOB","dobcd")
+				set output.piece("|",153) = cif.ZHLPTEACHER
+				set output.piece("|",154) = cif.ZHLPMEMBER
+				if 'cd1.isNull(),Db.isDefined("ZUTBLMINISTRY1","cd1") set output.piece("|",155) = Db.getOneRow("DESC","ZUTBLMINISTRY1","cd1")
+				if 'cd1.isNull(),'cd2.isNull(),Db.isDefined("ZUTBLMINISTRY2","cd1,cd2") set output.piece("|",156) = Db.getOneRow("DESC","ZUTBLMINISTRY2","cd1,cd2")
+				if 'cd1.isNull(),'cd2.isNull(),'cd3.isNull(),Db.isDefined("ZUTBLMINISTRY3","cd1,cd2,cd3") set output.piece("|",157) = Db.getOneRow("DESC","ZUTBLMINISTRY3","cd1,cd2,cd3")
+				set output.piece("|",158) = cif.ZHHOLDNUMBER
+				
+				
+				while cifhh.next() do {
+				
+				type RecordUHHOLD htype = Db.getRecord("UHHOLD","KEY=:cifhh.getCol(2)")
+				set output.piece("|",159+i) = htype.desc 
+				set output.piece("|",160+i) = cifhh.getCol(4)
+				set output.piece("|",161+i) = cifhh.getCol(1)
+				type RecordUTBLHRC hrel = Db.getRecord("UTBLHRC","HRCODE=:cifhh.getCol(3)")
+				set output.piece("|",162+i) = hrel.HRCDESC
+				set i=i+4
+							}
+				set recordCount=1 
+				if recordHhCount'=0 set sendFLG =recordHhCount   //No Affiliation Info
+				else set sendFLG=1	
+				set ztmp=output
+			
+			}
+				
+		
+	}
+
+	set output=""
+	set output=sendFLG_"|"_ztmp
+	set header.piece("|",7) = recordCount		
+	set output=header_"|"_$$GETTIME()_"|0||0||"_output	
+	}
+	quit output
+	
+CUSTCORP(String input)
+	/* Modified By Ravipong Chumsai Na Ayuthaya 18/09/11 */
+	//w $$CUSTCORP^ZCAPCIF("||||||||||C|TN||1821|||0|0|0")
+	//w $$CUSTCORP^ZCAPCIF("||||||||||C||||K|EN|0|20|0")
+ /* ***************************************************************************
+ 	CAP Customer Inquiry (corporate)
+ 	
+ 	Search for and return customer data for all customer records that
+ 	match the input criteria.  There is a limit of 20 records maximum
+ 	to be returned.
+ 	
+ 	Refer to the spreadsheet Profile-to-CAP_data_mapping_asof_interface_20110105_PT for
+ 	details of the input and output records.
+ 
+  
+
+	   
+	*/
+	do WRLOG^ZNUTIL("Case 1 :"_input,4)
+	type public Number ER = 0
+	type public String RM = ""
+	
+	type String custName, custNum, custSurname, custType, header, inqType, output, searchCond, typeValue
+	type String respCode = "0000", respDesc = ""
+	type Number ACN = "", CNT = 0, recordCount = 0,recordCifCount=0,recordHhCount=0
+	type String WHERE=""
+	
+	
+	set header 		= input.piece("|",1,10)	// Common Header
+	set custType 		= input.piece("|",11)	// Customer Type: P=personal; C=Corporate
+	set inqType 		= input.piece("|",12)	// Inquiry Type: "TN":Tax ID; "SC":Juristic ID)
+	set typeValue 		= input.piece("|",13)	// Citizen ID number or passport number
+	set custNum 		= input.piece("|",14)	// Customer Number
+	set custName 		= input.piece("|",15)	// Customer Name
+	set searchCond 		= input.piece("|",16)	// Search condition
+	set sTart		= input.piece("|",17)	
+	set cOunt		= input.piece("|",18)
+	set toTal		= input.piece("|",19)
+	set output = ""
+	
+	/* Search for the customer based on customer citizenship card ID, passport number, or
+	   customer number.
+	   
+	   Get the customer number from the database and use that for the main select statement below */
+	   
+	if inqType = "TN" do {
+		// Search by customer citizen ID card
+		if 'typeValue.isNull() do {
+			type ResultSet rs = Db.select("ACN","CIF","TAXID=:typeValue")
+			if 'rs.next() set ER = 1, RM = "Tax ID Not Found: "_ typeValue quit
+			set ACN = rs.getCol("ACN")
+			set WHERE = "TAXID='"_typeValue_"'"
+		}
+		
+		else  if 'custNum.isNull() do {
+			type RecordCIF cif = Db.getRecord("CIF","ACN=:custNum",1)
+			if 'cif.getMode() set ER = 1, RM = "Invalid Customer Number "_custNum quit
+			set ACN = cif.acn
+			set WHERE = "ACN="_ACN
+		}
+		
+		
+	}
+	
+	else  if inqType = "SC" do {
+		// search by customer passport number
+		if 'typeValue.isNull() do {
+			type ResultSet rs = Db.select("ACN","CIF","ZJIN=:typeValue")
+			if 'rs.next() set ER = 1, RM = "Juristic Number Not Found: "_ typeValue quit
+			set ACN = rs.getCol("ACN")
+			set WHERE = "ZJIN='"_typeValue_"'"
+		}
+		
+		else  if 'custNum.isNull() do {
+			type RecordCIF cif = Db.getRecord("CIF","ACN=:custNum",1)
+			if 'cif.getMode() set ER = 1, RM = "Invalid Customer Number "_custNum quit
+			set ACN = cif.acn
+			set WHERE = "ACN="_ACN
+		}
+		
+		
+	}
+	
+	
+	
+	if ER set output.piece("|",102) = "" quit (header_"|"_$$GETTIME()_"|4|"_RM_"|1404"_RM_"|"_output)	// 1404 is the 'record not found' failure code
+	
+	
+	if typeValue.isNull(),custNum.isNull(),custName.isNull() set ER = 1, RM =  "Customer Number or Identifier Required" quit
+	//Build WHERE CLAUSE
+	if 'custName.isNull() do {
+
+	if searchCond.isNull() set ER = 1, RM ="Language Identifier Required" quit 
+	
+	if searchCond="EN" do {
+	if 'WHERE.isNull() set WHERE = WHERE_" AND ZENAM LIKE '%"_custName_"%'" 
+	else set WHERE = "ZENAM LIKE '%"_custName_"%'" 
+		}
+	
+	if searchCond="TH" do { 
+	if 'WHERE.isNull() set WHERE = WHERE_" AND XNAME LIKE '%"_custName_"%'" 
+	else set WHERE = "XNAME LIKE '%"_custName_"%'" 
+		}
+	}
+	
+	
+	if custType = "P" set WHERE = WHERE_" AND PERS=0"
+	if custType = "C" set WHERE = WHERE_" AND PERS=1"
+	if WHERE.isNull() set ER = 1, RM =inqType_" : is not a valid Inquiry Type :" quit
+
+	do {
+		// We need to determine if we have more than 1 record in the result set.  If we have more than 1, then
+		//  build the output using the Personal List section of the record layout.  If we only have 1 record, then
+		// build the output using the personal detail section of the layout.
+
+		type String exe()
+		type ResultSet recCifCount = Db.select("ACN","CIF",WHERE)
+		while recCifCount.next() do {	
+		type ResultSet recHhCount = Db.select("COUNT(HEADACN)","CIFHH","ACN=:recCifCount.getCol(1)")
+		if recHhCount.next() set recordHhCount=recHhCount.getCol(1)
+		}
+	}	
+
+
+	set ztmp=""
+	type DbSet ds = Db.selectDbSet("CIF",WHERE)
+	set CNT=0
+	set zwait=0
+	set sendFLG=0
+	set exit=0
+	if (cOunt'=0),(toTal>0) set zwait=1
+	
+	while ds.next() do { quit:exit
+	set i=0
+	type RecordCIF cif = ds.getRecord()
+	type ResultSet cifhh = Db.select("HEADACN,HHTYP,RELATE","CIFHH","ACN=:cif.acn")
+	
+	if (toTal=0),(cOunt'=0) do {
+			do WRLOG^ZNUTIL("Case 1 :"_cif.acn,5)
+			set record.piece("|",1) = cif.acn
+			set record.piece("|",2) = cif.zktbccode			// ktb code
+			set record.piece("|",3) = cif.zcizid			// citizen id
+			set record.piece("|",4) = cif.ztitle			// corp. title
+			if searchCond="EN" set record.piece("|",5) = cif.zenam  // name
+			else set record.piece("|",5) = cif.xname
+			set record.piece("|",7) = cif.crcd			// currency cod
+			set record.piece("|",8) = cif.boo	// Branch or ownership
+			set record.piece("|",9) = cif.zktbccode			// ktb code
+			set record.piece("|",10) = cif.pad1_" "_cif.pad2	// address
+			set record.piece("|",12) = cif.bph			// phone
+			set record.piece("|",13) = cif.zjrdate.toDate("DD/MM/YEAR")	// 
+				
+				//Affiliation INFO
+				while cifhh.next() do { quit:exit
+				set recordCount=recordCount+1
+				set zhh=record
+				type RecordUHHOLD htype = Db.getRecord("UHHOLD","KEY=:cifhh.getCol(2)")
+				set zhh.piece("|",100) = htype.desc 
+				type RecordCIF hcif = Db.getRecord("CIF","ACN=:cifhh.getCol(1)")
+				set zhh.piece("|",101) = $S(cifhh.getCol(2)=cif.acn:1,1:0)
+				set zhh.piece("|",102) = hcif.xname
+				type RecordUTBLHRC hrel = Db.getRecord("UTBLHRC","HRCODE=:cifhh.getCol(3)")
+				set zhh.piece("|",103) = hrel.HRCDESC
+				set zhh =zhh_124.char()
+				if (cOunt'=0) do {
+				set ztmp=ztmp_zhh
+				set sendFLG=sendFLG+1
+				set cOunt=cOunt-1
+				}
+				
+				}
+				//Case where affiliacation doesn't exists 
+				if recordHhCount=0 do {
+				set recordCount=recordCount+1
+				set record.piece("|",100) =""
+				set record.piece("|",101) =""
+				set record.piece("|",102) =""
+				set record.piece("|",103) =""
+				
+				if (cOunt'=0) do {
+				set ztmp=ztmp_record
+				set sendFLG=sendFLG+1
+				set cOunt=cOunt-1
+				}
+			
+				}	
+			
+			}
+			
+			
+			if (zwait) do {
+			
+			set record.piece("|",1) = cif.acn
+			set record.piece("|",2) = cif.zktbccode			// ktb code
+			set record.piece("|",3) = cif.zcizid			// citizen id
+			set record.piece("|",4) = cif.ztitle			// corp. title
+			set record.piece("|",5) = cif.nam			// name
+			set record.piece("|",7) = cif.crcd			// currency cod
+			set record.piece("|",8) = cif.boo	// Branch or ownership
+			set record.piece("|",9) = cif.zktbccode			// ktb code
+			set record.piece("|",10) = cif.pad1_" "_cif.pad2	// address
+			set record.piece("|",12) = cif.bph			// phone
+			set record.piece("|",13) = cif.zjrdate.toDate("DD/MM/YEAR")	// 
+				
+				//Affiliation INFO
+				while cifhh.next() do { quit:exit
+				set CNT=CNT+1
+				set recordCount=toTal
+					
+					if (sTart'>CNT) do {
+					set zhh=record
+					type RecordUHHOLD htype = Db.getRecord("UHHOLD","KEY=:cifhh.getCol(2)")
+					set zhh.piece("|",100) = htype.desc 
+					type RecordCIF hcif = Db.getRecord("CIF","ACN=:cifhh.getCol(1)")
+					set zhh.piece("|",101) = $S(cifhh.getCol(2)=cif.acn:1,1:0)
+					set zhh.piece("|",102) = hcif.xname
+					type RecordUTBLHRC hrel = Db.getRecord("UTBLHRC","HRCODE=:cifhh.getCol(3)")
+					set zhh.piece("|",103) = hrel.HRCDESC
+					set zhh =zhh_124.char()
+					set ztmp=ztmp_zhh
+					set sendFLG=sendFLG+1
+					set cOunt=cOunt-1
+					if cOunt=0 set exit=1 set zwait=0
+					}
+				}
+				
+				if recordHhCount=0 do {
+				set CNT=CNT+1
+				set recordCount=toTal
+				set record.piece("|",100) =""
+				set record.piece("|",101) =""
+				set record.piece("|",102) =""
+				set record.piece("|",103) =""
+				
+					if (sTart'>CNT) do {
+					set ztmp=ztmp_record_124.char()
+					set sendFLG=sendFLG+1
+					set cOunt=cOunt-1
+					if cOunt=0 set exit=1 set zwait=0
+					}
+					}
+		}
+			//CIF must be indicated,otherwise error will occure
+			if (toTal=0),(cOunt=0),(sTart=0) do {
+			do WRLOG^ZNUTIL("Case 5 :"_input,4)
+			if 'ztmp.isNull() quit
+			if custNum="" set ER = 1, RM =  "Customer Number Required" quit
+			set record.piece("|",1) = cif.acn
+			set record.piece("|",2) = cif.ztitle			// title
+			set record.piece("|",3) = cif.xname			// name
+			set record.piece("|",6) = cif.zenam			// english name
+			set record.piece("|",9) = cif.ccode			// customer code	
+			set record.piece("|",10) = inqType			// CI or TN
+			set record.piece("|",11) = cif.zjrdate.toString("DD/MM/YEAR")
+			set record.piece("|",12) = cif.zrescd			// resident. code
+			set record.piece("|",13) = cif.mad1
+			set record.piece("|",14) = cif.mad2
+			set record.piece("|",15) = cif.zmsdiscd		
+			set record.piece("|",16) = cif.mcity
+			set record.piece("|",17) = cif.mstate
+			set record.piece("|",18) = cif.mzip
+			set record.piece("|",19) = cif.mcntry
+			set record.piece("|",21) = cif.email
+			set record.piece("|",22) = cif.pad1
+			set record.piece("|",23) = cif.pad2
+			set record.piece("|",24) = cif.zpsdiscd
+			set record.piece("|",25) = cif.pcity
+			set record.piece("|",26) = cif.pstate
+			set record.piece("|",27) = cif.pcntry
+			set record.piece("|",30) = "B"
+			set record.piece("|",31) = cif.bph
+			set record.piece("|",32) = cif.bphext
+			set record.piece("|",37) = cif.zestobj
+			set record.piece("|",39) = cif.as
+			set record.piece("|",40) = cif.ne
+			set record.piece("|",42) = cif.zktbccode
+			set record.piece("|",45) = cif.boo
+			set record.piece("|",48) = cif.ta
+			set record.piece("|",51) = cif.zregcap
+			set record.piece("|",52) = cif.zpaidcap
+			set record.piece("|",53) = cif.crertsc
+			set record.piece("|",56) = cif.schrvld.toString("DD/MM/YEAR")
+			set record.piece("|",57) = cif.schrvnd.toString("DD/MM/YEAR")
+			set record.piece("|",66) = "B"
+			set record.piece("|",67) = cif.bph
+			set record.piece("|",68) = cif.bphext
+			set record.piece("|",69) = "O"
+			set record.piece("|",70) = cif.aph
+			set record.piece("|",73) = cif.aph3
+			set record.piece("|",85) = ""
+			
+				while cifhh.next() do {
+				type RecordUHHOLD htype = Db.getRecord("UHHOLD","KEY=:cifhh.getCol(2)")
+				set record.piece("|",100+i) = htype.desc 
+				type RecordCIF hcif = Db.getRecord("CIF","ACN=:cifhh.getCol(1)")
+				set record.piece("|",101+i) = $S(cifhh.getCol(2)=cif.acn:1,1:0)
+				set record.piece("|",102+i) = hcif.xname
+				type RecordUTBLHRC hrel = Db.getRecord("UTBLHRC","HRCODE=:cifhh.getCol(3)")
+				set record.piece("|",103+i) = hrel.HRCDESC
+				set i=i+4
+				set recordCount=recordCount+1
+							}
+			if recordHhCount'=0 set recordCount=1
+			set ztmp=record
+			set sendFLG=1
+	
+			}
+			
+	}
+	
+	do WRLOG^ZNUTIL("Before quit:"_ztmp,5)	
+	
+	set output=""
+	set output=sendFLG_"|"_ztmp
+	set header.piece("|",7) = recordCount		
+	set output=header_"|"_$$GETTIME()_"|0||0||"_output	
+	
+	quit output
+	
+public LOGERR(Error error)
+
+	type String ERRMSG = ""
+	
+	set ERRMSG = error.description
+ 	do LOG^UTLEXC($T(+0), "*", , "*", "", ERRMSG)
+	quit
+
+
+public LOANCRE(String input)
+
+	/* Create Loan Account */
+	
+	type public Number ER = 0
+	type public String RM = ""
+	type String autoDebitAcct, custName, custNum, custType, empCode, empComp, header, inp, inqType, ODAccount, output, reqID, searchCond, typeValue
+	type String ARR(), CRCD, ODT, respCode = "0000", respDesc = "", RETURN
+	type Number ACN = "", BOO, CNT = 0, count, i, pos, TYPE, ZTYPE
+	type RecordZODTIER zodtier
+	type RecordDEP zoddep
+
+
+	set header = input.piece("|",1,10)	// Common Header
+	set output = ""
+
+	// Build Column=Value input string for MRPC044
+	set pos = 11
+	set inp = "LN.ACN="_input.piece("|",11), ACN = input.piece("|",11)				// Account
+	
+	// Fac. Code contains keys to ZUTBLPRODCAP.  Go to that table and get account type,
+	// subtype, market code, and dealer code and set those into the ln object.
+	type String acctype, campaign, prod, prog
+	set acctype = input.piece("|",12)								// Facility code
+	set prod = acctype.piece(",",1)
+	set prog = acctype.piece(",",2)
+	set campaign = acctype.piece(",",3)
+	do {
+		if prod.isNull() ! prog.isNull() ! campaign.isNull() set ER = 1, RM = "Facility Code Data is Null" quit
+		type RecordZUTBLPRODCAP prodcap = Db.getRecord("ZUTBLPRODCAP","MPROD=:prod, PPROG=:prog, PCAMPAIGN=:campaign",1)
+		if 'prodcap.getMode() set ER = 1, RM = "Facility Code not defined in ZUTBLPRODCAP table" quit
+		set inp = inp_",LN.TYPE="_prodcap.type, TYPE = prodcap.type
+		set inp = inp_",LN.SUBT="_prodcap.subt
+		set inp = inp_",LN.ZMKTCD="_prodcap.zmktcd
+		set inp = inp_",LN.ZDLRCD="_prodcap.zdlrcd
+		set ZTYPE = prodcap.ztype	// ZTYPE: 1-Financing, 2-Committment, 3-Committment (discount), 4-OD
+	}
+	
+	if ER quit (header_"|"_$$GETTIME()_"|0||1404|"_RM_"|"_output)
+	
+	// Overdraft account
+	if ZTYPE = 4 do { 	
+		type Number cbCount, cbPos, mtCount, ODCID, pos, SEQ
+		set mtCount 	= input.piece("|",49)	// multi tier row count
+		set cbPos 	= 50 + (mtCount * 8)		// co-borrower position
+		set cbCount 	= input.piece("|",cbPos)	// co-borower count 		
+		set pos 	= cbPos + (cbCount * 10)	// first position after co-borrower information
+		set SEQ 	= ^ZODTIER(CID).order(-1) + 1	// get next sequence
+		set ODCID 	= input.piece("|", pos + 3)	// ovefdraft account
+		set zodtier 	= Db.getRecord("ZODTIER","CID=:ODCID, SEQ=:SEQ",1)
+		//set zodtier.active = 1
+		set zoddep	= Db.getRecord("DEP","CID=:ODCID", 1)
+		do ZTYPE4(.zodtier, zoddep)	// Create ZODTIER entry and update the DEP overdraft account
+	}
+	
+	set inp = inp_",LN.BOO="_input.piece("|",13), BOO = input.piece("|",13)				// Branch of Ownership
+	set inp = inp_",LN.ODT="_input.piece("|",15).toDate("DD/MM/YEAR"), ODT = input.piece("|",15).toDate("DD/MM/YEAR")	// Open date
+	set inp = inp_",LN.ZREQAMT="_input.piece("|",16)						// amount requested
+	set inp = inp_",LN.CRCD="_input.piece("|",18), CRCD = input.piece("|",18)			// Currency code
+	
+	if ZTYPE = 1 set inp = inp_",LN.ZPERCONS="_input.piece("|",19)					// Purpose code
+	else  if ZTYPE = 2 ! (ZTYPE = 3) set inp = inp_",LN.ZARRPUR="_input.piece("|",19)		
+	
+	set inp = inp_",LN.ZACCOID="_input.piece("|",21)						// User
+	set inp = inp_",LN.TRM="_input.piece("|",22,23).translate("|")					// Account term
+
+	// Grace period fields
+	type String gp = input.piece("|",26)								// Grace per. method
+	type String gpTerm = input.piece("|",28)							// Grace per. method
+	if gp = "I" set gpTerm = ""
+	if gp = "E" set gpTerm = +gpTerm
+	if gp = "E" set inp = inp_",LN.PCM=3,LN.FPA=0,LN.PMTPI=,LN.FIA="  //,LN.EFD="_(ODT + input.piece(pos+2) + 1)
+	
+	type String profit = input.piece("|",30)	// to be used later in this process		// interest rate
+	if ZTYPE = 1 do {
+		set inp = inp_",LN.ZSP="_input.piece("|",31)							// Selling price
+		set inp = inp_",LN.ZSELRATE="_input.piece("|",32) 							// Selling rate
+	}
+	
+	if ZTYPE = 2 ! (ZTYPE = 3) set inp = inp_",ZRECBY="_input.piece("|",33)					// Recommended by
+
+	set inp = inp_",LN.ZAPPRVCD="_input.piece("|",34)						// Approved by
+	set inp = inp_",LN.ZDATEREC="_input.piece("|",35)						// Date recommended
+	set inp = inp_",LN.ZAPPDT="_input.piece("|",36).toDate("DD/MM/YEAR")				// Date approved
+	set inp = inp_",LN.MDT="_input.piece("|",37).toDate("DD/MM/YEAR")				// Maturity date
+	if ZTYPE = 1 set inp = inp_",LN.SCHND="_input.piece("|",38).toDate("DD/MM/YEAR")		// Next payment date
+	
+	type Number dom = input.piece("|",39)								// Payment frequency
+	if dom.isNull() ! (dom = 31) set inp = inp_",LN.DIST1FRE=1MNE"
+	else set inp = inp_",LN.DIST1FRE=1MN"_dom
+
+	set autoDebitAcct = input.piece("|",40)
+	set empComp = input.piece("|",41)
+	set empCode = input.piece("|",42)
+	set ODAccount = input.piece("|",43)
+	
+	type String busType = input.piece("|",45)							// Business type
+	set inp = inp_",LN.ZISICSD="_busType.extract(2,4)
+	set inp = inp_",LN.ZISICGC="_busType.extract(5)
+	set inp = inp_",LN.ZISICTS="_busType.extract(6,8)
+	
+	set inp = inp_",LN.ZARRPUR="_input.piece("|",47)						// Purpose code
+
+	if ZTYPE = 1 do {
+		type String sptf = input.piece("|",51)								// SPTF Dual Mode
+		if sptf = "X" set inp = inp_",LN.PCM=3,LN.FPA=0,LN.FIA=,LN.PMTPI="
+		else  if sptf = "Q" set inp = inp_",LN.DIST1FRE=*,LN.DIST2FRE=1MN"_dom_",LN.DIST3FRE=3MN"_dom	
+		else  if sptf = "H" set inp = inp_",LN.DIST1FRE=*,LN.DIST2FRE=1MN"_dom_",LN.DIST3FRE=6MN"_dom	
+		else  if sptf = "A" set inp = inp_",LN.DIST1FRE=*,LN.DIST2FRE=1MN"_dom_",LN.DIST3FRE=12MN"_dom	
+	}
+	
+	set inp = inp_",LN.AMTREQ="_input.piece("|",52)							// Amount requested
+	
+	// Multi-tiered Information...this data is stored in EFD
+	set count = input.piece("|",53)		
+	set pos = 54											// # of tier rows to proces
+	for i = 1:1:count do {
+		type String index, pmtpi, sql, seq, spread, tier, tprofit, var
+		type Date EFD
+		
+		set tier 	= input.piece("|",pos)						// Tier sequence number
+		set tprofit 	= input.piece("|",pos+1)					// profit (rate)
+		set index 	= input.piece("|",pos+2)					// Interest index
+		set spread 	= input.piece("|",pos+3)					// Rate spread
+		set var 	= input.piece("|",pos+4)					// Variance (+ or -)
+		set EFD 	= input.piece("|",pos+5)					// Effective date
+		set pmtpi 	= input.piece("|",pos+6)					// P&I amount
+		
+		if i = 1, profit = tprofit set inp = inp_",LN.INDEX="_index_",LN.INTSPR="_spread_var set pos = pos + 8 quit
+		
+		set sql = "UPDATE LN SET "
+		if ZTYPE = 1 do {
+			set sql = sql_"INTRRAT="_tier_","
+			set sql = sql_"IRN="_tprofit_","
+		}
+		
+		if ZTYPE = 1 ! (ZTYPE = 3) do {
+			if ZTYPE = 1 set sql = sql_"INDEX="_index
+			else  if ZTYPE = 3, tier = 1 set sql = sql_"ZINDEX='"_index_"',"
+			if ZTYPE = 1 set sql = sql_"INTSPR="_spread
+			else  if ZTYPE = 3, tier = 1 set sql="ZINTSPR="_spread
+		}
+		
+		// if ZTYPE = 2, record these values in NOTES table, but don't add them to 
+		//   the loan account
+		else  if ZTYPE = 2, (tier = 1) do {
+			
+			type Number NUM
+			set NUM = ^NOTES("ACN",CID,"").order(-1) + 1
+			type RecordNOTES notes = Db.getRecord("NOTES","FILE='ACN',CID=:CID,NUM=:NUM",1)
+			
+			set notes.desc = index_" = "_tprofit_" + "_var_spread
+			do notes.save()
+		}
+			
+		
+		set seq 	= $$GETSEQ^SQLDD()
+		type RecordEFD efd = Class.new("RecordEFD")
+		set efd.efdate	= EFD
+		set efd.buff 	= seq
+		
+		#ACCEPT Date=04/18/2011; Pgm=Pete Chenard; CR=unknown; Group=Global
+		set efd.seq 	= ^EFD(EFD,seq,"").order(-1) + 1
+		set efd.sql	= sql
+		set efd.table 	= "LN"
+		set efd.tjd 	= %SystemDate
+		do efd.save()	
+		set pos 	= pos + 8						// increment field pointer
+		
+	}
+
+	// Co-borrower Information
+	set count = input.piece("|",pos), pos = pos + 1
+	set inp = inp_",RELCIF1.ACN="_ACN_",RELCIF1.ROLE=1"			// Set up primary owner
+
+	type Boolean coBorrower = false
+	for i = 1:1:count do {
+		type String coACN, divPct, guarAmt, guarPct, mail, nameConj, profitPct, role, relOwner, sharePct
+		
+		set role 	= input.piece("|",pos), pos = pos + 1		// RELCIF.ROLE
+		set relOwner 	= input.piece("|",pos), pos = pos + 1		// LN.ACNRELC
+		set mail 	= input.piece("|",pos), pos = pos + 1
+		set guarAmt 	= input.piece("|",pos), pos = pos + 1
+		set guarPct 	= input.piece("|",pos), pos = pos + 1
+		set sharePct 	= input.piece("|",pos), pos = pos + 1
+		set profitPct 	= input.piece("|",pos), pos = pos + 1
+		set divPct 	= input.piece("|",pos), pos = pos + 1
+		set coACN 	= input.piece("|",pos), pos = pos + 1		// co-borrower
+		set nameConj 	= input.piece("|",pos), pos = pos + 1		// name conjunction (not used)
+		quit:coACN.isNull()
+		
+		set coBorrower 	= true
+	}
+
+	set inp 	= inp_",RELCIF"_(count+1)_".ROLE="_role
+	set inp 	= inp_",RELCIF"_(count+1)_".ACN="_coACN
+	set inp 	= inp_",RELCIF"_(count+1)_".ROLE="_role
+	set inp 	= inp_",LN.AUPTCID="_autoDebit		
+	set inp 	= inp_",LN.ZAGENT="_agentCode
+	set inp 	= inp_",LN.ZPROJCODE="_empCode
+		
+	if 'coBorrower set inp = inp_",LN.ACNRELC=1"
+	else  set inp = inp_",LN.ACNRELC=2"
+
+	do {
+	
+		catch loanError {
+			set ER = 1
+			set RM = loanError.description
+		}
+	
+	
+		// this is needed to get past the after_insert trigger
+		set inp = inp_",LN.ZDACTYP=1,LN.ZSIGNED=1"
+		set RM = $$^MRPC044(.RETURN, 1, TYPE, CRCD, inp, ACN, BOO)
+	}
+	
+	set RETURN = $$LV2V^MSG(RETURN,.ARR(),1)
+	type Number CID = +ARR(1).get().toNumber()
+	// Error occured.  Set error data into messate and quit
+	if 'RM.isNull() quit (header_"|"_$$GETTIME()_"|4|"_RM_"|1404|"_RM_"|")
+	if ER  quit (header_"|"_$$GETTIME()_"|4|"_RM_"|1404|"_RM_"|")
+	// no error, set error flags to 0.
+	quit (header_"|"_$$GETTIME()_"|0||0||"_CID)
+
+
+private ZTYPE4(RecordZODTIER zodtier, RecordDEP dep)
+
+	type Number count, i, pos
+	set dep.boo 		= input.piece("|",13)		// branch of ownership
+	set zodtier.ctrcdate 	= input.piece("|",15)		// contract date
+	//set dep.zlimacr	 	= input.piece("|",16)		// ACR limit
+	set dep.crcd 		= input.piece("|",17)		// currency code
+	set dep.zarrpur 	= input.piece("|",19)		// Purpose
+	set dep.zaccoid 	= input.piece("|",21)		// Account id
+	//set dep.zsp 		= input.piece("|",31)		//
+	//set dep.znegirn 	= input.piece("|",32)		// Negative interest rate
+	//set zodtier.zrecby 	= input.piece("|",33)		// Recommended by
+	//set zodtier.zapprvcd 	= input.piece("|",34)		// approved date
+	//set zodtier.zdaterec 	= input.piece("|",35)		// date recorded
+	//set zodtier.zappdt 	= input.piece("|",36)		// app. date
+	set zodtier.expdt 	= input.piece("|",37)		// exp. date
+	
+	type String busType = input.piece("|",41)		// Business type
+	set inp = inp_",LN.ZISICSD="_busType.extract(2,4)
+	set inp = inp_",LN.ZISICGC="_busType.extract(5)
+	set inp = inp_",LN.ZISICTS="_busType.extract(6,8)
+	
+	set dep.zarrpur 	= input.piece("|",43)		//
+	set dep.odlim 		= input.piece("|",48)		// overdraft limit
+
+	// Multi-tiered Information...this data is stored in EFD
+	set count = input.piece("|",49)		
+	set pos = 50											// # of tier rows to process
+	for i = 1:1:count do {
+		type String index, pmtpi, sql, seq, spread, tier, tprofit, var
+		type Date EFD
+		
+		set tier 	= input.piece("|",pos)		// Tier sequence number
+		set tprofit 	= input.piece("|",pos+1)	// profit (rate)
+		set index 	= input.piece("|",pos+2)	// Interest index
+		set spread 	= input.piece("|",pos+3)	// Rate spread
+		set var 	= input.piece("|",pos+4)	// Variance (+ or -)
+		set EFD 	= input.piece("|",pos+5)	// Effective date
+		set pmtpi 	= input.piece("|",pos+6)	// P&I amount
+
+		set pos = pos + 8	
+		quit:i>1					// only 1 row for OD account
+		
+		if tier '= 1 quit
+		
+		set zodtier.rate  = tprofit
+		set zodtier.irdif = spread
+		set zodtier.irdif = $S(var.isNull():"",1:"+")
+	}
+	
+	// now add co-borrower information to DEP
+	
+			
+	quit
+
+	
+public CIFMAINTI(String input)
+
+ /* ***************************************************************************
+ 	CAP Customer Maintenance (individual)
+ 	
+	Modify customer report.
+	 	
+	
+	Input Arguments:
+	
+	   input	"|" delimited string	/REQ/VAL/READ
+	   
+		ACN
+		ZTITLE
+		FNAM
+		LNM
+		NULL
+		NULL
+		ZETITLE
+		ZEFNAME
+		ZELNM
+		NULL
+		NULL
+		NULL
+		ZCIZID
+		ZCIZMDT
+		DOB
+		SEX
+		NATION
+		CITZSHP
+		EDUC
+		MAR
+		SPOUSE
+		CIF.ZSPOUID
+		CIF.ZSPOUDOB
+		DEP
+		CIF.ZCNOWN
+		MAD1
+		MAD2
+		MAD3
+		MAD4
+		MCITY
+		MZIP
+		MCNTRY
+		PAD1
+		PAD2
+		PAD3
+		PAD4
+		PCITY
+		PZIP
+		PCNTRY
+		ZSPOUBNM
+		ZOAD1
+		ZOAD2
+		ZOAD3
+		ZOAD4
+		ZOCITY
+		ZOZIP
+		ZOCNTRY
+		EMAIL
+		ZOCC
+		INC
+		ZSRCINC
+		EMPTITLE
+		PERS
+		CIF.ZISICSD/CIF.ZISICGC
+		ZVIPFLG
+		ZRELIGIONCD
+		ZKTBCCODE
+		ZISIC
+		BOO
+		NULL
+		AS
+		NE
+		NULL
+		ZNFA
+		NULL
+		NULL
+		CIF.ZCRRT
+		CIF.ZRRTDT
+		CIF.ZINSTDESC
+		CIF.ZRRTLTD
+		CIF.ZRRTNTD
+		CIF.ZRRTDFLG
+		CIF.ZEINSTDESC
+		CIF.ZECRRT
+		CIF.ZERRTDT
+		CIF.ZFINSTDESC
+		CIF.ZFCRRT
+		CIF.ZFRRTDT
+		NULL
+		CIF.HPH
+		CIF.ZHPHEXT
+		NULL
+		CIF.ZHPH
+		CIF.ZHPHEXT2
+		NULL
+		CIF.APH
+		NULL
+		NULL
+		CIF.FAXNUM
+		NULL
+		NULL
+		CIF.BPH
+		CIF.BPHEXT
+		NULL
+		CIF.ZBPH2
+		CIF.ZBPHEXT2
+		NULL
+		CIF.ZAPH2
+		NULL
+		CIF.ZFAXNUM2
+		NULL
+
+	   	
+	   
+	Returns:
+	
+	   output	Customer Number
+	   
+	   */
+
+
+	type public Number ER = 0
+	type public String RM = ""
+	type String header, output
+	type Number ACN = "", CNT = 0, pos
+	type Boolean newCIF = false
+	
+	set header = input.piece("|",1,10)	// Common header - first 10 pieces.
+	set pos = 11
+	set ACN = input.piece("|",pos)
+	
+	// if ACN is null, then check citizen ID.  If found, get ACN based on that.  If citizen ID
+	// is also null, then create a new customer record.
+	if ACN.isNull() do {
+		set CITZID = input.piece("|",23)
+		if CITZID.isNull() set newCIF = true, ACN = $$GETACN^MRPC082() quit
+		type ResultSet rs = Db.select("ACN","CIF","ZCIZID=:CITZID")
+		if 'rs.next() set ER = 1, RM = "Citizen ID not found: "_CITZID quit
+		set ACN = rs.getCol("ACN")
+		set newCIF = false
+	}
+	
+	// record not found
+	if ER quit (header_"|"_$$GETTIME()_"|4||1404|"_RM_"|"_output)
+	
+	type RecordCIF cif = Db.getRecord("CIF","ACN=:ACN",1)
+	if 'newCIF, 'cif.getMode() set ER = 1, RM = "Record Not Found: "_ACN
+	if ER quit (header_"|"_$$GETTIME()_"|4|"_RM_"|1404"_RM_"|"_ACN)	// 1404 is the 'record not found' failure code
+	
+	if 'newCIF, cif.pers '= 0 set ER = 1, RM = "Not an individual customer record"
+	if ER quit (header_"|"_$$GETTIME()_"|4|"_RM_"|1404"_RM_"|"_ACN)	// 1404 is the 'record not found' failure code
+	
+	do cif.setAuditFlag(1)
+	if newCIF do {
+		set cif.pers = 0							// personal CIF
+		set cif.type = 0							// personal CIF	
+		set cif.zipc = 176001							// involved party group
+		set cif.ccode = 1
+	}
+	
+	if 'input.piece("|",12).isNull() set cif.ztitle 	= input.piece("|",12)	// ZTITLE
+	if 'input.piece("|",13).isNull() set cif.fname 		= input.piece("|",13)	// FBAM
+	if 'input.piece("|",14).isNull() set cif.lnm 		= input.piece("|",14)	// LNM
+	if 'input.piece("|",17).isNull() set cif.zetitle 	= input.piece("|",17)	// English title
+	if 'input.piece("|",18).isNull() set cif.zefname 	= input.piece("|",18)	// English first name
+	if 'input.piece("|",19).isNull() set cif.zelnm 		= input.piece("|",19)	// English last name
+	if 'input.piece("|",23).isNull() set cif.zcizid 	= input.piece("|",23)	// Citizen ID
+	if 'input.piece("|",24).isNull() set cif.zcizmdt 	= input.piece("|",24)	// CI card exp date
+	
+	if 'input.piece("|",25).isNull() set cif.dob 		= input.piece("|",25)	// date of birth
+	if cif.dob.contains("/") set cif.dob = cif.dob.toDate("DD/MM/YEAR")		// convert to internal format
+	
+	if 'input.piece("|",26).isNull() set cif.sex 		= input.piece("|",26)	// sex
+	if 'input.piece("|",27).isNull() set cif.nation 	= input.piece("|",27)	// nationality
+	if 'input.piece("|",28).isNull() set cif.citzshp 	= input.piece("|",28)	// citizenship
+	if 'input.piece("|",29).isNull() set cif.educ 		= input.piece("|",29)	// education
+	if 'input.piece("|",30).isNull() set cif.mar 		= input.piece("|",30)	// Marital status
+	if 'input.piece("|",31).isNull() set cif.spouse 	= input.piece("|",31)	// spouse
+	//if 'input.piece("|",32).isNull() set cif.zspouid 	= "" //input.piece("|",32)	// spouse id
+	//if 'input.piece("|",33).isNull() set cif.zspoudob 	= "" //input.piece("|",33)	// spouse DOB
+	//if cif.zspoudob.contains("/") set cif.zspoudob 		= "" //cif.zspoudob.toDate("DD/MM/YEAR")		// convert to internal format
+
+	if 'input.piece("|",34).isNull() set cif.dep 		= input.piece("|",34)	// # dependents
+	//if 'input.piece("|",35).isNull() set cif.zcnown 	= "" //input.piece("|",35)	// Resident status
+	if 'input.piece("|",36).isNull() set cif.mad1 		= input.piece("|",36)	// Address line 1
+	if 'input.piece("|",37).isNull() set cif.mad2 		= input.piece("|",37)	// Address line 2
+	if 'input.piece("|",38).isNull() set cif.mad3 		= input.piece("|",38)	// Address Line 3
+	if 'input.piece("|",39).isNull() set cif.mad4 		= input.piece("|",39)	// Address Line 4
+	if 'input.piece("|",40).isNull() set cif.mcity 		= input.piece("|",40)	// City
+	if 'input.piece("|",41).isNull() set cif.mzip 		= input.piece("|",41)	// Zip Code
+	if 'input.piece("|",42).isNull() set cif.mcntry 	= input.piece("|",42)	// Country
+	if 'input.piece("|",43).isNull() set cif.pad1 		= input.piece("|",43)	// Address line 1
+	if 'input.piece("|",44).isNull() set cif.pad2 		= input.piece("|",44)	// Address line 2
+	if 'input.piece("|",45).isNull() set cif.pad3 		= input.piece("|",45)	// Address line 3
+	if 'input.piece("|",46).isNull() set cif.pad4 		= input.piece("|",46)	// Address line 4
+	if 'input.piece("|",47).isNull() set cif.pcity 		= input.piece("|",47)	// City
+	if 'input.piece("|",48).isNull() set cif.pzip 		= input.piece("|",48)	// Zip code
+	if 'input.piece("|",49).isNull() set cif.pcntry 	= input.piece("|",49)	// Country
+	//if 'input.piece("|",50).isNull() set cif.zspoubnm 	= "" //input.piece("|",50)	// ZSPOUBNM
+	if 'input.piece("|",51).isNull() set cif.zoad1 		= input.piece("|",51)	// ZAddress line 1
+	if 'input.piece("|",52).isNull() set cif.zoad2 		= input.piece("|",52)	// ZAddress line 2
+	if 'input.piece("|",53).isNull() set cif.zoad3 		= input.piece("|",53)	// ZAddress line 3
+	if 'input.piece("|",54).isNull() set cif.zoad4 		= input.piece("|",54)	// ZAddress line 4
+	if 'input.piece("|",55).isNull() set cif.zocity 	= input.piece("|",55)	// ZCity
+	if 'input.piece("|",56).isNull() set cif.zozip 		= input.piece("|",56)	// ZZip code
+	if 'input.piece("|",57).isNull() set cif.zocntry 	= input.piece("|",57)	// ZCountry
+	if 'input.piece("|",58).isNull() set cif.email 		= input.piece("|",58)	// Email address
+	if 'input.piece("|",59).isNull() set cif.zocc 		= input.piece("|",59)	// Occ. Code
+	if 'input.piece("|",60).isNull() set cif.inc 		= input.piece("|",60)	// Income
+	//if 'input.piece("|",61).isNull() set cif.zsrcinc 	= "" //input.piece("|",61)	// Source of Incode
+	if 'input.piece("|",62).isNull() set cif.emptitle 	= input.piece("|",62)	// Employee title
+	if 'input.piece("|",63).isNull() set cif.pers 		= input.piece("|",63)	// Personal flag
+
+	if 'input.piece("|",64).isNull() do {
+		type String tmp								// Bus. Type Code
+		set tmp = input.piece("|",64)
+		set cif.zisicsd = tmp.piece("/",1)
+		set cif.zisicgc = tmp.piece("/",2)
+	}
+	if 'input.piece("|",65).isNull() set cif.zvipflg 	= input.piece("|",65)	// VIP flag
+	if 'input.piece("|",66).isNull() set cif.zreligioncd 	= input.piece("|",66) 	// Religion code
+	if 'input.piece("|",67).isNull() set cif.zktbccode 	= input.piece("|",67)	// KTB Customer code
+
+	if 'input.piece("|",68).isNull() do {
+		type String tmp = input.piece("|",68)					// ZISIC code
+		set cif.zisicsd = tmp.extract(2,4)					// ZISICSD code
+		set cif.zisicgc = tmp.extract(5)					// ZISICSD code
+		set cif.zisicts = tmp.extract(6,8)					// ZISICSD code
+	}
+		
+
+	if 'input.piece("|",69).isNull() set cif.boo 		= input.piece("|",69)	// Branch of Ownership
+	if 'input.piece("|",71).isNull() set cif.as 		= input.piece("|",71)	// Annual Sale
+	if 'input.piece("|",72).isNull() set cif.ne 		= input.piece("|",72)	// Number of employees
+	if 'input.piece("|",74).isNull() set cif.znfa 		= input.piece("|",74)	// Fixed Assets
+	//if 'input.piece("|",77).isNull() set cif.zcrrt 		= "" // input.piece("|",77)	// Customer rating
+	//if 'input.piece("|",78).isNull() set cif.zrrtdt 	= "" // input.piece("|",78)	// date of rating
+	//if 'input.piece("|",80).isNull() set cif.zrrtltd 	= "" // input.piece("|",80).toDate("DD/MM/YEAR")	// Last review date
+	//if 'input.piece("|",81).isNull() set cif.zrrtntd 	= "" // input.piece("|",81).toDate("DD/MM/YEAR")	// Next review date
+	if 'input.piece("|",90).isNull() set cif.hph 		= input.piece("|",90)	// home phone
+	if 'input.piece("|",91).isNull() set cif.zhphext 	= input.piece("|",91)	// Home phoen extension
+	if 'input.piece("|",93).isNull() set cif.bph 		= input.piece("|",93)	// Business phone
+	if 'input.piece("|",94).isNull() set cif.bphext 	= input.piece("|",94)	// Business phone extension
+	if 'input.piece("|",96).isNull() set cif.aph 		= input.piece("|",96)	// Phone 3
+	if 'input.piece("|",99).isNull() set cif.aph2 		= input.piece("|",99)	// Business phone 3
+	if 'input.piece("|",102).isNull() set cif.aph3	 	= input.piece("|",102)	// Fax number 2
+	if 'input.piece("|",105).isNull() set cif.aph4	 	= input.piece("|",105)	// Fax number 2
+
+	set output = ACN
+
+	
+	do {
+		catch error@"LOGERR^UTLERR" {
+			set output = (header_"|"_$$GETTIME()_"|4||1999|"_error.description_"|"_output)
+			set ER = 1
+		}
+		
+		do cif.save()
+	}
+	if ER quit output
+	
+	// no error, set error flags to 0.
+	quit (header_"|"_$$GETTIME()_"|0||0||"_output)
+	
+	
+public CIFMAINTC(String input)
+
+ /* ***************************************************************************
+ 	CAP Customer Maintenance (Corporate)
+ 	
+	Modify customer report.
+	 	
+	
+	Input Arguments:
+	
+	   input	"|" delimited string	/REQ/VAL/READ
+	   
+		ACN
+		ZTITLE
+		FNAM
+		LNM
+		NULL
+		NULL
+		ZETITLE
+		ZEFNAME
+		ZELNM
+		NULL
+		NULL
+		NULL
+		ZCIZID
+		ZCIZMDT
+		DOB
+		SEX
+		NATION
+		CITZSHP
+		EDUC
+		MAR
+		SPOUSE
+		CIF.ZSPOUID
+		CIF.ZSPOUDOB
+		DEP
+		CIF.ZCNOWN
+		MAD1
+		MAD2
+		MAD3
+		MAD4
+		MCITY
+		MZIP
+		MCNTRY
+		PAD1
+		PAD2
+		PAD3
+		PAD4
+		PCITY
+		PZIP
+		PCNTRY
+		ZSPOUBNM
+		ZOAD1
+		ZOAD2
+		ZOAD3
+		ZOAD4
+		ZOCITY
+		ZOZIP
+		ZOCNTRY
+		EMAIL
+		ZOCC
+		INC
+		ZSRCINC
+		EMPTITLE
+		PERS
+		CIF.ZISICSD/CIF.ZISICGC
+		ZVIPFLG
+		ZRELIGIONCD
+		ZKTBCCODE
+		ZISIC
+		BOO
+		NULL
+		AS
+		NE
+		NULL
+		ZNFA
+		NULL
+		NULL
+		CIF.ZCRRT
+		CIF.ZRRTDT
+		CIF.ZINSTDESC
+		CIF.ZRRTLTD
+		CIF.ZRRTNTD
+		CIF.ZRRTDFLG
+		CIF.ZEINSTDESC
+		CIF.ZECRRT
+		CIF.ZERRTDT
+		CIF.ZFINSTDESC
+		CIF.ZFCRRT
+		CIF.ZFRRTDT
+		NULL
+		CIF.HPH
+		CIF.ZHPHEXT
+		NULL
+		CIF.ZHPH
+		CIF.ZHPHEXT2
+		NULL
+		CIF.APH
+		NULL
+		NULL
+		CIF.FAXNUM
+		NULL
+		NULL
+		CIF.BPH
+		CIF.BPHEXT
+		NULL
+		CIF.ZBPH2
+		CIF.ZBPHEXT2
+		NULL
+		CIF.ZAPH2
+		NULL
+		CIF.ZFAXNUM2
+		NULL
+
+	   	
+	   
+	Returns:
+	
+	   output	Customer Number
+	   
+	   */
+
+
+	type public Number ER = 0
+	type public String RM = ""
+	type String header, output
+	type Number ACN = "", CNT = 0, pos
+	type Boolean newCIF = false
+	
+	set header = input.piece("|",1,10)	// Common header - first 10 pieces.
+	set pos = 11
+	set ACN = input.piece("|",pos)
+
+	// if ACN is null, then check citizen ID.  If found, get ACN based on that.  If citizen ID
+	// is also null, then create a new customer record.
+	if ACN.isNull() do {
+		set CITZID = input.piece("|",23)
+		if CITZID.isNull() set newCIF = true, ACN = $$GETACN^MRPC082() quit
+		type ResultSet rs = Db.select("ACN","CIF","ZCIZID=:CITZID")
+		if 'rs.next() set ER = 1, RM = "Citizen ID not found: "_CITZID quit
+		set ACN = rs.getCol("ACN")
+		set newCIF = false
+	}
+	
+	// record not found
+	if ER quit (header_"|"_$$GETTIME()_"|4||1404|"_RM_"|"_output)
+	
+	
+	type RecordCIF cif = Db.getRecord("CIF","ACN=:ACN",1)
+	if 'newCIF, 'cif.getMode() set ER = 1, RM = "Record Not Found: "_ACN
+	if ER quit (header_"|"_$$GETTIME()_"|4|"_RM_"|1404"_RM_"|"_ACN)	// 1404 is the 'record not found' failure code
+
+	if 'newCIF, cif.pers '= 1 set ER = 1, RM = "Not a corporate customer record"
+	if ER quit (header_"|"_$$GETTIME()_"|4|"_RM_"|1404"_RM_"|"_ACN)	// 1404 is the 'record not found' failure code
+	
+	do cif.setAuditFlag(1)
+	if newCIF do {
+		set cif.pers = 1
+		set cif.type = 1							// personal CIF	
+		set cif.zipc = 176001							// involved party group
+		set cif.ccode = 1
+	}
+		
+	if 'input.piece("|",12).isNull() set cif.ztitle 	= input.piece("|",12)	// ZTITLE
+	if 'input.piece("|",13).isNull() set cif.nam 		= input.piece("|",13)		// NAM
+	if 'input.piece("|",16).isNull() set cif.zenam 		= input.piece("|",16)	// English first name
+	if 'input.piece("|",20).isNull() set cif.zcizid 	= input.piece("|",20)	// Citizen ID
+	if 'input.piece("|",21).isNull() set cif.dob 		= input.piece("|",21).toDate("DD/MM/YEAR")		// date of birth
+
+	if 'input.piece("|",22).isNull() set cif.zrescd 	= input.piece("|",22)	// resident code
+	if 'input.piece("|",23).isNull() set cif.mad1 		= input.piece("|",23)	// Address line 1
+	if 'input.piece("|",24).isNull() set cif.mad2 		= input.piece("|",24)	// Address line 2
+	if 'input.piece("|",24).isNull() set cif.mad3 		= input.piece("|",25)	// Address line 2
+	if 'input.piece("|",24).isNull() set cif.mad4 		= input.piece("|",26)	// Address line 2
+	if 'input.piece("|",26).isNull() set cif.mcity 		= input.piece("|",27)	// City
+	if 'input.piece("|",27).isNull() set cif.mzip 		= input.piece("|",28)	// Zip Code
+	if 'input.piece("|",28).isNull() set cif.mcntry 	= input.piece("|",29)	// Country
+
+	if input.piece("|",29).isNull() set cif.email 		= input.piece("|",30)	// email Adress
+
+	if 'input.piece("|",30).isNull() set cif.zoad1 		= input.piece("|",30)	// ZAddress line 1
+	if 'input.piece("|",31).isNull() set cif.zoad2 		= input.piece("|",31)	// ZAddress line 2
+	if 'input.piece("|",32).isNull() set cif.zosdiscd 	= input.piece("|",32)	// zSubdistrict
+	if 'input.piece("|",33).isNull() set cif.zocity 	= input.piece("|",33)	// ZCity
+	if 'input.piece("|",34).isNull() set cif.zozip 		= input.piece("|",34)	// ZZip code
+	if 'input.piece("|",35).isNull() set cif.zocntry 	= input.piece("|",35)	// ZCountry
+
+	if 'input.piece("|",37).isNull() set cif.ztitle 	= input.piece("|",37)	// Contact title
+	//if 'input.piece("|",38).isNull() set cif.zcntitle 	= input.piece("|",38)	// Contact name (surname)
+	//if 'input.piece("|",39).isNull() set cif.zcnhph 	= input.piece("|",39)	// Contact Namr home phone
+	//if 'input.piece("|",40).isNull() set cif.zcnpos 	= input.piece("|",40)	// Contact position
+
+	if 'input.piece("|",49).isNull() set cif.zrbnam 	= input.piece("|",49)	// Business description
+	//if 'input.piece("|",50).isNull() set cif.zcnown 	= input.piece("|",50)	// contaction own
+	if 'input.piece("|",51).isNull() set cif.as 		= input.piece("|",51)	// Annual sales
+	if 'input.piece("|",52).isNull() set cif.ne 		= input.piece("|",52)	// Number of employees
+	//if 'input.piece("|",53).isNull() set cif.zcnsme 	= input.piece("|",53)	// Small business flag
+	if 'input.piece("|",54).isNull() set cif.zktbccode 	= input.piece("|",54)	// KTB Customer code
+	if 'input.piece("|",55).isNull() set cif.zisicsd 	= input.piece("|",55)	// Business type code
+	if 'input.piece("|",56).isNull() set cif.boo 		= input.piece("|",56)	// Branch opening code
+	if 'input.piece("|",58).isNull() set cif.ta 		= input.piece("|",58)	// Net Fixed Asset
+
+	if 'input.piece("|",61).isNull() set cif.zregcap 	= input.piece("|",61)	// Capital Registered Account
+	if 'input.piece("|",62).isNull() set cif.zpaidcap 	= input.piece("|",62)	// Capital Registered Amount
+	if 'input.piece("|",63).isNull() set cif.crertsc 	= input.piece("|",63)	// Customer rating
+
+	//if 'input.piece("|",64).isNull() set cif.zrrtdt 	= input.piece("|",64).toDate("DD/MM/YEAR")	// date of rating
+	//if 'input.piece("|",65).isNull() set cif.zinstcd 	= input.piece("|",65)	// Rated by Bank
+	//if 'input.piece("|",66).isNull() set cif.zrrtltd 	= input.piece("|",66).toDate("DD/MM/YEAR")	// Last review date
+	//if 'input.piece("|",67).isNull() set cif.zrrtntd 	= input.piece("|",67).toDate("DD/MM/YEAR")	// Next review date
+	//if 'input.piece("|",68).isNull() set cif.zrrtdflg 	= input.piece("|",68)	// 
+
+	//if 'input.piece("|",69).isNull() set cif.zecrrt 	= input.piece("|",69)	// Local rating
+	//if 'input.piece("|",70).isNull() set cif.zerrtdt 	= input.piece("|",70).toDate("DD/MM/YEAR")	// Local rating date
+	//if 'input.piece("|",71).isNull() set cif.zeinstcd 	= input.piece("|",71)	// Local rating by
+
+	//if 'input.piece("|",72).isNull() set cif.zfcrrt 	= input.piece("|",72)	// Foreign rating
+	//if 'input.piece("|",73).isNull() set cif.zfrrtdt 	= input.piece("|",73).toDate("DD/MM/YEAR")	// Foreign rating date
+	//if 'input.piece("|",74).isNull() set cif.zfinstcd 	= input.piece("|",74)	// Foreign Rating by
+
+	if 'input.piece("|",76).isNull() set cif.bph 		= input.piece("|",76)	// Business phone
+	if 'input.piece("|",77).isNull() set cif.bphext 	= input.piece("|",77)	// Business phoen extension
+	//if 'input.piece("|",79).isNull() set cif.zbph2 		= input.piece("|",79)	// Business phone 2
+	//if 'input.piece("|",80).isNull() set cif.zbphext2 	= input.piece("|",80)	// Business phone 2 extension
+	if 'input.piece("|",82).isNull() set cif.aph 		= input.piece("|",82)	// Phone 3
+
+	//if 'input.piece("|",85).isNull() set cif.zaph2 		= input.piece("|",85)	// FILLER
+	if 'input.piece("|",88).isNull() set cif.faxnum 	= input.piece("|",88)	// Fax Number
+	//if 'input.piece("|",91).isNull() set cif.zfaxnum2 	= input.piece("|",91)	// Fax number 2
+	if 'input.piece("|",99).isNull() set cif.email 		= input.piece("|",99)	// email
+	set output = ACN
+	
+	do {
+		catch error@"LOGERR^UTLERR" {
+			set output = (header_"|"_$$GETTIME()_"|4||1999|"_error.description_"|"_output)
+			set ER = 1
+		}
+		
+		do cif.save()
+	}
+	if ER quit output
+	
+	// no error, set error flags to 0.
+	quit (header_"|"_$$GETTIME()_"|0||0||"_output)
+
+
+public COLINQ(String input)
+	/* Customer Collateral Inquiry - Brief */
+
+	type public Number ER = 0
+	type public String RM = ""
+	type String header, output = ""
+	type Number ACN = "", CNT = 0, pos
+	
+	set header = input.piece("|",1,10)	// Common header - first 10 pieces.
+	set pos = 11
+	set ACN = input.piece("|",pos)
+	
+	type RecordCIF cif = Db.getRecord("CIF","ACN=:ACN",1)
+	if 'cif.getMode() set ER =1, RM = "Customer record does not exist "_ACN
+	if ER quit (header_"|"_$$GETTIME()_"|4|"_RM_"|1404"_RM_"|"_output)	// 1404 is the 'record not found' failure code
+	
+	type ResultSet rs = Db.select("ZCOL.COLL","ZCOL,ZCOLOWNLINK","ZCOL.COLL=ZCOLOWNLINK.COLL AND ZCOLOWNLINK.ACN=:ACN")
+	while rs.next() do {
+			type String COL
+			set CNT = CNT + 1
+			set COL = rs.getCol("ZCOL.COLL")
+			
+			type RecordZCOL zcol = Db.getRecord("ZCOL","COLL=:COL")
+			if CNT > 1 set output = output_124.char()			
+			set output.piece("|",1) = COL					// Collateral ID
+			set output.piece("|",2) = zcol.coltyp				// Collateral type
+			set output.piece("|",3) = zcol.colsubt				// Collateral subtype
+			set output.piece("|",4) = zcol.desc				// Description
+			set output.piece("|",5) = zcol.appval				// Colateral value
+			set output.piece("|",6) = zcol.crcd				// Currency
+			set output.piece("|",7) = zcol.appdt.toString("DD/MM/YEAR")				// Issue date
+			
+			type ResultSet rs1 = Db.select("CCSTAT,CTRCT","ZCTRCTCOL","ZCTRCTCOL.COLL = :COL")
+			if rs1.next() do {
+				type String CCSTAT 
+				set CCSTAT = rs1.getCol("CCSTAT")
+				if CCSTAT = "R" set output.piece("|",8) = 1
+				if CCSTAT = "P" do {
+					type RecordZCONTRACT zcontract = Db.getRecord("ZCONTRACT","CTRCT=:rs1.getCol(""CTRCT"")",1)
+					set output.piece("|",8) = zcontract.ctrstat
+				}
+			}
+
+			/* isActive field not sent back per 9-May-2011 email with cnage in record layout
+			// Set Active staus based on collateral type
+			if zcol.coltyp = 3 do {
+				if zcol.useage <= 0 set output.piece("|",9) = 0
+				else  set output.piece("|",9) = 1
+			}
+			else  if zcol.coltyp = 4 do {
+				if zcol.cid.isNull() set output.piece("|",9) = 1 quit
+				type RecordDEP dep = Db.getRecord("DEP","CID=:zcol.cid",1)
+				if (dep.dtc - %SystemDate) <= 0 set output.piece("|",9) = 0
+				else  set output.piece("|",9) = 1
+			}
+			else  if zcol.coltyp = 5 do {
+				if (zcol.bexpdate - %SystemDate) <= 0 set output.piece("|",9) = 0
+				else  set output.piece("|",9) = 1
+			}
+			else  if zcol.coltyp = 10 do {
+				if zcol.useage <= 0 set output.piece("|",9) = 0
+				else  set output.piece("|",9) = 1
+			}
+			else  if zcol.coltyp = 11 do {
+				if (zcol.zraexp - zcol.appdt) <=0  <= 0 set output.piece("|",9) = 0
+				else  set output.piece("|",9) = 1
+			}
+			else  if zcol.coltyp = 12 do {
+				if (zcol.zateexp - %SystemDate)  <= 0 set output.piece("|",9) = 0
+				else  set output.piece("|",9) = 1
+			}
+			else  if zcol.coltyp = 14 do {
+				if zcol.cid.isNull() ! zcol.zcertccid.isNull() set output.piece("|",9) = 0 quit
+				
+				type RecordZCERT zcert = Db.getRecord("ZCERT","CID=:zcol.cid,CCID=:zcol.zcertccid",1)
+				if (zcert.mdt - %SystemDate) <= 0 set output.piece("|",9) = 0
+				else  set output.piece("|",9) = 1
+			}
+			else  set output.piece("|",9) = 1  
+			*/
+			
+			// Account Number
+			type ResultSet rs3 = Db.select("CID","ZCTRCTACN","ZCTRCTACN.CTRCT=:rs1.getCol(""CTRCT"")")
+			if rs3.next() set output.piece("|",10) = rs3.getCol("CID")
+			
+	}
+	
+	set header.piece("|",7) = CNT
+	quit (header_"|"_$$GETTIME()_"|0||0||"_output)
+	
+	
+public COLINQF(String input)
+	/* Customer Collateral Inquiry - Full Detail */
+
+	type public Number ER = 0
+	type public String RM = ""
+	type String header, output = ""
+	type Number CID, CNT = 0, COACN, COL, CTRCT, pos
+	
+	set header = input.piece("|",1,10)	// Common header - first 10 pieces.
+	set pos = 11
+	set COL = input.piece("|",11)
+	set CID = input.piece("|",12)
+	
+	type ResultSet rs = Db.select("CTRCT","ZCTRCTCOL,ZCTRCTACN","ZCTRCTCOL.CTRCT = ZCTRCTACN.CTRCT AND ZCTRCTCOL.COLL=:COL AND ZCTRCTACN.CID=:CID")
+	if rs.next() set CTRCT = rs.getCol("CTRCT")
+	else set CTRCT = ""
+	
+	type RecordLN ln = Db.getRecord("LN","CID=:CID",1)
+	if 'ln.getMode() set ER = 1, RM = "Invalid account "_CID
+	
+	type RecordZCOL zcol = Db.getRecord("ZCOL","COLL=:COL",1)
+	if 'zcol.getMode() set ER = 1, RM = "Invalid collateral record "_COL
+	
+	type RecordZCONTRACT zcontract = Db.getRecord("ZCONTRACT","CTRCT=:CTRCT",1)
+	if 'zcontract.getMode() set ER = 1, RM = "Invalid contract number "_CTRCT
+	
+	type RecordZACNCTRCOL zacnctrcol = Db.getRecord("ZACNCTRCOL","CID=:CID, CTRCT=:CTRCT, COLL=:COL",1)
+	
+	type RecordZUTBLCOLSUBT zcolsubt = Db.getRecord("ZUTBLCOLSUBT","COLCD=:COL,COLSUBT=:zcol.colsubt",1)
+
+	type ResultSet rs1 = Db.select("ACN","ZCOLOWNLINK","COLL=:COL")
+	if rs1.next() set COACN = rs1.getCol("ACN")
+	else  set COACN= ""
+		
+	set output = CID
+	set output.piece("|",2) = ln.type
+	set output.piece("|",3) = ""
+	set output.piece("|",4) = COL
+	set output.piece("|",5) = zcol.coltyp
+	set output.piece("|",6) = zcol.colsubt
+	set output.piece("|",7) = zcol.bldcode
+	set output.piece("|",8) = zcol.province
+	set output.piece("|",9) = zcol.tambol
+	set output.piece("|",10) = zcol.amphur
+	set output.piece("|",11) = zcol.desc
+
+	if zcol.coltyp = 1 set output.piece("|",12) = zcolsubt.desc
+	else  set output.piece("|",12) = ""
+	
+	set output.piece("|",13) = zcol.rscd
+	set output.piece("|",14) = zcol.lndvol1 + zcol.lndvol2 + zcol.lndvol3 + zcol.lndvol4
+	set output.piece("|",15) = zcol.lndno
+	set output.piece("|",16) = zcolsubt.phc
+	set output.piece("|",17) = zcontract.reldate.toString("DD/MM/YEAR")
+	set output.piece("|",18) = ln.acn
+	if 'zcontract.mctrct.isNull() set output.piece("|",19) = "N"
+	else  set output.piece("|",19) = "Y"
+	
+	set output.piece("|",20) = zcol.lndno
+	set output.piece("|",21) = zcol.rscd
+	set output.piece("|",22) = zcol.ravang
+	set output.piece("|",24) = zcol.appby
+	set output.piece("|",25) = zcol.appdt.toString("DD/MM/YEAR")
+	set output.piece("|",26) = zcol.appval
+	set output.piece("|",27) = zcol.bldval
+	set output.piece("|",28) = zcol.lndval
+	set output.piece("|",29) = zcol.mkprice
+	
+	set output.piece("|",41) = zcontract.crtdate.toString("DD/MM/YEAR")
+	set output.piece("|",42) = zcontract.contrrel
+	
+	set output.piece("|",44) = COACN				// Co owner
+	set output.piece("|",52) = zcol.insreq
+	set output.piece("|",54) = zcol.appoff1 - zcol.appoff3
+	set output.piece("|",55) = zcol.condpar
+	set output.piece("|",56) = zcontract.totpldg
+	set output.piece("|",67) = zcol.mcode1
+	set output.piece("|",68) = zcol.mcode1 - zcol.mcode2
+	set output.piece("|",69) = zcol.mkprice
+	set output.piece("|",72) = zcol.bstrtid // to-zcol.blastid	???????
+	set output.piece("|",73) = zcol.bondname
+	set output.piece("|",74) = zcol.bexpdate.toString("DD/MM/YEAR")
+	set output.piece("|",75) = zcol.bondtype
+	set output.piece("|",76) = zcol.issyear
+	set output.piece("|",77) = zcol.cid
+	
+	//type RecordDEP dep = Db.getRecord("DEP","CID",1)
+	//set output.piece("|",78) = dep.mdt	// deposit maturity date
+	set output.piece("|",79) = zcol.issname
+	//set output.piece("|",80) = dep.xname		
+	//set output.piece("|",83) = dep.eodbal
+	//if 'dep.trm.isNull() set output.piece("|",84) = +dep.trm
+	//if 'dep.trm.isNull() set output.piece("|",85) = dep.trm.piece(+dep.trm,2)
+	set output.piece("|",90) = zcol.appval
+	set output.piece("|",91) = zcol.appcname
+	set output.piece("|",92) = zcol.appdt.toString("DD/MM/YEAR")
+	set output.piece("|",97) = zcol.bintrate
+	
+	set header.piece("|",7) = 1
+	quit (header_"|"_$$GETTIME()_"|0||0||"_output)
+	
+	
+public COLMAINT(String input)
+
+	/* Collateral maintenance  */
+
+	type public Number ER = 0
+	type public String RM = ""
+	type String header, output
+	type Number CID, CNT = 0, COL, CTRCT, pos, SEQNO, TYPE
+	type RecordZUTBLCOLSUBT zcolsubt
+	
+	set header = input.piece("|",1,10)	// Common header - first 10 pieces.
+	set pos = 11
+	set CID = input.piece("|",pos)
+	set pos = pos + 1, TYPE = input.piece("|",pos)
+	set pos = pos + 1, SEQNO = input.piece("|",pos)
+	set pos = pos + 1, COL = input.piece("|",pos)
+	
+	if COL.isNull() set ER = 1, RM = "Collateral ID cannot be null" quit (header_"|"_$$GETTIME()_"|4|"_RM_"|1404"_RM_"|"_output)
+	
+	type RecordZCOL zcol = Db.getRecord("ZCOL","COLL=:COL",1)
+	if 'zcol.getMode() set ER = 1, RM = "Record not found"
+	
+	type ResultSet rs = Db.select("CTRCT","ZACNCTRCOL","CID=:CID AND COLL=:COL")
+	if 'rs.next() set ER = 1, RM = "Record not found in ZACNCTRCOL table"
+	else  set CTRCT = rs.getCol("CTRCT")
+	
+	if ER if ER quit (header_"|"_$$GETTIME()_"|4|"_RM_"|1404"_RM_"|"_output)	// 1404 is the 'record not found' failure code
+	
+	type RecordZACNCTRCOL zacnctrcol = Db.getRecord("ZACNCTRCOL","CID=:CID,CTRCT=:CTRCT,COLL=:COL",1)
+	
+	type RecordZCONTRACT zcontract = Db.getRecord("ZCONTRACT","CTRCT=:CTRCT",1)
+	if 'zcontract.getMode() set ER = 1, RM = "Record not found in ZCONTRACT table"
+	if ER if ER quit (header_"|"_$$GETTIME()_"|4|"_RM_"|1404"_RM_"|"_output)	// 1404 is the 'record not found' failure code
+	
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.coltyp = input.piece("|",pos)	// collateral type
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.colsubt = input.piece("|",pos)	// collateral subtype
+	
+	if 'zcol.coltyp.isNull(), 'zcol.colsubt.isNull() set zcolsubt = Db.getRecord("ZUTBLCOLSUBT","COLCD=:zcol.coltyp,COLSUBT=:zcol.colsubt",1)
+
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.bldcode = input.piece("|",pos)	// Building code
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.province = input.piece("|",pos)	// province code
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.tambol = input.piece("|",pos)	// tempor code
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.amphur = input.piece("|",pos)	// Amphur code
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.desc = input.piece("|",pos)	// desctiption
+	
+	
+	set pos = pos + 1 set zcontract.contrrel = input.piece("|",pos)		// description	
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.rscd = input.piece("|",pos)	// property type
+	
+	// This field is comma-separated list of values.  Assign each to each of the land area columns
+	type String vol
+	set pos = pos + 1 set vol = input.piece("|",pos)
+	if zcol.coltyp = 1 do {
+		set zcol.lndvol1 = vol.piece(";",1)
+		set zcol.lndvol2 = vol.piece(";",2)
+		set zcol.lndvol3 = vol.piece(";",3)
+		set zcol.lndvol4 = vol.piece(";",4)
+	}
+	else  if zcol.coltyp = 8 do {
+		set zcol.rmarea = vol.piece(";",1)
+		set zcol.rmarea = zcol.rmarea + vol.piece(";",2)
+		set zcol.rmarea = zcol.rmarea + vol.piece(";",3)
+		set zcol.rmarea = zcol.rmarea + vol.piece(";",4)
+	}
+		
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// Title prefix number
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.lndno = input.piece("|",pos)	// title number
+	
+	#ACCEPT Date=04/18/2011; Pgm=Pete Chenard; CR=unknown; Group=Deprecated
+	set pos = pos + 1 if 'input.piece("|",pos).isNull(), zcolsubt.getPointer() set zcolsubt.phc = input.piece("|",pos)
+
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// UPDATE ZCONTRACT - set to nothing
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// UPDATE ZACNCTRCOL - set to nothing
+
+	// need clarification on how to handle this.
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// Master Title Flag
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcontract.crtdate = input.piece("|",pos)	// Master Title Number
+
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.rscd = input.piece("|",pos)	// Category of land
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.ravang = input.piece("|",pos)	// lot number
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// redemption value
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.apdcode = input.piece("|",pos)	// Valuer name
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.appdt = input.piece("|",pos)	// valuation date
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.appval = input.piece("|",pos)	// valuation value
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.bldval = input.piece("|",pos)	// building value
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.lndval = input.piece("|",pos)	// land value
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.mkprice = input.piece("|",pos)	// market value
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	
+	// Need clarification on where to get contract number to update the next 2 fields
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcontract.pldgamt = input.piece("|",pos)	// UPDATE ZCONTRACT.PLDGAMT
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcontract.reldate = input.piece("|",pos)	// UPDATE ZCONTRACT.RELDATE
+
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// UPDATE ZCONTRACT
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zacnctrcol.cid = input.piece("|",pos)	// UPDATE ZACNTRCOL
+	
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.insreq = input.piece("|",pos)	// insurence
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.appoff1 = input.piece("|",pos)	// official valuer
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.condpar = input.piece("|",pos)	// pledged status
+	
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcontract.pldgamt = input.piece("|",pos)	// amount pledged
+
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.mcode1 = input.piece("|",pos)	// Chassis number
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.mcode2 = input.piece("|",pos)	// engine number
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.mkprice = input.piece("|",pos)	// mkprice
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.bstrtid = input.piece("|",pos)	// BSTRTID-to-BLASTID??
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.bondname = input.piece("|",pos)	// Bond issuer name
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.bexpdate = input.piece("|",pos)	// Bond maturity date
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.bondtype = input.piece("|",pos)	// Bond type
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.issyear = input.piece("|",pos)	// Date registered
+	
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.cid = input.piece("|",pos)		// account number	
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set dep.mdt = input.piece("|",pos)	// UPDATE DEP.MDT
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.isname = input.piece("|",pos)	// Issuing institution name
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.xnam = input.piece("|",pos)	// UPDATE DEP.XNAME
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.eodbal = input.piece("|",pos)	// UPDATE DEP.EODBAL
+
+	type String trm1 = "", trm2 = ""
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set trm1 = input.piece("|",pos)		// Term part 1
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set trm2 = input.piece("|",pos)		// term part 2
+	//set dep.trm = trm1_trm2
+	
+	//set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.zinstrument = input.piece("|",pos)	// Promisary Note Number
+	//set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.zissuename = input.piece("|",pos)	// Payee name
+	//set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.gtype = input.piece("|",pos)	// Gold code
+	//set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.zunit = input.piece("|",pos)	// Weight
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.appval = input.piece("|",pos)	// Appraised value
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.appby = 3, zcol.apptid = input.piece("|",pos)	// Appraiser name
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() set zcol.appdt = input.piece("|",pos)	// Appraisal date
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.bintrate = input.piece("|",pos)	// profit rate
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// guarantee amount
+	set pos = pos + 1 if 'input.piece("|",pos).isNull() //set zcol.coltyp = input.piece("|",pos)	// ZTITLE
+	
+	// save data
+	do {
+		catch error {
+			set ER = 1, RM = error.description
+		}
+		do zcol.save()
+		do zcontract.save()
+		do zacnctrcol.save()
+		#ACCEPT Date=04/18/2011; Pgm=Pete Chenard; CR=unknown; Group=Deprecated
+		if zcolsubt.getPointer() do zcolsubt.save()
+	}
+	
+	if ER quit (header_"|"_$$GETTIME()_"|4|"_RM_"|1999"_RM_"|"_output)	// 1404 is the 'record not found' failure code
+	
+	set RM = ""
+	quit (header_"|"_$$GETTIME()_"|0|"_RM_"|0"_RM_"|")
+
+
+public COLADD(String input)
+	/* Add a collateral record  */
+	
+	type public Number ER = 0
+	type public String RM = ""
+	type String ARR(), header, isMaster, output, tieToMaster
+	type Number CID, CNT = 0, COL, CTRCT, pos, SEQNO ="", TYPE	
+	type Boolean isUpdate = false		// is this a create or an update record?
+	type RecordZCONTRACT zcontract
+	type RecordZCTRCTCOL zctrctcol
+	type RecordZCOLOWNLINK link
+	
+	
+	set header = input.piece("|",1,10)	// Common header - first 10 pieces.
+		
+	// Get collateral number from the input record.  If it is not null, then we are updating
+	// an existing collateral record.  If it is null, then geenerate a new collateral number 
+	// and create a new record.
+	set COL = input.piece("|",11)
+	if 'COL.isNull() set isUpdate = true
+	else  do {
+		set isUpdate = false		
+		set ER = $$^ZMRPC920(.COL,1,"COL",9997)					// Collateral ID
+		set ER = $$LV2V^MSG(COL,.ARR,0)
+		set COL = ARR(1).get()
+	}
+	
+	set CID = input.piece("|",12)							// Account number
+	
+	type RecordZCOL zcol = Db.getRecord("ZCOL","COLL=:COL",1)
+	do zcol.setAuditFlag(1)
+	
+	//if zcol.getMode() set ER = 1, RM = "Collateral record already exists "_COL 
+	
+	type RecordACN acn = Db.getRecord("ACN","CID=:CID",1)	
+
+	set isMaster =  input.piece("|",40)						// Master contract flag
+	set tieToMaster = input.piece("|",41)						// Tie to master indicator
+	
+	
+	// We will either create a new contract record, or use an existing one if the isMaster flag is turned on.
+	if isMaster = "Y", 'isUpdate do {
+		type String ARR()
+		#ACCEPT Date=04/18/2011; Pgm=Pete Chenard; CR=unknown; Group=Global
+		set ER = $$^ZMRPC920(.CTRCT,1,"COL",9996) 
+		set ER = $$LV2V^MSG(CTRCT,.ARR(),0)
+		set CTRCT = ARR(1).get()
+		set zcontract.ctrct = CTRCT
+		set zcontract = Db.getRecord("ZCONTRACT","CTRCT=:CTRCT",1)
+		//set zcontract.cid = CID
+	}
+	
+	else  if isMaster = "N", ('tieToMaster.isNull()) do {
+		set zcontract = Db.getRecord("ZCONTRACT","CTRCT=:tieToMaster",1)
+		if 'zcontract.getMode() set ER = 1, RM = "Missing Master Contract Record "_tieToMaster quit
+		set zctrctcol = Db.getRecord("ZCTRCTCOL","CTRCT=:tieToMaster,COLL=:COL",1)
+		set zctrctcol.ctrct = tieToMaster
+		set zctrctcol.coll = COL
+		set CTRCT = tieToMaster
+		//do zctrctcol.save()
+	}
+	
+	else  if isMaster = "N", (tieToMaster.isNull()), 'isUpdate do {
+		type String ARR()
+		set zcontract = Class.new("RecordZCONTRACT")
+		#ACCEPT Date=04/18/2011; Pgm=Pete Chenard; CR=unknown; Group=Global
+		set ER = $$^ZMRPC920(.CTRCT,1,"COL",9996)
+		set ER = $$LV2V^MSG(CTRCT,.ARR(),0)
+		set CTRCT = ARR(1).get()
+		set zcontract.ctrct = CTRCT
+		//set zcontract.cid = CID
+		set zctrctcol = Db.getRecord("ZCTRCTCOL","CTRCT=:CTRCT,COLL=:COL",1)
+	}
+	
+	if ER quit (header_"|"_$$GETTIME()_"|4|"_RM_"|1404"_RM_"|"_output)
+	
+	// Create account to contract linkage
+	type RecordZCTRCTACN zctrctacn = Db.getRecord("ZCTRCTACN","CTRCT=:CTRCT,CID=:acn.cid",1)
+	
+	// Create customer to contract linkage
+	type RecordZCTRCTCIF zctrctcif = Db.getRecord("ZCTRCTCIF","CTRCT=:CTRCT,ACN=:acn.acn",1)
+		
+	set zcol.coltyp = input.piece("|",14)						// Collateral type
+	set zcol.colsubt = input.piece("|",15)						// Collateral subtype
+	set zcol.bondcode = input.piece("|",16)						// Bond code
+	set zcol.issyear = input.piece("|",17)						// Issue year
+	set zcol.bseq = input.piece("|",18)						// Bond sequence
+	
+	if zcol.coltyp = 7 do {
+		type String cid = input.piece("|",19)					// Citizen ID
+		type ResultSet rs = Db.select("ACN","CIF","ZCIZID=:cid")
+		if rs.next() set zcol.pacn = rs.getCol("ACN")
+	}
+	
+	do {										// Branch and Cost Center
+		type String boo								// Also response unit
+		set boo = input.piece("|",20)
+		set zcol.boo = boo
+		#ACCEPT Date=04/18/2011; Pgm=Pete Chenard; CR=unknown; Group=Scope
+		set zcontract.boo = boo
+		
+		type RecordUTBLBRCD brcd = Db.getRecord("UTBLBRCD","BRCD=:boo",1)
+		set zcol.cc = brcd.ccdef
+		#ACCEPT Date=04/18/2011; Pgm=Pete Chenard; CR=unknown; Group=Scope
+		set zcontract.cc = brcd.ccdef
+		set zcol.respunit = brcd.ccdef
+		#ACCEPT Date=04/18/2011; Pgm=Pete Chenard; CR=unknown; Group=Scope
+		set zcontract.respunit = brcd.ccdef
+	}
+	
+	
+	#ACCEPT Date=04/18/2011; Pgm=Pete Chenard; CR=unknown; Group=Scope
+	set zcontract.ctrctdt = input.piece("|",21)					// Contract date
+	if zcontract.ctrctdt.contains("/") set zcontract.ctrctdt = $$FDAT^%ZM(zcontract.ctrctdt,"DD/MM/YEAR")
+	
+	set zcol.bldcode = input.piece("|",22)						// Building code
+	set zcol.grpno = input.piece("|",24)						// Group number
+	set zcol.bknumber = input.piece("|",25)						// Book number
+	set zcol.pageno = input.piece("|",26)						// Page number
+	set zcol.seqno = input.piece("|",27)						// Sequence number
+	set zcol.province = input.piece("|",28)						// Province
+	set zcol.tambol = input.piece("|",29)						// Tempor code
+	set zcol.amphur = input.piece("|",30)						// Amphur code
+	#ACCEPT Date=04/18/2011; Pgm=Pete Chenard; CR=unknown; Group=Scope
+	set zcontract.contrrel = input.piece("|",32)					// Contract relation
+	
+	type String vol									// Land volume
+	set vol = input.piece("|",34)
+	if zcol.coltyp = 1 do {
+		set zcol.lndvol1 = vol.piece(";",1)	
+		set zcol.lndvol2 = vol.piece(";",2)	
+		set zcol.lndvol3 = vol.piece(";",3)	
+		set zcol.lndvol4 = vol.piece(";",4)
+	}
+	if zcol.coltyp = 8 set zcol.rmarea = vol.piece(";",1) +  vol.piece(";",2) +  vol.piece(";",3) +  vol.piece(";",4) 
+	
+	set zcol.lndno = input.piece("|",36)						// Land deed number	  
+	set zcol.ravang = input.piece("|",43)						// Lot number
+	set zcol.apdcode = input.piece("|",45)						// Valuer name
+	set zcol.appdt = input.piece("|",46)						// Valuation date
+	if zcol.appdt.contains("/") set zcol.appdt = $$FDAT^%ZM(zcol.appdt,"DD/MM/YEAR")
+
+	set zcol.appval = input.piece("|",47)						// Valuation
+	set zcol.lndval = input.piece("|",48)						// Land value
+
+	#ACCEPT Date=04/18/2011; Pgm=Pete Chenard; CR=unknown; Group=Scope
+	set zcontract.pldgamt = input.piece("|",60)					// Pledged amount
+	#ACCEPT Date=04/18/2011; Pgm=Pete Chenard; CR=unknown; Group=Scope
+	set zcontract.reldate = input.piece("|",61)					// Pledge date
+	if zcontract.reldate.contains("/") set zcontract.reldate = $$FDAT^%ZM(zcontract.reldate,"DD/MM/YEAR")
+
+	
+	// Create collateral to owner linkage if zcol.pacn is defined.
+	set zcol.pacn = input.piece("|",64)						//
+	if 'zcol.pacn.isNull() do {
+		set link = Db.getRecord("ZCOLOWNLINK","COLL=:COL,ACN=:zcol.pacn",1)
+		//do link.save()
+	}
+	
+	set zcol.appoff1 = input.piece("|",74)						// Official valuer
+	#ACCEPT Date=04/18/2011; Pgm=Pete Chenard; CR=unknown; Group=Scope
+	set zcontract.ctrstat = 0							// Contract status
+	#ACCEPT Date=04/18/2011; Pgm=Pete Chenard; CR=unknown; Group=Scope
+	set zcontract.pldgamt = input.piece("|",75)					// Pledged amount
+	set zcol.mcode1 = input.piece("|",86)						// Chassis number
+
+	if zcol.coltyp = 3 do {
+		type String tmp
+		set tmp = input.piece("|",87)
+		set zcol.mcode1 = input.piece(";",1)					// Engine number
+		set zcol.mcode2 = input.piece(";",2)					// Engine number
+	}
+	set zcol.mkprice = input.piece("|",88)						// Market price
+	set zcol.bstrtid = input.piece("|",91)						// Bond number
+	set zcol.bondname = input.piece("|",92)						// Bond name
+	set zcol.bexpdate = input.piece("|",93)						// Bond date
+	if zcol.bexpdate.contains("/") set zcol.bexpdate = $$FDAT^%ZM(zcol.bexpdate,"DD/MM/YEAR")
+
+	set zcol.bondtype = input.piece("|",94)						// Bond type
+	set zcol.cid = input.piece("|",96)						// Deposit account number
+	//set zcol.zinstrument = input.piece("|",105)					// Promissory Note Nuber
+	//set zcol.zissuename = input.piece("|",106)					// Issuer name
+	//set zcol.gtype = input.piece("|",107)						// Gold code
+	//set zcol.zunit = input.piece("|",108)						// Weight
+	set zcol.appval = input.piece("|",109)						// Appraised value
+	set zcol.apptid = input.piece("|",110), zcol.appby = 3				// External / appraiser name
+	set zcol.appdt = input.piece("|",111)						// Appraisal date
+	if zcol.appdt.contains("/") set zcol.appdt = $$FDAT^%ZM(zcol.appdt,"DD/MM/YEAR")
+
+	
+	#ACCEPT Date=04/18/2011; Pgm=Pete Chenard; CR=unknown; Group=Scope
+	if zcol.coltyp = 7 set zctrctcol.pldgval = input.piece("|",118)			// pledged value
+	if zcol.coltyp = 4 set zcol.appval = input.piece("|",118)			// pledged value
+	
+	
+	// Create up to 3 insurance policy records
+	type String INSCODE, POLICYNUM
+	set INSCODE = input.piece("|",123)						// insurance code
+	set POLICYNUM = input.piece("|",124)						// policy number
+	if 'INSCODE.isNull(), 'POLICYNUM.isNull() do {
+		type RecordZINSURANCE zinsurance = Db.getRecord("ZINSURANCE","INSCOCD=:INSCODE,POLICYNUM=:POLICYNUM",1)
+		
+		set zinsurance.instype = input.piece("|",125)				// insurance type
+		set zinsurance.inscovamt = input.piece("|",127)				// Amount insured
+		set zinsurance.startdate = input.piece("|",128)				// Start date
+		if zinsurance.startdate.contains("/") set zinsurance.startdate = $$FDAT^%ZM(zinsurance.startdate,"DD/MM/YEAR")
+
+		set zinsurance.expiredate = input.piece("|",129)			// Expiration date
+		if zinsurance.expiredate.contains("/") set zinsurance.expiredate = $$FDAT^%ZM(zinsurance.expiredate,"DD/MM/YEAR")
+		set zinsurance.netprem = input.piece("|",130)				// premium amount
+		do zinsurance.save()
+	}
+	
+	set INSCODE = input.piece("|",131)						// insurance code
+	set POLICYNUM = input.piece("|",132)						// policy number
+	if 'INSCODE.isNull(), 'POLICYNUM.isNull() do {
+		type RecordZINSURANCE zinsurance = Db.getRecord("ZINSURANCE","INSCOCD=:INSCODE,POLICYNUM=:POLICYNUM",1)
+		
+		set zinsurance.instype = input.piece("|",133)				// insurance type
+		set zinsurance.inscovamt = input.piece("|",134)				// Amount insured
+		set zinsurance.startdate = input.piece("|",135)				// Start date
+		if zinsurance.startdate.contains("/") set zinsurance.startdate = $$FDAT^%ZM(zinsurance.startdate,"DD/MM/YEAR")
+		set zinsurance.expiredate = input.piece("|",136)			// Expiration date
+		if zinsurance.expiredate.contains("/") set zinsurance.expiredate = $$FDAT^%ZM(zinsurance.expiredate,"DD/MM/YEAR")
+		set zinsurance.netprem = input.piece("|",137)				// premium amount
+		do zinsurance.save()
+	}
+	
+	set INSCODE = input.piece("|",138)						// insurance code
+	set POLICYNUM = input.piece("|",139)						// policy number
+	if 'INSCODE.isNull(), 'POLICYNUM.isNull() do {
+		type RecordZINSURANCE zinsurance = Db.getRecord("ZINSURANCE","INSCOCD=:INSCODE,POLICYNUM=:POLICYNUM",1)
+		
+		set zinsurance.instype = input.piece("|",140)				// insurance type
+		set zinsurance.inscovamt = input.piece("|",141)				// Amount insured
+		set zinsurance.startdate = input.piece("|",142)				// Start date
+		if zinsurance.startdate.contains("/") set zinsurance.startdate = $$FDAT^%ZM(zinsurance.startdate,"DD/MM/YEAR")
+		set zinsurance.expiredate = input.piece("|",143)			// Expiration date
+		if zinsurance.expiredate.contains("/") set zinsurance.expiredate = $$FDAT^%ZM(zinsurance.expiredate,"DD/MM/YEAR")
+		set zinsurance.netprem = input.piece("|",144)				// premium amount
+		do zinsurance.save()
+	}
+	
+	do {
+		catch error {
+			set ER = 1
+			set RM = error.description
+		}
+		
+		// If isMaster, then only create ZCONTRACT record.
+		// Otherwise, only create the ZCOL record
+		// Plus the related tables...
+		if isMaster = "Y" do zcontract.save()
+		else  do {
+			do zcol.save()
+			if link.exists() do link.save()
+			if zctrctcol.exists() do zctrctcol.save()
+			do zctrctacn.save()
+			do zctrctcif.save()
+			
+		}
+	}
+	if ER quit (header_"|"_$$GETTIME()_"|4|"_RM_"|1999"_RM_"|"_output.get())
+	
+	set RM = ""
+	if isMaster = "Y" set output = CTRCT	// Return Contract Number
+	else  set output = COL
+	quit (header_"|"_$$GETTIME()_"|0|"_RM_"|0|"_RM_"|"_output)
+	
+
+public CUSTEXP(String input)
+	/*  Customer exposure by CIF #  */
+	/* Created By Ravipong Chumsai Na Ayuthaya 21/09/11 */
+	//w $$CUSTEXP^ZCAPCIF("||||||||||1817|L|")
+	do SYSVAR^SCADRV0()
+	type public Number ER = 0
+	type public String RM = ""
+	type Number ACN = "", CNT = 0,countLn=0,countDep=0,Dbal="",DStat=""
+	set (LnColl,LnGtDue,LnBal,LnCrlmt,LnPrin,LnAcr,LnDelPeriod,LnStat,LnWflag,LnTdrFlags,LnLegStat,CollList,Dbal,zmktcdList,Dtype,Dacr,LnSub,DBalAV) = ""
+	set DepList =""
+	set LnList = ""
+	set CollList=""
+	set header = input.piece("|",1,10)				// Common header - first 10 pieces.
+	set ACN = input.piece("|",11)
+	set InqType = input.piece("|",12)
+	if (InqType'="D"),(InqType'="L") set ER=1,RM = "Invalid Inquiry Type('D' or 'L')" quit
+	if 'Db.isDefined("CIF","ACN=:ACN") set ER=1,RM = "Invalid Customer Number" quit
+	set DepCount=0	 		
+	set LnCount=0
+	
+	
+			
+			type ResultSet rs = Db.select("CID,CLS","ACN","ACN=:ACN")
+			while rs.next() do {
+			set CID = rs.getCol("CID")
+			set CLS = rs.getCol("CLS")
+			
+			if (CLS="L") do {
+			
+			type RecordLN l = Db.getRecord("LN",CID)
+			if l.type=8011 quit
+			set LnCount=LnCount+1
+			set LnList = LnList_","_CID
+			set LnBal =LnBal_","_l.bal
+			set LnSub =LnSub_","_l.subt
+			set zmktcdList = zmktcdList_","_l.zmktcd
+			set LnCrlmt=LnCrlmt_","_l.Crlmt
+			set LnPrin = LnPrin_","_($S(l.pcm=15:l.pmtpi,l.pcm=2:l.fpa,l.pcm=1:l.fpa+l.fia,l.pcm=14:l.PMTPI,1:"N/A"))
+			set LnGtDue = LnGtDue_","_l.gtdue
+			set LnAcr = LnAcr_","_l.acr
+			set LnDelPeriod = LnDelPeriod_","_l.pmtdel
+			set xstat = l.stat
+			if xstat'="" set LnStat = LnStat_","_Db.getOneRow("DESC","STBLSTATL","xstat")
+			else set LnStat = LnStat_"DESC,N/A"
+			set LnWflag = LnWflag_","_l.zfwostat
+			set LnTdrFlags = LnTdrFlags_","_l.zresflg
+			set xleg = l.zlegf
+			if xleg'="" set LnLegStat = LnLegStat_","_Db.getOneRow("DESC","ZUTBLLEGAL","xleg")
+			else set LnLegStat = LnLegStat_",DESC N/A"
+			
+			}
+			
+			
+			
+			if (CLS="D") do {
+			set DepCount=DepCount+1
+			type RecordDEP d = Db.getRecord("DEP",CID)
+			
+			if d.zcheckod'=1 do {
+			
+			set DepList = DepList_","_CID
+			if d.bal.isNull() set Dbal = Dbal_",0"
+			if 'd.bal.isNull() set Dbal = Dbal_","_d.bal
+			if d.balavl.isNull() set DBalAV = DBalAV_",0"
+			if 'd.balavl.isNull() set DBalAV = DBalAV_","_d.balavl
+			type ResultSet t = Db.select("DES","PRODDFTD","TYPE=:d.type")
+			if t.next() set Dtype = Dtype_","_t.getCol(1)
+			set xstat = d.zstatcd
+			if xstat'="" set DStat = DStat_","_Db.getOneRow("DES","ZUTBLSTATD","xstat")
+			else set DStat = DStat_",DESC N/A"
+			set Dacr = Dacr_","_(d.negacr+d.negacrun)
+					} //d.zcheckod'=1
+			//Check Bal if it is an od acct	    } 
+			else do {
+				set LnCount=LnCount+1
+				
+				if d.bal'<0 do {
+				set LnList = LnList_","_d.cid
+				set LnBal = LnBal_",0"
+				set LnStat = LnStat_","
+				set LnSub =LnSub_","
+				set zmktcdList = zmktcdList_","
+				set LnCrlmt=LnCrlmt_","
+				set LnPrin = LnPrin_","
+				set LnGtDue = LnGtDue_","_d.zdelprd
+				set LnAcr = LnAcr_","_(d.negacr+d.negacrun)
+				set LnDelPeriod = LnDelPeriod_","
+				set xstat = d.zstatcd
+				if xstat'="" set LnStat = LnStat_","_Db.getOneRow("DES","ZUTBLSTATD","xstat")
+				else set LnStat = LnStat_",DESC N/A"
+				set LnWflag = LnWflag_","
+				set LnTdrFlags = LnTdrFlags_","
+				set LnLegStat = LnLegStat_","
+				
+				
+				set DepList = DepList_","_d.cid
+				if d.bal.isNull() set Dbal = Dbal_",0"
+				if 'd.bal.isNull() set Dbal = Dbal_","_d.bal
+				type ResultSet t = Db.select("DES","PRODDFTD","TYPE=:d.type")
+				if t.next() set Dtype = Dtype_","_t.getCol(1)
+				if xstat'="" set DStat = DStat_","_Db.getOneRow("DES","ZUTBLSTATD","xstat")
+				else set DStat = DStat_",DESC N/A"
+				set Dacr = Dacr_","_(d.negacr+d.negacrun)
+				if d.balavl.isNull() set DBalAV = DBalAV_",0"
+				if 'd.balavl.isNull() set DBalAV = DBalAV_","_d.balavl
+						
+						} //d.bal'<0
+				
+				if d.bal<0 do {
+				set LnList = LnList_","_d.cid
+				set LnBal = LnBal_","_(-d.bal)
+				set LnSub =LnSub_","
+				set zmktcdList = zmktcdList_","
+				set LnCrlmt=LnCrlmt_","
+				set LnPrin = LnPrin_","
+				set LnGtDue = LnGtDue_","_d.zdelprd
+				set LnAcr = LnAcr_","_(d.negacr+d.negacrun)
+				set LnDelPeriod = LnDelPeriod_","
+				set xstat = d.zstatcd
+				if xstat'="" set LnStat = LnStat_","_Db.getOneRow("DES","ZUTBLSTATD","xstat")
+				else set LnStat = LnStat_",DESC N/A"
+				set LnTdrFlags = LnTdrFlags_","
+				set LnLegStat = LnLegStat_","
+				
+				set DepList = DepList_","_d.cid
+				set Dbal = Dbal_",0"
+				type ResultSet t = Db.select("DES","PRODDFTD","TYPE=:d.type")
+				if t.next() set Dtype = Dtype_","_t.getCol(1)
+				if xstat'="" set DStat = DStat_","_Db.getOneRow("DES","ZUTBLSTATD","xstat")
+				else set DStat = DStat_",DESC N/A"
+				set Dacr = Dacr_","_(d.negacr+d.negacrun)
+				if d.balavl.isNull() set DBalAV = DBalAV_",0"
+				if 'd.balavl.isNull() set DBalAV = DBalAV_","_d.balavl		
+						} //d.bal<0
+				} // d.checkod=0
+			} // CLS=D
+			
+		}
+		//Setting up Output Message
+		
+		
+					
+				
+		set LOAN.piece("|",1) = ACN	
+		set LOAN.piece("|",2) = LnCount //Number of Loan Acct
+		set LOAN.piece("|",3) = LnBal
+		set LOAN.piece("|",4) = LnList					
+		set LOAN.piece("|",5) = zmktcdList					
+		set LOAN.piece("|",6) = LnSub		
+		set LOAN.piece("|",7) = LnCrlmt
+		set LOAN.piece("|",8) = LnPrin
+		set LOAN.piece("|",9) = LnGtDue
+		set LOAN.piece("|",10) = LnAcr
+		set LOAN.piece("|",11) = LnDelPeriod
+		set LOAN.piece("|",12) = LnStat
+		set LOAN.piece("|",13) = LnWflag
+		set LOAN.piece("|",14) = LnTdrFlags
+		set LOAN.piece("|",15) = LnLegStat
+		
+		
+		set DEP.piece("|",1) = ACN
+		set DEP.piece("|",2) = DepCount //Number of Dep ACCT
+		set DEP.piece("|",3) = DepList
+		set DEP.piece("|",4) = Dtype
+		set DEP.piece("|",5) = Dbal
+		set DEP.piece("|",6) = DBalAV
+		set DEP.piece("|",7) = Dacr
+		set DEP.piece("|",8) = DStat
+		//set output.piece("|",20) =
+		
+		
+		
+	if InqType="L" set output = LOAN set header.piece("|",7) = LnCount
+	if InqType="D" set output = DEP set header.piece("|",7) = DepCount
+		
+		
+	quit (header_"|"_$$GETTIME()_"|0||0||"_output)
+	
+	
+private INSTALL(RecordLN ln)
+
+	// return installment data from EFD based on ln.pcm value
+
+	type String maxfpa = "", maxfpafia = "", maxpmtpi = ""
+	
+	type ResultSet rs = Db.select("SQL","EFD","EFDATE>:%SystemDate and CID=:ln.cid")
+	while rs.next() do {
+		type String fia, fpa, pmtpi, sql
+		
+		set sql = rs.getCol("SQL").translate(" ")
+		
+		if ln.pcm = 14 ! (ln.pcm = 15) do {
+			quit:'sql.contains("PMTPI=")
+			set pmtpi = sql.piece("PMTPI=",2).piece(",",1).stripQuotes("'")
+			if pmtpi > maxpmtpi set maxpmtpi = pmtpi
+		}
+		
+		if ln.pcm = 2 ! (ln.pcm = 3) do {
+			quit:'sql.contains("FPA=")
+			set fpa = sql.piece("FPA=",2).piece(",",1).stripQuotes("'")
+			if fpa > maxfpa set maxfpa = fpa
+		}
+		
+		if ln.pcm = 1 do {
+			set fia = "" set fpa = ""
+			if sql.contains("FPA=") set fpa = sql.piece("FPA=",2).piece(",",1).stripQuotes("'")
+			if sql.contains("FIA=") set fia = sql.piece("FIA=",2).piece(",",1).stripQuotes("'")
+			if (fia + fpa) > maxfpa set maxfpa = (fia + fpa)
+		}
+	}
+	
+	if maxpmtpi.isNull() set maxpmtpi = ln.pmtpi
+	if maxfpa.isNull() set maxfpa = ln.fpa
+	if maxfpafia.isNull() set maxfpafia = (ln.fpa + ln.fia)
+	
+	if ln.pcm = 14 ! (ln.pcm = 15) quit +maxpmtpi.roundDec(2)
+	if ln.pcm = 2 ! (ln.pcm = 3) quit +maxfpa.roundDec(2)
+	if ln.pcm = 1 quit +maxfpafia.roundDec(2)
+	
+	quit ""
+public ACCREL(String input)
+
+	type public Number ER = 0
+	type public String RM = ""
+	type String BOO, CRCD, header, output = ""
+	type Number ACN, CNT = 0, TYPE
+	
+	set header = input.piece("|",1,10)	// Common header - first 10 pieces.
+	set CRCD = input.piece("|",13)
+	set BOO = input.piece("|",14)
+	set CID = input.piece("|",16)
+	
+	type RecordACN acn = Db.getRecord("ACN","CID=:CID",1)
+	if 'acn.getMode() set ER =1, RM = "Account record does not exist "_CID
+	if ER quit (header_"|"_$$GETTIME()_"|4|"_RM_"|1404"_RM_"|"_output)	// 1404 is the 'record not found' failure code
+
+	set TYPE = acn.type
+	
+	type ResultSet rs = Db.select("ZCOL.PACN","ZCOL,ZCTRCTCOL,ZCTRCTACN,ZCONTRACT","ZCOL.COLTYP=7 AND ZCOL.COLL=ZCTRCTCOL.COLL AND ZCTRCTCOL.CCSTAT='P' AND ZCTRCTCOL.CTRCT=ZCTRCTACN.CTRCT AND ZCTRCTACN.CID=:CID AND ZCTRCTACN.CTRCT=ZCONTRACT.CTRCT AND ZCONTRACT.CTRSTAT=0")
+	if 'rs.isEmpty() do {
+		
+		while rs.next() do { quit:ER!(CNT>20)
+			
+			type Number ACN = rs.getCol("ZCOL.PACN")
+			if ACN.isNull() set ER = 1, RM = "CIF Number is null for guarantor" quit
+			
+			type RecordCIF cif = Db.getRecord("CIF","ACN=:ACN",1)	
+			if 'cif.getMode() set ER = 1, RM = "Customer record not found: "_ACN quit
+
+			if CNT=0 set output = TYPE
+			else  set output = output_"|"_TYPE
+			set output = output_"|"_ACN
+			set output = output_"|"_cif.ztitle_" "_cif.nam
+			set CNT = CNT + 1
+		}
+	}
+	
+	// Else it's not a guarantor, so get CIF numbers from RELCIF
+	
+	else  do {
+		
+		type resultSet rs1 = Db.select("ACN","RELACN","CID=:CID")
+		while rs1.next() do { quit:ER!(CNT>20)
+			
+			type Number ACN
+			set ACN = rs1.getCol("ACN")
+			if ACN.isNull() set ER = 1, RM = "CIF Number is null for guarantor" quit
+
+			type RecordCIF cif = Db.getRecord("CIF","ACN=:ACN",1)	
+			if 'cif.getMode() set ER = 1, RM = "Customer record not found: "_ACN quit
+	
+			if CNT=0 set output = TYPE
+			else  set output = output_"|"_TYPE
+			set output = output_"|"_ACN
+			set output = output_"|"_cif.ztitle_" "_cif.nam
+			set CNT = CNT + 1
+		}
+
+	}
+	if ER quit (header_"|"_$$GETTIME()_"|0||1404|"_RM_"|"_output)
+	
+	set header.piece("|",7) = CNT
+	quit (header_"|"_$$GETTIME()_"|0||0||"_output)
+	
+
+	
+public GETTIME()
+	type String datetime
+	
+	set datetime = $H.piece(",",1).toDate().toString("YEAR-MM-DD")
+	set datetime = datetime_"T"
+	set datetime = datetime_$H.piece(",",2).toTime().toString("24:60:SS")
+	quit datetime
+
+public ZRPC8001(String input)	
+	//Modified by Ravipong Chumsai Na Ayuthaya
+	//09/30/2011	
+	//Duplicated from ZRPC8001
+	new TJD,ZGRP,ZTYPE,ZSUBT,ZPCM,ZFLAT,ZAMTREQ,ZFRE,ZTRM,ZDFP,ZIRN,ZINDEX,ZINTSPR,ZINTMAT,ZRELDCID
+	new ZIRNDIFF,ZIACM,ZNBDC,ZODT
+	
+	type RecordCUVAR cuvar=Db.getRecord("CUVAR")
+	set TJD=cuvar.tjd //%SystemDate
+	set INPUT = input.piece("|",11)
+	set INPUT = INPUT.translate("""","")
+	do WRLOG^ZNUTIL("ZMRPC8001 input:"_INPUT,100)
+	set ZGRP=$P(INPUT,",",1)
+	set ZTYPE=$P(INPUT,",",2)
+	set ZSUBT=$P(INPUT,",",3)
+	set ZPCM=$P(INPUT,",",4)
+	set ZFLAT=$P(INPUT,",",5)
+	set ZAMTREQ=$P(INPUT,",",6)
+	set ZFRE=$P(INPUT,",",7)
+	set ZTRM=$P(INPUT,",",8)
+	set ZDFP=$P(INPUT,",",9)
+	set ZIRN=$P(INPUT,",",10)
+	set ZINDEX=$P(INPUT,",",11)
+	set ZINTSPR=$P(INPUT,",",12)
+	set ZINTMAT=$P(INPUT,",",13)
+	set ZZRELDCID=$P(INPUT,",",14)
+	set ZZIRNDIFF=$P(INPUT,",",15)
+	set ZIACM=$P(INPUT,",",16)
+	set ZNBDC=$P(INPUT,",",17)
+	set ZODT=$P(INPUT,",",18)
+
+	
+	
+	set return=$$CALC^ZPMTAMT(ZGRP,ZTYPE,ZSUBT,ZPCM,ZFLAT,ZAMTREQ,ZFRE,ZTRM,ZDFP,ZIRN,ZINDEX,ZINTSPR,ZINTMAT,ZZRELDCID,ZZIRNDIFF,ZIACM,ZNBDC,ZODT)
+	//do WRLOG^ZNUTIL("ZMRPC8001:return"_return,111)
+	
+	quit return
+	
+public PREAPP(INPUT)	
+	do WRLOG^ZNUTIL("PREAPP INPUT:"_INPUT,10)
+	type String CID,data,header = ""
+	set maxrec=999
+	set enddate=-1
+	set versn=2
+	set INPUT = INPUT.piece("|",11)
+	set %TOKEN=$$LOGID^SCADRV()
+	do SYSVAR^SCADRV0()
+	
+	do WRLOG^ZNUTIL("Step 0",10)
+	type public Boolean ER
+	type Boolean unlock,quit
+	type Number cnt,orgcid
+	type String hdrdata, RM044
+	
+	set RM044 = ""
+	set hdrdata=""
+	set %UID=1
+	do INIT^SCADRV
+
+	// Version number of client message is not compatible with server
+	if '(versn=1),'(versn=2) quit $$ERRMSG^PBSUTL($$^MSG(2951))
+
+	// Default number of return records to 999 (unlimited)
+	if maxrec<1 set maxrec=999
+
+	/* End TP session initiated by server.  If not done, ^TMPRPT1(%TOKEN)
+	   is only deleted (next instruction) until TROLLBACK done in this
+	   routine.
+        */
+	if $TLEVEL do Runtime.rollback()
+
+	// Ensure that temporary reporting file is empty
+	set SID=%SessionID
+	do Db.delete("TMPRPT1","PID=:%ProcessID AND KEY1=:SID")
+	do Db.delete("TMPRPT3","PID=:%ProcessID AND KEY1=:SID")
+
+	type RecordLN ln
+
+	/* 
+	Account will be "created" temporarily for the purpose of this
+	analysis.  TP fence earmarks these updates for later rollback.
+	*/
+	do Runtime.start("CS")
+	
+	if versn = 1 do { quit:ER $$ERROR
+		// Ensure that account is not locked by another user
+		if CID'=999999999999 lock +ACN(CID):0 else  do Runtime.setErrSTBLER("LN","RECLOC") quit
+
+		// Ensure that account is valid
+		if CID'=999999999999 do { if ER do Runtime.setErrSTBLER("LN","INVLDACN") quit
+
+			/*  
+			following only occurs if not coming here from PFW account
+			create.  The -1 value is only sent from PFW create account
+			to indicate account preview only (no amort schedule).
+			*/
+		
+			if enddate'=-1 do { quit:ER
+		        	set ln=Db.getRecord("LN","CID=:CID",1)
+			        if ln.cls'="L" set ER=1 quit:ER			
+				}
+			}
+
+		/*			
+		If modeling a non-existent account, client will send account
+		number 999999999999.  If already locked, because function
+		is in use elsewhere, change to available account number.
+		*/
+		set orgcid=CID 
+		set quit=""
+		if CID=999999999999 for CID=CID:-1 do { Q:quit
+			lock +ACN(CID):0 else  quit
+
+			// Use this account number
+			set quit=1
+
+			// SQL does not have to change if account number has not changed.
+			if CID'=999999999999 do {
+				set data=$$CONVSQL(data)
+				set header=$$CONVSQL(header)
+				}
+			}
+
+		}
+	
+	// If called from a non PFW front end create new loan account
+	// Set values for TYPE, CRCD, ACN and BOO from INPUT that is 
+	// passed in.
+	else  if versn = 2 do { quit:ER $$ERROR
+		
+		type Number ACN, BOO, TYPE
+		type String CRCD, EXT, RETURN
+		type public Cache %CACHE()
+
+		// Invalid Record
+		if INPUT.isNull() set ER=1,RM=$$^MSG(8097) quit
+		
+		// Extract out customer number if not defined
+		if 'INPUT.isLike("%LN.ACN=%") do Runtime.setErrMSG("LN",1295) quit
+
+		set EXT=INPUT.piece("LN.ACN=",2)
+		set ACN=EXT.piece(",",1)
+		do WRLOG^ZNUTIL("PREAPP ACN:"_ACN,10)
+		if ACN.extract(1)="'" set ACN=ACN.extract(2,(ACN.length()-1))
+
+		// Extract out branch of ownership if not defined
+		if INPUT.isLike("%LN.BOO=%") do {			
+
+			set EXT=INPUT.piece("LN.BOO=",2)
+			set BOO=EXT.piece(",",1)
+			if BOO.extract(1)="'" set BOO=BOO.extract(2,(BOO.length()-1))
+			}
+		else  do {
+			type RecordSCAU scau = %CACHE("SCAU").getRecord("SCAU", "UID=:%UserID")			
+			set BOO=scau.brcd
+			}
+	
+		// Extract out product type if not defined
+		if 'INPUT.isLike("%LN.TYPE=%") do Runtime.setErrMSG("LN",1503) quit
+
+		set EXT=INPUT.piece("LN.TYPE=",2)
+		set TYPE=EXT.piece(",",1)
+		if TYPE.extract(1)="'" set TYPE=TYPE.extract(2,(TYPE.length()-1))
+	
+		// Extract out currency code if not defined
+		if 'INPUT.isLike("%LN.CRCD=%") do Runtime.setErrMSG("LN",1293) quit
+
+		set EXT=INPUT.piece("LN.CRCD=",2)
+		set CRCD=EXT.piece(",",1)
+		if CRCD.extract(1)="'" set CRCD=CRCD.extract(2,(CRCD.length()-1))	
+
+		// Call MRPC044 to create new loan account
+		set RETURN = ""
+		do WRLOG^ZNUTIL("Step 3:Call MRPC044",10)
+		set RM044 = $$^MRPC044(.RETURN, 1, TYPE, CRCD, INPUT, ACN, BOO)
+		
+		if 'RM044.isNull() set ER=1 quit
+		do WRLOG^ZNUTIL("PREAPP RETURNMSG:"_RETURN,10)
+		set RETURN=$$LV2V^MSG(RETURN,.RETURN)
+		
+		set CID = RETURN(1).piece($C(13,10),1)
+		}
+
+	// Cannot produce this schedule. System is busy. Try again later.
+	if $TRESTART>3 do Runtime.setErrMSG("LN",1600) quit:ER $$ERROR
+
+	// Parse client insert commands and pass to SQL input utility
+	set ER=$$SQLDATA(CID,data,header) quit:ER $$ERROR
+			
+	// Account now "exists", or has been "updated".
+	set ln=Db.getRecord("LN","CID=:CID",1)
+	
+	/* 
+	Build transaction file
+	Errors encountered when anticipating transaction activity.  
+	Report the following error: ~p1
+	*/
+	
+	do { if ER do Runtime.setErrMSG("LN",999) quit $$ERROR
+
+		// Build file of projected transactions
+
+		type Number SEQ,TMPSEQ
+		type Date DATE
+		type String data,ETC,TMP,TMP1
+		
+		/* 
+		If through date is not passed, default to either maturity date
+		(closed end loans) or one year from current date (open end loans)
+		*/
+	
+		if 'enddate do { quit:ER
+			set enddate=ln.mdt
+			if enddate="" set enddate=%SystemDate.nextFreqDate("1YA") quit:ER
+			}
+
+		type RecordTTX ttx=Class.new("RecordTTX")		
+		
+		// Build projected transaction array
+		if enddate'=-1 do LOAD^LNCAL21(.ln,.ttx,.enddate)
+
+		// Exit if transaction builder returned error
+		if ER.get() quit
+
+		// Store transaction file in temporary global
+		set (DATE,SEQ,ETC,TMPSEQ)=""
+	
+		type DbSet ds=Db.selectDbSet("TMPRPT4","PID=:%ProcessID","KEY2")
+
+		while ds.next() do {
+
+			type String SUBSIDY,TAMT,TMPRC,TRDESC,TRNDT,TXNBAL,TXNINT,TXNPRN,TXNREC
+			type Number I, N
+						
+			type RecordTMPRPT4 tmprpt4=ds.getRecord("TMPRPT4")
+			
+			set CID=tmprpt4.key1
+	                set DATE=tmprpt4.key2
+	                set SEQ=tmprpt4.key3
+	                set ETC=tmprpt4.key4
+	                set TMPRC=tmprpt4.data
+	        	set TMP1=TMPRC
+			
+			// For Rebate VAT on Interest option, 6 pieces are 
+			// stored in TMPRPT4.DATA
+			if (ln.vatintopt=5) set N=6
+			else  set N=5
+			
+			// Replace null values with zeroes
+			for I=1:1:N  set TMP1.piece("|",I)=+TMP1.piece("|",I)
+				
+			// Replace "|" delimiter with TAB
+			set TMP1=TMP1.translate("|",$C(9))
+
+			// Re-format into reply message structure
+			type RecordTRN trn=Db.getRecord("TRN","ETC=:ETC",1)
+			
+			set TMP=$$TRDESC^LNCAL20(.trn,ETC)
+			
+			set TMPSEQ=TMPSEQ+1
+
+			set TRNDT=DATE
+			set TRDESC=TMP
+			set TAMT=TMP1.piece($C(9),1)
+			set TXNINT=TMP1.piece($C(9),2)
+			set TXNPRN=TMP1.piece($C(9),3)
+			set TXNBAL=TMP1.piece($C(9),4)
+			set SUBSIDY=TMP1.piece($C(9),5)
+				
+			set TXNREC=TRNDT_$C(9)_SEQ_$C(9)_TRDESC_$C(9)_TAMT_$C(9)_TXNINT_$C(9)_TXNPRN_$C(9)_TXNBAL_$C(9)_SUBSIDY
+			// Include VAT on Interest
+			if (ln.vatintopt=5) set TXNREC=TXNREC_$C(9)_TMP1.piece($C(9),6)
+
+			type RecordTMPRPT3 tmprpt3=Class.new("RecordTMPRPT3")
+			
+			set tmprpt3.PID=%ProcessID
+			set tmprpt3.KEY1=%SessionID
+			set tmprpt3.KEY2=TMPSEQ
+			set tmprpt3.KEY3=TRNDT
+			set tmprpt3.data=TXNREC
+			
+			do tmprpt3.bypassSave()
+			}
+		}
+	do WRLOG^ZNUTIL("PREAPP:BUILD REPLY MESSAGE",10)	
+	// Build reply message
+	do BLDRPLY(maxrec,hdrdata,enddate)
+
+	// Reverse account filing
+	if $TLEVEL do Runtime.rollback()
+
+	// Unlock temporary account number used for modeling
+	lock -ACN(CID)
+	do WRLOG^ZNUTIL("PREAPP:Before QUIT",10)
+	quit "Account Approved"
+
+
+SQLDATA(CID,data,header)	// Private; Manage SQL statements
+
+	new buf,maxrec,quit
+	type public Boolean ER
+	
+	set (ER,quit,buf)=""
+
+	if $G(data)'="" do { quit:ER 1
+
+		set quit="" for sqlstmt=1:1 do { quit:quit!(ER)
+	
+			// SQL statements are delimited with "|^|" characters
+			set stmt=$P(data,"|^|",sqlstmt)
+			if stmt="" set quit=1 quit
+
+			/* 
+			Buffer SQL stmts to ensure referential integrity,
+			and submit statement received from client
+			*/
+			//I18N=OFF
+	
+			set buf="BUFFER "_$S(sqlstmt>1:"ADD ",1:"NEW ")_"MRPC014"
+			set ER=$$^SQL(buf_" "_stmt) quit:ER
+			//I18N=ON
+	
+			}
+
+		if ER quit
+
+		set ER=$$^SQL("BUFFER COMMIT MRPC014")
+
+		}
+	
+	// Contruct report header data
+	if $G(header)'="" set ER=$$^SQL(header,,,.hdrdata)
+
+	quit ER
+
+
+SQL(stmt)	// Private ; Submit SQL statements
+
+	type public Boolean ER
+	
+	set ER=0
+	set X=$$^SQL(stmt)
+	quit ER
+
+
+CONVSQL(sql)	// Private ;Convert 999999999999 to new acid in SQL statements
+
+	new part1,part2
+	for  quit:'$F(sql,orgcid)  do {
+
+		set part1=$P(sql,orgcid,1)
+		set part2=$P(sql,orgcid,2,99)
+		set sql=part1_CID_part2
+
+		}
+
+	quit sql
+
+private BLDRPLY(count,hdrdata,enddate)	//Private;Build reply message
+
+	/*
+
+	Called by above and companion routine MRPC040 which is used to
+	return additional records.
+
+	   count = maximum number of records to return
+
+	*/
+	new fld,last,more,mxlength,record,string,TSEQ
+	
+	// Maximum string length, allowing buffer for extraneous information
+	set mxlength=31000-hdrdata.get().toByteString().length()
+
+	set (string,return)=""
+	
+	// Find sequence number of last transaction reported
+	type RecordTMPRPT1 tmprpt1=Db.getRecord("TMPRPT1","PID=:%ProcessID,KEY1=:%SessionID",1)
+	set (last,TSEQ)=+tmprpt1.data
+
+	type ResultSet rs=Db.select("KEY2,KEY3","TMPRPT3","PID=:%ProcessID AND KEY1=:%SessionID AND KEY2>:TSEQ","KEY3")
+
+	while rs.next() do { quit:count<1
+		set TSEQ=rs.getCol("KEY2")
+		set TRNDT=rs.getCol("KEY3")
+		type RecordTMPRPT3 tmprpt3=Db.getRecord("TMPRPT3","PID=:%ProcessID,KEY1=:%SessionID,KEY2=:TSEQ, KEY3=:TRNDT",1)
+		set record=tmprpt3.data
+
+		set mxlength=mxlength-record.toByteString().length()
+		if mxlength<0 set count=-1 quit
+
+		set string=string_record_$C(13)_$C(10)
+		set count=count-1
+		set last=TSEQ
+		}
+
+	// Are there records which have not been returned (0=no, 1=yes)
+	set more=0
+	type ResultSet rs1=Db.select("KEY2","TMPRPT3","PID=:%ProcessID AND KEY1=:%SessionID AND KEY2>=:TSEQ","KEY2")
+	if rs1.next() set more=last'=rs1.getCol("KEY2")
+	
+	// Store the last sequence processed
+	set tmprpt1=Db.getRecord("TMPRPT1","PID=:%ProcessID,KEY1=:%SessionID",1)
+	set tmprpt1.data=last
+	do tmprpt1.bypassSave()
+
+	// Header data reflecting user changes
+	set fld(1)=hdrdata.get()
+
+	// Through date - may have been computed here
+	set fld(2)=enddate.get()
+
+	// Transaction detail
+	set fld(3)=string
+
+	// Indicator of whether or not more transactions
+	set fld(4)=more
+
+	set return=$$V2LV^MSG(.fld,"",0)
+
+	quit
+
+
+ERROR()	//Private;Error handling
+	
+	type public String RM044
+	
+	if $TLEVEL do Runtime.rollback()
+
+	if $G(unlock),$G(CID) lock -ACN(CID)
+
+	if 'RM044.isNull() quit RM044
+	
+	quit $$ERRMSG^PBSUTL($G(RM),$G(ET))

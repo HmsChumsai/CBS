@@ -1,0 +1,17 @@
+//DO NOT MODIFY  Fix DAYENDINP for DEP account|ZFIXDAYE|||||||1
+	
+	/* Created By Ravipong.Ch 2012/04/17
+	*/
+	
+
+K470()
+	type DbSet ds = Db.selectDbSet("DEP","TYPE=3003,ZSTATCD=0")
+	while ds.next() do {
+		if ds.getRecord().type'=3003 quit
+		if ds.getRecord().ipf'="1MAE" quit
+		type RecordDEP dep = ds.getRecord("DEP",1)
+		set ZMLD=dep.mld
+		
+		}
+	
+	

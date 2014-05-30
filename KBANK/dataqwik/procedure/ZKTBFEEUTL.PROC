@@ -1,0 +1,661 @@
+//DO NOT MODIFY  KTB Fee Utiliy|ZFEEUTL|||||||1
+ZFEEUTL
+	//DO NOT MODIFY  KTB Fee Utiliy|ZFEEUTL|||||||1
+	  /*
+	ORIG: choochac - 06/16/2003
+	DESC: KTB Fee Utiliy
+	
+	---- Comments --------------------------------------------------------
+	
+	---- Revision History ------------------------------------------------
+	03/07/2012 - Ace Choompolkanchana
+		   Modified FEETCMT to add Min/Max boolean flag
+	
+	04/05/2011 - Wipawan Karnwiwat
+		   in Line Tag FEEAMT
+		   Change convert rate for fee ZSECCRCD, ZSECMIN and
+		   ZSECMAX from buying T/T rate to mid rate
+ 		
+	03/12/2008 - Anchalee Ch. (Profile Upgrade)
+		   Modified section FEEETC, getRecord of TRN before calling
+		   GLACN^TRNUTL.
+	
+	28/10/08 - Rachod Intraha (Profile Upgrade)
+		   Modified code to comply with profile 7.2
+
+	28/09/05 - Piyanan
+		   Updated logic for Teller Payment Special Fee.
+		   
+	27/07/05 - NISA
+		   Fixed miscellaneous bugs in FEETCMT.
+
+	26/07/05 - NISA
+		   Added section FEETCMT for return Fixed Amount Feein THB.
+
+	28/06/05 - NISA
+		   Change converted rate for fee from mid rate to buying 
+		   T/T rate only for ZSECCRCD,ZSECMIN,ZSECMAX="THB"
+
+	05/06/05 - NISA
+		   Change buying T/T rate for convert fee to mid rate.
+		   (TRNTYP=2,CUSTCD=2).
+
+	27/05/05 - NISA
+		   Check if CRCD='JPY' set decimal=0.
+
+	17/05/05 - NISA
+		   Use buying T/T rate for convert Fee amount.
+		   (TRNTYP=0,CUSTCD=2).
+
+	30/04/05 - NISA
+		   Updated logic for FX Fee conversion.
+
+	29/04/05 - Thanuwat Add foreign currency deposit fee
+	18/10/03 - Chaiyun
+		   Add field minimum/maximum fee amount for interregion
+	05/10/03 - Chaiyun
+		   Add Percentage fee amount in case of interregion
+		   including in total fee amount.
+	26/09/03 - CHOK
+		   Modified section FEE, FEEAMT to pull DEC from 
+		   ZUTBLZSFEE.DEC if DEC is not passed from the 
+		   parameter list.
+
+	 ****** Consider using setAuditFlag for all objects in this procedure
+	   example :do dep.setAuditFlag(1)
+	
+	 */
+ 	
+ 	quit
+ 	
+	//FEE(FEEMSG,FEECODE,FEEAMT,TAMT,TRNTYP,CID,TBRCD,INTRFACE,INTREG) 	
+FEE(FEECODE,FEEAMT,TAMT,CID,INTRFACE,INTREG,DEC) 	
+	new FEEMSG,FEEATMR
+		
+	set FEEMSG=""
+	if $$TRIM^%ZS(FEECODE)="" quit FEEMSG
+	
+	type RecordZUTBLZSFEE zsfee=Db.getRecord("ZUTBLZSFEE","FEECODE")
+
+	// set number of decimal points to zero, if it isn't indicate
+	//if '$D(DEC) set DEC=0
+	if '$D(DEC) set DEC=+zsfee.dec
+
+	if '$D(FEEAMT) set FEEAMTR=$$FEEAMT(FEECODE,TAMT,INTREG,DEC)	
+	else  set FEEAMTR=FEEAMT
+
+	// Look up product group of account number
+	if 'Db.isDefined("ACN","CID=:CID") quit FEEMSG
+
+
+	type RecordACN prd=Db.getRecord("ACN","CID=:CID")
+	set PRDGRP=prd.grp
+	//set FEEMSG=FEECODE_"|"_$$FEEAMT(FEECODE,TAMT,INTREG)_"|"_$$FEEETC(INTRFACE,FEECODE,PRDGRP)      	
+	set FEEMSG=FEECODE_"|"_FEEAMTR_"|"_$$FEEETC(INTRFACE,FEECODE,PRDGRP)
+	quit FEEMSG
+ 	
+FEEAMT(FEECODE,TAMT,INTREG,DEC)
+	
+	/*
+	29/04/2005 Thanuwat Suttirak 
+	add Foreign curency deposit fee for check  minimum and maximum fee
+	
+	 Return Fee Amount
+	 The following process rules will be used to determine the transaction amount:
+         o Retrieve the following columns from the KTB Fee Table:
+	   . FEEAMT	Fixed Fee Amount
+	   . FEEPCT	Percentage of Transaction Fee
+	   . FEEINTPT	Percentage of Interregion Fee
+	   . FEEINT	Inter-region Fee
+	   . FEEMIN	Minimum Fee Amount
+	   . FEEMAX	Maximum Fee Amount
+	   . DEC	No. of Decimal point for percentage fee
+	 o If FEEPCT is defined increment fee amount by the transaction 
+	   amount times this percentage amount (rounding rules apply)
+	 o If FEEAMT is defined increment fee amount by this fixed amount
+	 o If the passed Inter-region Fee Indicator is "true", increment
+	   fee amount by FEEINT
+	 o If total fee amount is less than FEEMIN set fee amount to FEEMIN
+	 o If total fee amount is greater than FEEMAX set fee amount to FEEMAX
+	*/
+	set ER=0
+	new FEE,OPT
+	set FEE=0
+	set OPT=""
+	
+	// If entry does not exist quit without an amount
+	if 'Db.isDefined("ZUTBLZSFEE","FEECODE=:FEECODE") set ER=1,RM="fee code is not define. " quit 0
+	type RecordZUTBLZSFEE zsfee=Db.getRecord("ZUTBLZSFEE","FEECODE=:FEECODE")
+	 
+	// set number of decimal points to zero, if it isn't indicate
+	if '$D(DEC) set DEC=+zsfee.dec
+	
+	// Piyanan 28/09/05
+	new SPFEE,ZSPECIAL
+	set SPFEE=0
+	set ZSPECIAL=zsfee.special
+	// Piyanan End 28/09/05
+	
+	// Percentage amount
+	if zsfee.feepct>0 do {
+		set FEE=TAMT*zsfee.feepct/100
+		// Round fee based on rounding option
+		if zsfee.rndopt'="" set OPT=$S(zsfee.rndopt=0:"",zsfee.rndopt=1:"+",zsfee.rndopt=2:"-")
+		else  set OPT=""
+		set FEE=$$^SCARND(FEE,,,,DEC,OPT)	
+	}
+
+	// Fixed amount ============================================================
+	/* 
+		Thanuwat Suttirak 29/04/2005
+		Add Checking for set Min/Max Fee Amount for each Currency
+	*/
+	
+	new ZFIXAMT,ZSECCRCD,BASECRCD,ZEXCAMT,ZSYS
+	set ZSYS=%SystemDate
+	set (ZFIXAMT,ZSECCRCD,BASECRCD,ZEXCAMT)=""
+	set ZFIXAMT= zsfee.feeamt		// Fee Amount
+	set ZSECCRCD=zsfee.feeamtcrcd   	// Fee Amount base currency
+	set BASECRCD=zsfee.crcd   		// Currency Code
+	set ZFIXAMT=+ZFIXAMT
+	
+	
+	if ZFIXAMT>0 do {
+		if ZSECCRCD="" set FEE=FEE+ZFIXAMT
+		else  do {
+			if BASECRCD="" set BASECRCD="THB"
+			if ZSECCRCD="" set ER=1,RM="Fee Amount base currency is null" quit
+
+			if BASECRCD'=ZSECCRCD do {
+				if ZSECCRCD="THB" do {
+					// 04/05/2011 Change to Used Mid Rate
+					// --Used buying T/T rate			
+					do EXC^CRCDUTL(BASECRCD,ZSECCRCD,ZFIXAMT,0,2,"00",2,ZSYS,1)
+				}
+				else  do {
+					// Used mid rate
+					do EXC^CRCDUTL(BASECRCD,ZSECCRCD,ZFIXAMT,0,2,"00",2,ZSYS,1)
+				}
+				set ZEXCAMT=0
+				set ZEXCAMT=EXCAMT
+				set EXCAMT=0
+				set FEE=FEE+ZEXCAMT
+				if BASECRCD'="JPY" do {
+					set FEE=$$^SCARND(FEE,,,,2)
+				}
+				else  do {
+					set FEE=$$^SCARND(FEE,,,,0)
+				}
+			}
+			else  do {
+				set FEE=FEE+ZFIXAMT
+			}
+		}
+	}
+		
+	// old program said ->  if zsfee.feeamt>0 set FEE=FEE+zsfee.feeamt
+
+	// =====================================================================
+	// Inter-region
+	new PCTFEE
+	set PCTFEE=0
+	if INTREG=1 do {
+		// <---- Add percentage of interregion fee 
+		new OPT,PCTFEE
+		set PCTFEE=0
+		if +zsfee.feeintpt>0 do {
+			set PCTFEE=TAMT*zsfee.feeintpt/100
+			// Round fee based on rounding option
+			if zsfee.rndopt'="" set OPT=$S(zsfee.rndopt=0:"",zsfee.rndopt=1:"+",zsfee.rndopt=2:"-")
+			else  set OPT=""
+			// set FEE=FEE+$$^SCARND(PCTFEE,,,,DEC,OPT)	
+			set PCTFEE=$$^SCARND(PCTFEE,,,,DEC,OPT)
+		}
+	//     Chaiyun   05/10/2003    ------>	
+		// Interregion fixed amount
+		set PCTFEE=PCTFEE+zsfee.feeint
+	//     Piyanan	28/09/05
+		// Special fee
+		if ZSPECIAL'= "" do {
+			set SPFEE=$$SPFEEAMT^ZFEEUTL(FEECODE,TAMT,INTREG,DEC)
+			if ZSPECIAL=1 &(SPFEE>0) set PCTFEE=SPFEE
+			else  set PCTFEE=PCTFEE+SPFEE		
+		}
+		// <---- check inter-region min./max. fee amount
+		if PCTFEE<zsfee.intrgmin,zsfee.intrgmin'="" set PCTFEE=zsfee.intrgmin
+		if PCTFEE>zsfee.intrgmax,zsfee.intrgmax'="" set PCTFEE=zsfee.intrgmax
+		// Combine inter-region fee to normal fee
+		//set FEE=FEE+PCTFEE
+		//  	    Chaiyun   18/10/2003    ------>
+		//     Piyanan	28/09/05
+		if (ZSPECIAL=1)&(SPFEE>0) set FEE=PCTFEE
+		else  set FEE=FEE+PCTFEE
+	}
+	//     Piyanan	28/09/05
+		// Special fee
+	if (ZSPECIAL'= "")&(INTREG'=1) do {
+		set SPFEE=$$SPFEEAMT^ZFEEUTL(FEECODE,TAMT,INTREG,DEC)
+		if (ZSPECIAL=1)&(SPFEE>0) set FEE=SPFEE
+		else  set FEE=FEE+SPFEE
+	}
+	
+	/*  
+	=====================================================================
+	Thanuwat Suttirak 29/04/2005
+	Add Checking for set Min/Max Fee Amount for each Currency
+	
+	old Program
+	if FEE<zsfee.feemin,zsfee.feemin'="" set FEE=zsfee.feemin
+	if FEE>zsfee.feemax,zsfee.feemax'="" set FEE=zsfee.feemax
+	*/
+	
+	new ZSECMIN,ZSECMAX,ZMINAMT,ZMAXAMT
+	set (ZSECMIN,ZSECMAX,ZMINAMT,ZMAXAMT)=""
+	set ZSECMIN=zsfee.feemincrcd	//  Minimum fee base currency
+	set ZSECMAX=zsfee.feemaxcrcd	//  Maximum fee base currency
+	set ZMINAMT=0            	//  Minimum Fee Amount
+	set ZMAXAMT=0		//  Maximum Fee Amount
+	
+        if (zsfee.feemin'="") do {
+                if BASECRCD'=ZSECMIN do {
+			if ZSECMIN="THB" do {
+				// 04/05/2011 Change to Used Mid Rate
+				// -- Used buying T/T
+        			do EXC^CRCDUTL(BASECRCD,ZSECMIN,zsfee.feemin,0,2,"00",2,ZSYS,1)
+			}
+			else  do {
+				// Used mid rate
+				do EXC^CRCDUTL(BASECRCD,ZSECMIN,zsfee.feemin,0,2,"00",2,ZSYS,1)
+			}
+                        set ZMINAMT=EXCAMT
+			if BASECRCD'="JPY" do {
+                        	set ZMINAMT=$$^SCARND(ZMINAMT,,,,2)
+			}
+			else  do {
+				set ZMINAMT=$$^SCARND(ZMINAMT,,,,0)
+			}
+                }
+                else  do {
+                        set ZMINAMT=zsfee.feemin
+                }
+        }
+        if (zsfee.feemax'="") do {
+                if BASECRCD'=ZSECMAX do {
+			if ZSECMAX="THB" do {
+				// 04/05/2011 Change to Used Mid Rate
+				// --Used buying T/T
+           			do EXC^CRCDUTL(BASECRCD,ZSECMAX,zsfee.feemax,0,2,"00",2,ZSYS,1)
+			}
+			else  do {
+				//Used mid rate
+				do EXC^CRCDUTL(BASECRCD,ZSECMAX,zsfee.feemax,0,2,"00",2,ZSYS,1)
+			}
+                        set ZMAXAMT=EXCAMT
+			if BASECRCD'="JPY" do {
+                        	set ZMAXAMT=$$^SCARND(ZMAXAMT,,,,2)
+			}
+			else  do {
+				set ZMAXAMT=$$^SCARND(ZMAXAMT,,,,0)
+			}
+                }
+                else  do {
+                        set ZMAXAMT=zsfee.feemax
+                }
+	}
+        if FEE<ZMINAMT,zsfee.feemin'="" set FEE=ZMINAMT
+        if FEE>ZMAXAMT,zsfee.feemax'="" set FEE=ZMAXAMT	
+
+	// =====================================================================
+	
+	quit FEE
+
+	
+	
+	
+FEEETC(INTRFACE,FEECODE,GRP)
+
+	/*
+	 Return Fee Transction Codes and Offset Account Number
+	 
+	 ARGUMENTS:
+	 	INTRFACE	Interface Name
+		FEECODE		Fee Code
+		GRP		Product Group (in case of ATM)
+
+	 RETURNS:
+		$$		Fee Transaction Code Information
+				fee_tran_code|offset_tran_code|offset_account_number
+	 
+	 This extrinsic function will return the fee transaction code,
+	 offset transaction code and offset account number.
+	*/
+
+	new ETC,OCID,STR,XCODE
+	type RecordUTBLEXTTRN1 exttrn
+	
+	set XCODE=FEECODE_GRP
+	
+	// If entry does not exist quit with null
+	if 'Db.isDefined("UTBLEXTTRN1","INTRFACE,XCODE") quit ""
+
+	set exttrn=Db.getRecord("UTBLEXTTRN1","INTRFACE,XCODE")
+	
+	// Determine offset account number
+	if exttrn.cretc'="" do {
+		
+		//set ETC=exttrn.cretc
+		//do LOADETC^TTXEXT(.ETC)
+		//set OCID=$$GLACN^TTXP2(ETC(exttrn.cretc),%UserID)
+		
+		//03/12/2008 - Anchalee Ch. (Profile Upgrade)
+		//Modified to getRecord of TRN before calling GLACN^TRNUTL
+		type RecordTRN trn=Db.getRecord("TRN","ETC=:exttrn.cretc",1)
+		if trn.getMode()=0 set OCID="" quit
+		//set trn.etc = exttrn.cretc
+		//End of 03/12/2008
+		set OCID = $$GLACN^TRNUTL(.trn,%UserID)
+		
+		
+	}
+	else  set OCID=""
+	quit exttrn.dretc_"|"_exttrn.cretc_"|"_OCID
+	
+
+
+FEETCMT(FEECODE,TAMT,INTREG,DEC, Boolean isMinorMax)
+	
+	/*
+	29/04/2005 Thanuwat Suttirak 
+	add Foreign curency deposit fee for check  minimum and maximum fee
+	
+	 Return Fee Amount
+	 The following process rules will be used to determine the transaction amount:
+         o Retrieve the following columns from the KTB Fee Table:
+	   . FEEAMT	Fixed Fee Amount
+	   . FEEPCT	Percentage of Transaction Fee
+	   . FEEINTPT	Percentage of Interregion Fee
+	   . FEEINT	Inter-region Fee
+	   . FEEMIN	Minimum Fee Amount
+	   . FEEMAX	Maximum Fee Amount
+	   . DEC	No. of Decimal point for percentage fee
+	 o If FEEPCT is defined increment fee amount by the transaction 
+	   amount times this percentage amount (rounding rules apply)
+	 o If FEEAMT is defined increment fee amount by this fixed amount
+	 o If the passed Inter-region Fee Indicator is "true", increment
+	   fee amount by FEEINT
+	 o If total fee amount is less than FEEMIN set fee amount to FEEMIN
+	 o If total fee amount is greater than FEEMAX set fee amount to FEEMAX
+	*/
+	
+	/*
+	03/07/2012 Ace
+	Added Min/Max flag to indicate that the amount is equal to minimum or maximum
+	*/
+	
+	set ER=0
+	new FEE,OPT
+	set FEE=0
+	set OPT=""
+
+	//new ZTFIXAMT,ZTMINAMT,ZTMAXAMT			//Nisa - 27/07/2005
+	set (ZTFIXAMT,ZTMINAMT,ZTMAXAMT)=""		//Nisa - 27/07/2005
+
+	// If entry does not exist quit without an amount
+	if 'Db.isDefined("ZUTBLZSFEE","FEECODE=:FEECODE") set ER=1,RM="fee code is not define. " quit 0
+	type RecordZUTBLZSFEE zsfee=Db.getRecord("ZUTBLZSFEE","FEECODE=:FEECODE")
+	 
+	// set number of decimal points to zero, if it isn't indicate
+	if '$D(DEC) set DEC=+zsfee.dec
+	
+	// Percentage amount
+	if zsfee.feepct>0 do {
+		set FEE=TAMT*zsfee.feepct/100
+		// Round fee based on rounding option
+		if zsfee.rndopt'="" set OPT=$S(zsfee.rndopt=0:"",zsfee.rndopt=1:"+",zsfee.rndopt=2:"-")
+		else  set OPT=""
+		set FEE=$$^SCARND(FEE,,,,DEC,OPT)	
+	}
+
+	// Fixed amount ============================================================
+	/* 
+		Thanuwat Suttirak 29/04/2005
+		Add Checking for set Min/Max Fee Amount for each Currency
+	*/
+	
+	new ZFIXAMT,ZSECCRCD,BASECRCD,ZEXCAMT,ZSYS
+	set ZSYS=%SystemDate
+	set (ZFIXAMT,ZSECCRCD,BASECRCD,ZEXCAMT)=""
+	set ZFIXAMT= zsfee.feeamt		// Fee Amount
+	set ZSECCRCD=zsfee.feeamtcrcd   	// Fee Amount base currency
+	set BASECRCD=zsfee.crcd   		// Currency Code
+	set ZFIXAMT=+ZFIXAMT
+	
+	if ZFIXAMT>0 do {
+		if ZSECCRCD="" set FEE=FEE+ZFIXAMT
+		else  do {
+			if BASECRCD="" set BASECRCD="THB"
+			if ZSECCRCD="" set ER=1,RM="Fee Amount base currency is null" quit
+
+			if BASECRCD'=ZSECCRCD do {
+				if ZSECCRCD="THB" do {
+					
+					set ZTFIXAMT=ZFIXAMT //Nisa - 27/07/2005
+					// 04/05/2011 Change to Used Mid Rate
+					// --Used buying T/T rate			
+					do EXC^CRCDUTL(BASECRCD,ZSECCRCD,ZFIXAMT,0,2,"00",2,ZSYS,1)
+				}
+				else  do {
+					// Used mid rate
+					do EXC^CRCDUTL(BASECRCD,ZSECCRCD,ZFIXAMT,0,2,"00",2,ZSYS,1)
+				}
+				set ZEXCAMT=0
+				set ZEXCAMT=EXCAMT
+				set EXCAMT=0
+				set FEE=FEE+ZEXCAMT
+				if BASECRCD'="JPY" do {
+					set FEE=$$^SCARND(FEE,,,,2)
+				}
+				else  do {
+					set FEE=$$^SCARND(FEE,,,,0)
+				}
+			}
+			else  do {
+				set FEE=FEE+ZFIXAMT
+			}
+		}
+	}
+	// old program said ->  if zsfee.feeamt>0 set FEE=FEE+zsfee.feeamt
+
+	// =====================================================================
+	// Inter-region
+	new PCTFEE
+	set PCTFEE=0
+	if INTREG=1 do {
+		// <---- Add percentage of interregion fee 
+		new OPT,PCTFEE
+		set PCTFEE=0
+		if +zsfee.feeintpt>0 do {
+			set PCTFEE=TAMT*zsfee.feeintpt/100
+			// Round fee based on rounding option
+			if zsfee.rndopt'="" set OPT=$S(zsfee.rndopt=0:"",zsfee.rndopt=1:"+",zsfee.rndopt=2:"-")
+			else  set OPT=""
+			// set FEE=FEE+$$^SCARND(PCTFEE,,,,DEC,OPT)	
+			set PCTFEE=$$^SCARND(PCTFEE,,,,DEC,OPT)
+		}
+	//     Chaiyun   05/10/2003    ------>	
+		// Interregion fixed amount
+		set PCTFEE=PCTFEE+zsfee.feeint
+		// <---- check inter-region min./max. fee amount
+		if PCTFEE<zsfee.intrgmin,zsfee.intrgmin'="" set PCTFEE=zsfee.intrgmin
+		if PCTFEE>zsfee.intrgmax,zsfee.intrgmax'="" set PCTFEE=zsfee.intrgmax
+		// Combine inter-region fee to normal fee
+		set FEE=FEE+PCTFEE
+		//  	    Chaiyun   18/10/2003    ------>
+	}
+	
+	/*  
+	=====================================================================
+	Thanuwat Suttirak 29/04/2005
+	Add Checking for set Min/Max Fee Amount for each Currency
+	
+	old Program
+	if FEE<zsfee.feemin,zsfee.feemin'="" set FEE=zsfee.feemin
+	if FEE>zsfee.feemax,zsfee.feemax'="" set FEE=zsfee.feemax
+	*/
+	
+	new ZSECMIN,ZSECMAX,ZMINAMT,ZMAXAMT
+	set (ZSECMIN,ZSECMAX,ZMINAMT,ZMAXAMT)=""
+	set ZSECMIN=zsfee.feemincrcd	//  Minimum fee base currency
+	set ZSECMAX=zsfee.feemaxcrcd	//  Maximum fee base currency
+	set ZMINAMT=0            	//  Minimum Fee Amount
+	set ZMAXAMT=0		//  Maximum Fee Amount
+
+
+
+	
+        if (zsfee.feemin'="") do {
+                if BASECRCD'=ZSECMIN do {
+			if ZSECMIN="THB" do {
+			
+				set ZTMINAMT=zsfee.feemin  //Nisa - 27/07/2005
+				// 04/05/2011 Change to Used Mid Rate
+				// --Used buying T/T
+        			do EXC^CRCDUTL(BASECRCD,ZSECMIN,zsfee.feemin,0,2,"00",2,ZSYS,1)
+			}
+			else  do {
+				// Used mid rate
+				do EXC^CRCDUTL(BASECRCD,ZSECMIN,zsfee.feemin,0,2,"00",2,ZSYS,1)
+			}
+                        set ZMINAMT=EXCAMT
+			if BASECRCD'="JPY" do {
+                        	set ZMINAMT=$$^SCARND(ZMINAMT,,,,2)
+			}
+			else  do {
+				set ZMINAMT=$$^SCARND(ZMINAMT,,,,0)
+			}
+                }
+                else  do {
+                        set ZMINAMT=zsfee.feemin
+                }
+        }
+        if (zsfee.feemax'="") do {
+                if BASECRCD'=ZSECMAX do {
+			if ZSECMAX="THB" do {
+			
+				set ZTMAXAMT=zsfee.feemax  //Nisa - 27/07/2005
+				// 04/05/2011 Change to Used Mid Rate
+				// --Used buying T/T
+           			do EXC^CRCDUTL(BASECRCD,ZSECMAX,zsfee.feemax,0,2,"00",2,ZSYS,1)
+			}
+			else  do {
+				//Used mid rate
+				do EXC^CRCDUTL(BASECRCD,ZSECMAX,zsfee.feemax,0,2,"00",2,ZSYS,1)
+			}
+                        set ZMAXAMT=EXCAMT
+			if BASECRCD'="JPY" do {
+                        	set ZMAXAMT=$$^SCARND(ZMAXAMT,,,,2)
+			}
+			else  do {
+				set ZMAXAMT=$$^SCARND(ZMAXAMT,,,,0)
+			}
+                }
+                else  do {
+                        set ZMAXAMT=zsfee.feemax
+                }
+	}
+        if FEE<ZMINAMT,zsfee.feemin'="" set FEE=ZMINAMT
+        if FEE>ZMAXAMT,zsfee.feemax'="" set FEE=ZMAXAMT	
+
+	// =====================================================================
+	
+	// Ace 03/07/2012 return Min/Max flag
+	//set teller comment with appropriate value - Nisa - 27/07/2005
+	if (FEE'=ZMINAMT)&(FEE'=ZMAXAMT)&(+ZFIXAMT=0) set FEE=""
+	else  do {
+	
+		//quit with fix amount in THB
+		if +ZFIXAMT>0 set FEE=ZTFIXAMT quit	
+		
+		//quit with minimum amount in THB
+		if FEE=ZMINAMT set FEE=ZTMINAMT, isMinorMax=true quit
+
+		//quit with maximum amount in THB
+		if FEE=ZMAXAMT set FEE=ZTMAXAMT, isMinorMax=true quit
+	
+	}
+	//Nisa End - 27/07/2005
+	
+	quit FEE
+	
+SPFEEAMT(FEECODE,TAMT,INTREG,DEC)
+	/*     
+	  Piyanan  28/09/05
+	  Return Special Fee Amount
+	  o Retrieve the following columns from table ZUTBLZSFEE:
+	    . SPECIAL		Special Flag
+				0 - Normal & First Amount
+				1 - Calculate From First
+				2 - Normal & Exceed Amount
+	    . AMTLEXT		Transaction Amount Limit for Extra
+	    . FEEPAMTL		Fee Percent of Transaction Amount Limit
+	    . EVAMTEXT		Every Transaction Amount for Extra
+	    . FEEAMTEXT		FEE Fixed Amount for Extra
+	    . IRAMTLEXT		Inter-Region Tran Amt Limit for Extra
+	    . IRFEEPAMTL	Inter-Region Fee % of Tran Amt Limit
+	    . IREVAMTEXT	Inter-Region Every Tran Amt for Extra
+	    . IRFEEAMTEXT	Inter-Region FEE Fixed Amount for Extra
+	*/
+	set ER=0
+	new SPFEE,TFEE,OPT
+	set SPFEE=0
+	set TFEE=0
+	set OPT=""
+	// If entry does not exist quit without an amount
+	if 'Db.isDefined("ZUTBLZSFEE","FEECODE=:FEECODE") set ER=1,RM="fee code is not define. " quit 0
+	type RecordZUTBLZSFEE zsfee=Db.getRecord("ZUTBLZSFEE","FEECODE=:FEECODE")
+	// Calculate from the first baht of TAMT 
+	// Special=0 or Special=1
+	if +zsfee.special'=2 do {
+		if (+zsfee.iramtlext>0)&(+zsfee.irfeepamtl>0)&(INTREG=1) do {
+			if TAMT>+zsfee.iramtlext set TFEE=TAMT*zsfee.irfeepamtl/100
+			set SPFEE=SPFEE+TFEE
+		}
+		if (+zsfee.amtlext>0)&(+zsfee.feepamtl>0)&(INTREG'=1) do {
+			if TAMT>+zsfee.amtlext set TFEE=TAMT*zsfee.feepamtl/100
+			set SPFEE=SPFEE+TFEE
+		}
+		// Round fee based on rounding option
+		if zsfee.rndopt'="" set OPT=$S(zsfee.rndopt=0:"",zsfee.rndopt=1:"+",zsfee.rndopt=2:"-")
+		else  set OPT=""
+		set SPFEE=$$^SCARND(SPFEE,,,,DEC,OPT)
+	} quit SPFEE
+	// Calculate from the extra of TAMT Limit
+	if +zsfee.special=2 do {
+		if (+zsfee.iramtlext>0)&(+zsfee.irfeepamtl>0)&(INTREG=1) do {
+			if TAMT>+zsfee.iramtlext set TFEE=(TAMT-zsfee.iramtlext)*zsfee.irfeepamtl/100
+			set SPFEE=SPFEE+TFEE
+		}
+		if (+zsfee.amtlext>0)&(+zsfee.feepamtl>0)&(INTREG'=1) do {
+			if TAMT>+zsfee.amtlext set TFEE=(TAMT-zsfee.amtlext)*zsfee.feepamtl/100
+			set SPFEE=SPFEE+TFEE
+		}
+		// Round fee based on rounding option
+		if zsfee.rndopt'="" set OPT=$S(zsfee.rndopt=0:"",zsfee.rndopt=1:"+",zsfee.rndopt=2:"-")
+		else  set OPT=""
+		set SPFEE=$$^SCARND(SPFEE,,,,DEC,OPT)
+	
+	} quit SPFEE
+	if (+zsfee.irevamtext>0)&(+zsfee.irfeeamtext>0)&(INTREG=1) do {
+		set TFEE=TAMT/zsfee.irevamtext	
+		set TFEE=$$^SCARND(TFEE,,,,"0","+")
+		set TFEE=TFEE*zsfee.irfeeamtext
+		set SPFEE=SPFEE+TFEE
+	}
+	if (+zsfee.evamtext>0)&(+zsfee.feeamtext>0)&(INTREG'=1) do {
+		set TFEE=TAMT/zsfee.evamtext	
+		set TFEE=$$^SCARND(TFEE,,,,"0","+")
+		set TFEE=TFEE*zsfee.feeamtext
+		set SPFEE=SPFEE+TFEE
+	}
+	
+	quit SPFEE
