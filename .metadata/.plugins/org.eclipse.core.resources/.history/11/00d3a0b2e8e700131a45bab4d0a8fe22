@@ -1,9 +1,7 @@
-//DO NOT MODIFY  bathc for recordBSpcBlkUnblkSalResult|ZBCHHRIS||||||ZHRIS|||100|32000|ZITFKEY,ZAPP|0|||10|10|0||0||0
+//DO NOT MODIFY  bathc for recordBSpcBlkUnblkSalResult|ZBCHHRIS||||||ZHRIS|||100|32000||0|||10|10|0||0||0
 ---------- REVHIST ------ Section marker
 
 ---------- OPEN    ------ Section marker
-
-	kill ^TMP("ZHRIS","OUT")
 
 ---------- SCHINIT ------ Section marker
 
@@ -12,6 +10,9 @@
 ---------- SCHPOST ------ Section marker
 
 ---------- SCHEXIT ------ Section marker
+
+	
+	do EXTRACT
 
 ---------- THRINIT ------ Section marker
 
@@ -33,50 +34,32 @@ EXT(IO out,toTalRec)
 	while 'ZSEQ.isNull() do {
 		set ZCID=$O(^TMP("ZHRIS","OUT",ZSEQ,""))
 		while 'ZCID.isNull() do {
-			set toTalRec=toTalRec+1
 			type String ZDATA
 			set ZDATA = ^TMP("ZHRIS","OUT",ZSEQ,ZCID))
 			do out.write(ZDATA)
 			set ZCID=$O(^TMP("ZHRIS","OUT",ZSEQ,ZCID))
+			set toTalRec=toTalRec+1
 		}
 		set ZSEQ=$O(^TMP("ZHRIS","OUT",ZSEQ))
 	}
 
 	quit
 
-EXTRACT(ZAPP,ZITFKEY)
-	
-	
-	//----- 2014/05/29 Dynamic File Name
-	set ZPFDIR = $$TRNLNM^%ZFUNC("PROFILE_DIR")
-	type RecordZUTBLITFFTP itf = Db.getRecord("ZUTBLITFFTP","ZPFDIR,ZAPP,ZITFKEY",1)
-	set ZFNAME = itf.OUTLFS
-	set ZFNAME = $$CFTPFUNC^ZITFUTL(ZFNAME)
-	set ZOUTPATH = itf.OUTLP
-	set ZOUTPATH = $$CFTPPATH^ZITFUTL(ZOUTPATH)
-	
-	
-	//type Date ZEXTDT
+EXTRACT
+
+	type Date ZEXTDT
 	type Number toTalRec=0
-	//do SYSVAR^SCADRV0()
-	//set ZEXTDT=%SystemDate.toString("YEARMMDD")
-	//type IO out =Class.new("IO")
-	//set out.fileName =$$TRNLNM^%ZFUNC("SCAU_SPOOL_HRIS")_"/SHARP.HRIS.RES.BLOCKACC.SAM_"_ZEXTDT
-	//set out.openParams ="NEWV/WRITE"
-	//set out.recordSize =1024
-	//do out.open()
+	do SYSVAR^SCADRV0()
+	set ZEXTDT=%SystemDate.toString("YEARMMDD")
 	type IO out =Class.new("IO")
-	set out.fileName =ZOUTPATH_"/"_ZFNAME
+	set out.fileName =$$TRNLNM^%ZFUNC("SCAU_SPOOL_HRIS")_"/SHARP.HRIS.RES.BLOCKACC.SAM_"_ZEXTDT
 	set out.openParams ="NEWV/WRITE"
 	set out.recordSize =1024
 	do out.open()
-	//-----
 	do HEADER(.out)
 	do EXT(.out,.toTalRec)
 	do FOOTER(.out,toTalRec)
 	do out.close()
-	set ER=0
-	
 
 	quit
 
@@ -112,9 +95,8 @@ HEADER(IO out)
 
 	set ZARROUT("RecType")="H01"
 	set ZARROUT("SysDt")=$$PADDING(ZSTAMP,1,33)
-	set ZARROUT("BusinessDt")=%SystemDate.toString("YYYY-MM-DD")
+	set ZARROUT("BusinessDt")=%CurrentDate.toString("YYYY-MM-DD")
 	set ZARROUT("SrcAppId")=$$PADDING(cuvar.zappid,1,5)
-	
 	set ZARROUT("FileType")="AcctInf "
 	set ZARROUT("FileSeqNum")="000001"
 	set ZARROUT("Filler")=$J("",291)
@@ -187,6 +169,7 @@ ZREJ(ZSEQ,ZCID,ZCAUSE)
 	set ZOM=ZOM_ZARROUT("ErrorCode").get()
 	set ZOM=ZOM_ZARROUT("ErrorDesc").get()
 
+
 	set ^TMP("ZHRIS","OUT",ZSEQ,ZCID)=ZOM
 	set ^TMP("ZHRIS","ERRLOG",ZSEQ,ZCID)=ZCAUSE
 
@@ -215,7 +198,7 @@ PROC(ZSEQ,ZCID)
 	type RecordDEP zdep = Db.getRecord("DEP","CID=:ZCID")
 	if (zdep.grp'="SAV"),(zdep.grp'="DDA") do ZREJ(ZSEQ,ZCID,"E0030") quit
 	//else zdep.grp'="DDA" do ZREJ(ZCID) quit
-	if zdep.stat'=0 do ZREJ(ZSEQ,ZCID,"E0047") quit
+	if zdep.stat'=0 do ZREJ(ZCID) quit
 
 	set ZINTMISCKEY=$G(^TMP("ZHRIS","zSrcAppId"))
 	type ResultSet rs = Db.select("VAL","ZUTBLINTMISC","INTRFACE='ITF' and KEY=:ZINTMISCKEY")
@@ -258,7 +241,7 @@ BALSIGN(zbal)
 	else set output="-"
 	quit output
 
-READ(ZAPP,ZITFKEY)
+READ
 
 	
 	/*

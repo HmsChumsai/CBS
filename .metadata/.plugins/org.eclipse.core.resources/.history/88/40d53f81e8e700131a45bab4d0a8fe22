@@ -75,8 +75,6 @@ EXTRACT(ZAPP,ZITFKEY)
 	do EXT(.out,.toTalRec)
 	do FOOTER(.out,toTalRec)
 	do out.close()
-	set ER=0
-	
 
 	quit
 
