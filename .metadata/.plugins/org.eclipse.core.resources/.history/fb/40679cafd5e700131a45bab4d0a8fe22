@@ -461,13 +461,11 @@ LNDETAIL(CID,CLS)
 		type Date ZLCEFD
 		set ZLCEFD=""
 		set ZQUIT=0
-		if FunctionFlg.get()'="C" do {
-			type ResultSet DAYENDLCHG = Db.select("LCEFD","DAYENDLCHG","CID=:CID","ORDER BY TJD")
-			while DAYENDLCHG.next() do { quit:ZQUIT
-	
-				set ZLCEFD=DAYENDLCHG.getCol(1)
-				if 'ZLCEFD.isNull() set ZQUIT=1
-			}
+		type ResultSet DAYENDLCHG = Db.select("LCEFD","DAYENDLCHG","CID=:CID","ORDER BY TJD")
+		while DAYENDLCHG.next() do { quit:ZQUIT
+
+			set ZLCEFD=DAYENDLCHG.getCol(1)
+			if 'ZLCEFD.isNull() set ZQUIT=1
 		}
 		set output.piece("|",46)=ZLCEFD.toString("DD/MM/YEAR")
 
