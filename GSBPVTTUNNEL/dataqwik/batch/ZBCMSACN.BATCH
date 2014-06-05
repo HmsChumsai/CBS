@@ -1,0 +1,258 @@
+//DO NOT MODIFY  Batch Filter for ACN,CIF extraction|ZBCMSACN||||||ZCONVRPT|PID='CID'||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	
+	new %TAB,%READ
+	set %TAB("MOEND")="/DES=Month End/REQ/TYP=N/LEN=1"
+	set %READ="@@%FN,,MOEND"
+	do ^UTLREAD if VFMQ="Q" set %BatchExit = 1 quit
+	
+	set BOMJD = $$BOMJD^SCADAT(%SystemDate)
+	if (BOMJD=%SystemDate)&(MOEND=0) set %BatchExit = 1 quit
+	if (BOMJD'=%SystemDate)&(MOEND=1) set %BatchExit = 1 quit
+	
+	kill ^ZCMS("CID")
+	
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	
+	do GENACN^ZCMSREPL
+	quit
+	
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	if PID="CID" do PROC(SEQ)
+	
+	quit
+	
+PROC(CID)
+
+	type String ZGRP 
+	type Number ZTYPE
+	if 'Db.isDefined("ACN","CID=:CID") quit
+	type RecordACN acn = Db.getRecord("ACN","CID=:CID")
+	if acn.cls = "L"  do {
+		
+		do ZACN(CID)
+		
+	}
+	
+	else do {
+		set ZGRP=acn.grp
+		set ZTYPE=acn.type
+		
+		//if $D(^XDTJ(TJD-1,SEQ)) set ^ZCONVEXT("ACNEXT",CID)="" quit
+		if $D(^XDTJ(TJD-1,CID)) do { quit
+			do ZACN(CID)
+		}
+		//if $D(^DTJFM(TJD-1,"D",ZGRP,ZTYPE,CID)) set ^ZCONVEXT("ACNEXT",CID)="" quit
+		if $D(^DTJFM(TJD-1,"D",ZGRP,ZTYPE,CID)) do { 
+			do ZACN(CID)
+		}
+		
+		// if run on 2nd day of each month, also include the account that modify at the end of the month
+		set BOMJD = $$BOMJD^SCADAT(TJD)
+		if TJD = (BOMJD + 1) do {
+			if $D(^XDTJ(TJD-2,CID)) do { quit
+				do ZACN(CID)
+			}
+			if $D(^DTJFM(TJD-2,"D",ZGRP,ZTYPE,CID)) do { 
+				do ZACN(CID)
+			}
+		}
+	}
+	
+	quit
+	
+ZACN(ZCID)
+			
+			type String SUBDESC,ZCLS,GRPDES,output
+			if 'Db.isDefined("ACN","CID=:ZCID") quit
+			type RecordACN acn  = Db.getRecord("ACN","CID=:ZCID")
+			if acn.getMode() =0 quit
+			set output.piece("|",36) =""
+			
+			set ZCLS  = acn.CLS
+			set ZSUBT = acn.ZSUBT
+			set SUBDESC=""
+			if ZCLS ="D" do {
+				
+				type RecordDEP dep  = Db.getRecord("DEP","CID =:ZCID")
+				set output.piece("|",1)  = dep.cid
+				set output.piece("|",2)  = dep.cls
+				set output.piece("|",3)  = dep.grp
+				
+				if 'dep.grp.isNull() do {			
+					type RecordSTBLGRP desc  = Db.getRecord("STBLGRP","CLS =:dep.cls,GRP =dep.grp",1)
+					if 'desc.getMode() =0 set GRPDES  = desc.des			
+				}
+				
+				set output.piece("|",4)  = GRPDES
+				set output.piece("|",5)  = dep.type
+				
+				if 'dep.type.isNull() do {
+					type RecordPRODCTL desc  = Db.getRecord("PRODCTL","TYPE =:dep.type",1)
+					if 'desc.getMode() =0 set PRODDES  = desc.des
+				}
+				
+				set output.piece("|",6)  = PRODDES
+				set output.piece("|",7)  = dep.title1
+				set output.piece("|",8)  = dep.acn
+				set output.piece("|",9)  = dep.zstatcd
+				
+				if 'dep.zstatcd.isNull() do {
+					type RecordZUTBLSTATD desc  = Db.getRecord("ZUTBLSTATD","ZSTATCD =:dep.zstatcd",1)
+					if 'desc.getMode() =0 set STATDESC  = desc.des
+				}
+				
+				set output.piece("|",10)  = STATDESC
+				set output.piece("|",11)  = dep.bal
+				set output.piece("|",12)  = dep.balavl
+				set output.piece("|",13)  = dep.ZMASTER
+				set output.piece("|",14)  = ""
+				set output.piece("|",15)  = ""
+				set output.piece("|",16)  = ""
+				set output.piece("|",17)  = dep.zcltot   
+				if dep.tld' =0,dep.tld' ="" set output.piece("|",18)  = dep.tld.toString("DD/MM/YEAR")
+				if dep.dtc' =0,dep.dtc' ="" set output.piece("|",19)  = dep.dtc.toString("DD/MM/YEAR")
+				set output.piece("|",20)  = dep.boo
+				
+				if 'dep.boo.isNull() do {
+					type RecordUTBLBRCD desc  = Db.getRecord("UTBLBRCD","BRCD =:dep.boo",1)
+					if 'desc.getMode() =0 set BRCDESC  = desc.desc		
+				}
+				
+				set output.piece("|",21)  = BRCDESC
+				set output.piece("|",22)  = dep.NEGACR+dep.NEGACRUN
+				set output.piece("|",23)  = dep.ZASINT
+				set output.piece("|",24)  = dep.zlgid
+				set output.piece("|",25)  = ""
+				set output.piece("|",26)  = ""
+				set output.piece("|",27)  = ""
+				set output.piece("|",28)  = ""
+				set output.piece("|",29)  = ""
+				set output.piece("|",30)  = dep.darcls
+				set output.piece("|",31)  = ""
+				if 'ZSUBT.isNull() do {
+					type RecordUTBLSUBT desc  = Db.getRecord("UTBLSUBT","GRP =:dep.grp,KEY =:ZSUBT",1)
+					if 'desc.getMode() =0 set SUBDESC  = desc.desc
+				}
+				
+				set output.piece("|",32)  = SUBDESC
+				set output.piece("|",33)  = ""
+				set output.piece("|",34)  = dep.ODLIM
+				set output.piece("|",36)  = ""
+				
+				
+			}
+		
+			if (ZCLS ="L") do {
+			type RecordLN ln  = Db.getRecord("LN","CID =:ZCID")
+				
+				set output.piece("|",1)  = ln.cid
+				set output.piece("|",2)  = ln.cls
+				set output.piece("|",3)  = ln.grp
+				
+				if 'ln.grp.isNull() do {
+					type RecordSTBLGRP desc  = Db.getRecord("STBLGRP","CLS =:ln.cls,GRP =:ln.grp",1)
+					if 'desc.getMode() =0 set GRPDES  = desc.des
+				}
+				
+				set output.piece("|",4)  = GRPDES
+				set output.piece("|",5)  = ln.type
+				
+				if 'ln.type.isNull() do {
+					
+					type RecordPRODCTL desc  = Db.getRecord("PRODCTL","TYPE =:ln.type",1)
+					if 'desc.getMode() =0 set PRODDES  = desc.des
+				
+				}
+				
+				set output.piece("|",6)  = PRODDES
+				set output.piece("|",7)  = ln.title1
+				set output.piece("|",8)  = ln.acn
+				set output.piece("|",9)  = ln.stat
+				
+				if 'ln.stat.isNull() do {
+				
+				type RecordSTBLSTATL desc = Db.getRecord("STBLSTATL","STAT=:ln.stat",1)
+				if 'desc.getMode()=0 set STATDESC = desc.desc
+			
+				}
+				set output.piece("|",10) = STATDESC
+				
+				set output.piece("|",11)  = ln.bal
+				set output.piece("|",12)  = ln.balavail
+				set output.piece("|",13)  = ""
+				set output.piece("|",14)  = ln.subt
+				set output.piece("|",15)  = ln.zmktcd
+				
+				if 'ln.zmktcd.isNull() do {
+					
+					type RecordZUTBLMKTCD desc  = Db.getRecord("ZUTBLMKTCD","GRP =:ln.grp,SUBT =:ln.subt,CODE =:ln.zmktcd",1)
+					if 'desc.getMode() =0 set MKTCDES  = desc.DESC
+					
+				}
+				set output.piece("|",16)  = MKTCDES
+				set output.piece("|",17)  = ln.crlmt
+				if ln.tld' =0,ln.tld' ="" set output.piece("|",18)  = ln.tld.toString("DD/MM/YEAR")
+				if ln.dtc' =0,ln.dtc' ="" set output.piece("|",19)  = ln.dtc.toString("DD/MM/YEAR")
+				set output.piece("|",20)  = ln.boo
+				
+				if 'ln.boo.isNull() do {
+					type RecordUTBLBRCD desc  = Db.getRecord("UTBLBRCD","BRCD =:ln.boo",1)
+					if 'desc.getMode() =0 set BRCDESC  = desc.desc
+				
+				}
+				set output.piece("|",21)  = BRCDESC
+				
+				if ln.ZDELSTAT =1 		set output.piece("|",22)  = ln.acr
+				if ln.ZDELSTAT =2 		set output.piece("|",22)  = 0
+				if 'ln.ZDELSTAT =2,ln.ZDELSTAT =1 set output.piece("|",22)  = ""
+				
+				if ln.ZDELSTAT =2 		set output.piece("|",23)  = ln.acr
+				if 'ln.ZDELSTAT =2 		set output.piece("|",23)  = 0
+				
+				
+				set output.piece("|",24)  = ln.zlgid
+				set output.piece("|",25)  = ln.gtdue
+				set output.piece("|",26)  = ln.mcnd
+				set output.piece("|",27)  = ln.lchg
+				set output.piece("|",28)  = ln.duin
+				set output.piece("|",29)  = ln.dupr
+				set output.piece("|",30)  = ln.darcls
+				set output.piece("|",31)  = ln.zrescls
+				
+				if 'ZSUBT.isNull() do {
+					type RecordUTBLSUBT desc  = Db.getRecord("UTBLSUBT","GRP =:ln.grp,KEY =:ZSUBT",1)
+					if 'desc.getMode() =0 set SUBDESC  = desc.desc
+				}
+				
+				set output.piece("|",32)  = SUBDESC
+				if ln.DTNT' =0,ln.DTNT' ="" set output.piece("|",33)  = ln.DTNT.toString("DD/MM/YEAR")
+				set output.piece("|",34)  = ""
+				set output.piece("|",35)  = ln.cctlb
+				set output.piece("|",36)  = ln.MCHG
+				
+			
+				
+			}
+			
+		set ^ZCMS("CID",ZCID)=output_" "
+	
+	quit
+	
+	
+---------- THREXIT ------ Section marker

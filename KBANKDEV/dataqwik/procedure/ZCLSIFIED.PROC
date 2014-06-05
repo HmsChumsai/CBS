@@ -1,0 +1,108 @@
+//DO NOT MODIFY  Procedure for Account number and classif|ZCLSIFIE|||||||1
+	/*
+	 ORIG: 1 - 19/12/2013
+	 DESC: 
+
+	 ---- Comments --------------------------------------------------------
+
+	 ---- Revision History ------------------------------------------------
+
+	 ****** Consider using setAuditFlag for all objects in this procedure
+	   example :do dep.setAuditFlag(1)
+
+	*/
+	quit
+	
+	
+
+
+PROC(ZCID)
+
+	type RecordDEP dep = Db.getRecord("DEP","CID=:ZCID")
+	if dep.stat'=0 quit
+	if dep.dtc="" quit
+	if dep.dtc'<ZEOM quit
+	set ZACCTNO=$$PADDING(ZCID,2,10)
+	set ZCLASSIFIED=$$PADDING(dep.darcls,1,1)
+
+	set ^TMP("ZCLSIFIED",ZCID)=ZACCTNO_ZCLASSIFIED_$J("",29)
+
+	quit
+	
+
+READ(ZAPP,ZITFKEY)
+
+	do SYSVAR^SCADRV0()
+	
+	type Number i,ZHEADERFLG,ZTAILFLG
+	type String ZFNM,REC
+	new ETYP
+	set (ZFNM,REC)=""
+	set (ZHEADERFLG,ZTAILFLG,i)=0
+	set ETYP=""
+
+	kill ^TMP("ZCLSIFIED")
+	set ZPFDIR = $$TRNLNM^%ZFUNC("PROFILE_DIR")
+	type RecordZUTBLITFFTP itf = Db.getRecord("ZUTBLITFFTP","ZPFDIR,ZAPP,ZITFKEY",1)
+	set ZFNAME = itf.inlf
+	set ZFNAME = $$CFTPFUNC^ZITFUTL(ZFNAME)
+	set ZINLPATH = itf.inlp
+	set ZINLPATH = $$CFTPPATH^ZITFUTL(ZINLPATH)
+	type IO in =Class.new("IO")
+	set in.fileName =ZINLPATH_"/"_ZFNAME
+	set in.openParams ="READ"
+	set in.recordSize =1024
+	//do in.open()
+
+	catch iox {
+
+		// if device has been opened, close it
+
+		if in.device'="" do in.close()
+
+		// if not an IO exception, it's not for us
+
+		if iox'["%PSL-E-IO" throw iox
+
+		// handle the IO exceptions
+
+		if iox["IOOPEN" write "Open failed", ! quit
+
+		if iox["IOEOF"  write "Reached end of file", ! quit
+
+		write "unexpected IO error '", iox.type, "'", !
+
+	}
+
+	do in.open()
+
+
+
+	for  set REC=in.read(.ETYP) quit:+ETYP'=0  do {
+		type String output
+		type Number ZCID=""
+		if REC="" quit
+		if $L(REC)<>40 quit
+		if REC["H01" set ZHEADERFLG=1 quit //Skipp header
+		if REC["T01" set ZTAILFLG=1 quit //quit when reached footer
+		set i=i+1
+		set ZCID=+$E(REC,1,10)
+		set ^TMP("ZCLSIFIED",ZAPP,ZITFKEY,"IN",i,ZCID)=$E(REC,11,11)
+	}
+	do in.close()
+	if (ZHEADERFLG'=1)!(ZTAILFLG'=1) do {
+		set ER=1
+		if (ZHEADERFLG'=1) set RM="Invalid format:No Header" 
+		else set RM="Invalid format:No Tailer" 
+		kill ^TMP("ZRINQBS",ZAPP,ZITFKEY,"IN")
+	}
+	else do {
+		write !,"SUCCESS"
+		set ER=0
+	}
+
+	quit
+
+
+
+

@@ -1,0 +1,148 @@
+//DO NOT MODIFY  Batch for Account classified|ZBCHCLSI||||||ZTMPCLS|BOUND='IN'||100|32000||0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	//kill ^TMP("ZCLSIFIED")
+	//do READ
+
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	do Runtime.rollback()
+	do PROC(CID,CLASS)
+
+	quit
+
+PROC(ZCID,ZCLASS)
+
+	do SYSVAR^SCADRV0()
+	type Date ZSJD
+	type String ZFILE
+	set ZSJD=%SystemDate
+	set ZFILE="CLASS"
+	type RecordZTMPLPM lpm = Db.getRecord("ZTMPLPM","ZSJD,ZFILE,ZCID",1)
+	set lpm.class=ZCLASS
+	do lpm.save()
+
+	quit
+	
+READ(ZAPP,ZITFKEY)
+
+	
+	type Number i,ZHEADERFLG,ZTAILFLG
+	type String ZFNM,REC
+	new ETYP
+	set (ZFNM,REC)=""
+	set (ZHEADERFLG,ZTAILFLG,i)=0
+	set ETYP=""
+
+	kill ^TMP("ZCLSIFIED")
+	set ZPFDIR = $$TRNLNM^%ZFUNC("PROFILE_DIR")
+	type RecordZUTBLITFFTP itf = Db.getRecord("ZUTBLITFFTP","ZPFDIR,ZAPP,ZITFKEY",1)
+	set ZFNAME = itf.inlf
+	set ZFNAME = $$CFTPFUNC^ZITFUTL(ZFNAME)
+	set ZINLPATH = itf.inlp
+	set ZINLPATH = $$CFTPPATH^ZITFUTL(ZINLPATH)
+	type IO in =Class.new("IO")
+	set in.fileName =ZINLPATH_"/"_ZFNAME
+	set in.openParams ="READ"
+	set in.recordSize =1024
+	//do in.open()
+
+	catch iox {
+
+		// if device has been opened, close it
+
+		if in.device'="" do in.close()
+
+		// if not an IO exception, it's not for us
+
+		if iox'["%PSL-E-IO" throw iox
+
+		// handle the IO exceptions
+
+		if iox["IOOPEN" write "Open failed", ! quit
+
+		if iox["IOEOF"  write "Reached end of file", ! quit
+
+		write "unexpected IO error '", iox.type, "'", !
+
+	}
+
+	do in.open()
+
+
+
+	for  set REC=in.read(.ETYP) quit:+ETYP'=0  do {
+		type String ZPOSTFLG=""
+		type Number ZCID,ZCLASS
+		set (ZCID,ZCLASS)=""
+		if REC="" quit
+		if REC["H01" set ZHEADERFLG=1 quit //Skipp header
+		if REC["T01" set ZTAILFLG=1 quit //quit when reached footer
+		if $L(REC)<>40 quit
+		set i=i+1
+		set ZCID=+$E(REC,1,10)
+		set ZCLASS=+$E(REC,11,11)
+		set ^TMP("ZCLSIFIED","IN",i,ZCID)=ZCLASS
+	}
+	do in.close()
+	if (ZHEADERFLG'=1)!(ZTAILFLG'=1) do {
+		set ER=1
+		if (ZHEADERFLG'=1) set RM="Invalid format:No Header" 
+		else set RM="Invalid format:No Tailer" 
+		kill ^TMP("ZCLSIFIED","IN")
+	}
+	else do {
+		write !,"SUCCESS"
+		set ER=0
+	}
+
+	quit
+	
+GENTEST(ZAPP,ZITFKEY)
+	set ZPFDIR = $$TRNLNM^%ZFUNC("PROFILE_DIR")
+	type RecordZUTBLITFFTP itf = Db.getRecord("ZUTBLITFFTP","ZPFDIR,ZAPP,ZITFKEY",1)
+	set ZFNAME = itf.OUTLFS
+	set ZFNAME = $$CFTPFUNC^ZITFUTL(ZFNAME)
+	set ZOUTPATH = itf.OUTLP
+	set ZOUTPATH = $$CFTPPATH^ZITFUTL(ZOUTPATH)
+	
+	type IO out =Class.new("IO")
+	set out.fileName =ZOUTPATH_"/"_ZFNAME
+	set out.openParams ="NEWV/WRITE"
+	set out.recordSize =1024
+	do out.open()
+	set Header="H01"
+	set Tailer="T01"
+	set DATA1="0123456789"_"1"_$J("",29)
+	set DATA2="0123456789"_"2"_$J("",29)
+	set DATA3="0123456789"_"3"_$J("",29)
+	set DATA4="9876543210"_"1"_$J("",29)
+	set DATA5="9876543210"_"2"_$J("",29)
+	set DATA6="9876543210"_"3"_$J("",29)
+	do out.write(Header)
+	do out.write(DATA1)
+	do out.write(DATA2)
+	do out.write(DATA3)
+	do out.write(DATA4)
+	do out.write(DATA5)
+	do out.write(DATA6)
+	do out.write(Tailer)
+	do out.close()
+	quit
+
+
+---------- THREXIT ------ Section marker

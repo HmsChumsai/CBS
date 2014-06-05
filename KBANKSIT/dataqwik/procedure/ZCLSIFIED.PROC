@@ -1,0 +1,162 @@
+//DO NOT MODIFY  Procedure for Account number and classif|ZCLSIFIE|||||||1
+	/*
+	 ORIG: 1 - 19/12/2013
+	 DESC: 
+
+	 ---- Comments --------------------------------------------------------
+
+	 ---- Revision History ------------------------------------------------
+
+	 ****** Consider using setAuditFlag for all objects in this procedure
+	   example :do dep.setAuditFlag(1)
+
+	*/
+	quit
+
+GETEOM(ZEOM)
+
+	do SYSVAR^SCADRV0()
+	type Date NEFD
+	set NEFD=$$NJD^UFRE(%SystemDate,"-1MAE")
+	set NEFD=$$NJD^UFRE(NEFD,"1MAE")
+	set ZEOM=NEFD
+	quit
+
+PROC(ZCID)
+
+	type RecordDEP dep = Db.getRecord("DEP","CID=:ZCID")
+	if dep.stat'=0 quit
+	if dep.dtc="" quit
+	if dep.dtc'<ZEOM quit
+	set ZACCTNO=$$PADDING(ZCID,2,10)
+	set ZCLASSIFIED=$$PADDING(dep.darcls,1,1)
+
+	set ^TMP("ZCLSIFIED",ZCID)=ZACCTNO_ZCLASSIFIED_$J("",29)
+
+	quit
+
+EXT(IO out)
+
+	set ZCID=$O(^TMP("ZCLSIFIED",""))
+	while 'ZCID.isNull() do {
+		type String ZDATA
+		set ZDATA = ^TMP("ZCLSIFIED",ZCID)
+		do out.write(ZDATA)
+		set ZCID=$O(^TMP("ZCLSIFIED",ZCID))
+		set toTalRec=toTalRec+1
+	}
+
+	quit
+
+
+EXTRACT
+
+	type Number toTalRec
+	set toTalRec=0
+	do SYSVAR^SCADRV0()
+	set ZEXTDAT=%SystemDate.toString("YEARMMDD")
+	type IO out =Class.new("IO")
+	set out.fileName =$$TRNLNM^%ZFUNC("SCAU_SPOOL")_"/TESTCLASSIFIED_"_ZEXTDAT_".txt"
+	set out.openParams ="NEWV/WRITE"
+	set out.recordSize =1024
+	do out.open()
+	do HEADER(.out)
+	do EXT(.out)
+	do FOOTER(.out,toTalRec)
+	do out.close()
+
+	quit
+
+FOOTER(IO out,i)
+
+	set TRAILER1="9999999999"
+	set TRAILER2="TOTAL"
+	set TRAILER3=$$PADDING(i,2,10)
+	set TRAILER4=$J("",15)
+
+	do out.write(TRAILER1_TRAILER2_TRAILER3_TRAILER4)
+
+	quit
+
+
+HEADER(IO out)
+
+	set HEADER1="0000000000"
+	set HEADER2="DATE"
+	set HEADER3=%CurrentDate.toString("YYYYMMDD")
+	set HEADER4=$J("",18)
+	do out.write(HEADER1_HEADER2_HEADER3_HEADER4)
+
+	quit
+
+PADDING(array,flg,fixL)
+
+	type String out
+	type Number zlength
+	set out=""
+
+	//Blank padding
+	if flg=1 do {
+		type String in
+		set in=array.get()
+		set zlength=in.length()
+		if fixL<zlength	set out=$E(in,1,fixL)
+		else set out=in_$J("",fixL-zlength)
+		//set out=in_$J("""",fixL-zlength)
+
+	}
+	//Zero padding
+	if flg=2 do {
+		type Number in
+		set in=array.get()
+		set zlength=in.length()
+		set out=in.zero(fixL)
+	}
+	//MainFrame
+	if flg=3 do {
+		type Number in,ZER,zprefix
+		type String ZRM
+		set (ZER,zprefix)=0
+		set ZRM=""
+		set in=array.get()*100
+		do CONVENC^ZITFUTL(1,in,.out,.ZER,.ZRM)
+		if $L(out)<18 do {
+			//set zprefix=18-$L(out)
+			set zprefix=zprefix.zero(18-$L(out))
+			set out=zprefix_out
+		}
+	}
+	if flg=4 do {
+		type Number in
+		set in=array.get()
+		set out=in.zero(fixL,2,0,0)
+	}
+	//Default value for mandatory date
+	if flg=5 do {
+
+		if array.get()="" set out="9999-12-31"
+		else set out=array
+
+	}
+	if flg=6 do {
+		//No decimal,sign representation,Right zero justify
+
+		type Number in,zlength
+		type String pre,suf,ZERO
+		set ZERO=""
+		set in=array.get()
+		if in<0 set in=-in
+		set pre=$P(in,".",1)
+		set pre=pre.zero(3)
+		set suf=$P(in,".",2)
+		set in=pre_"."_suf
+		//set zlength=in.length()
+		//set ZERO=ZERO.zero(fixL-zlength)
+		set zlength=suf.length()
+		set ZERO=ZERO.zero(8-zlength)
+		set out=in_ZERO
+
+
+		//set out=in_$J("0",fixL-zlength)
+	}
+	quit out
