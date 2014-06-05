@@ -74,9 +74,8 @@
 	quit
 
 PROC(CID)
-
-
-
+	
+	if $D(^ZBASD(CID))=1 quit
 	//set i=0
 	set ZSpecType=""
 	type ResultSet KTBMISC = Db.select("PRODTYP","ZUTBLKTBMISC","INTRFACE='ZSPA'")

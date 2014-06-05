@@ -73,7 +73,7 @@
 
 PROC(CID)
 
-	
+	if $D(^ZBAFD(CID))=1 quit	
 	do SYSVAR^SCADRV0()
 	set ZSpecType=""
 	type ResultSet KTBMISC = Db.select("PRODTYP","ZUTBLKTBMISC","INTRFACE='ZSPA'")

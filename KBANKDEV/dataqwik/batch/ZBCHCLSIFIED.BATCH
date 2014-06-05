@@ -1,4 +1,4 @@
-//DO NOT MODIFY  Batch for Account classified|ZBCHCLSI||||||ZTMPCLS|BOUND='IN'||100|32000||0|||10|10|0||0||0
+//DO NOT MODIFY  Batch for Account classified|ZBCHCLSI||||||ZTMPCLS|||100|32000||0|||10|10|0||0||0
 ---------- REVHIST ------ Section marker
 
 ---------- OPEN    ------ Section marker
@@ -21,7 +21,9 @@
 ---------- EXEC    ------ Section marker
 
 	do Runtime.rollback()
-	do PROC(CID,CLASS)
+	type RecordZTMPCLS zcls = Db.getRecord("ZTMPCLS","BOUND,SEQ,CID")
+	set ZCLASS = zcls.CLASS
+	do PROC(CID,ZCLASS)
 
 	quit
 
@@ -60,7 +62,7 @@ READ(ZAPP,ZITFKEY)
 	set in.openParams ="READ"
 	set in.recordSize =1024
 	//do in.open()
-
+	/*
 	catch iox {
 
 		// if device has been opened, close it
@@ -80,9 +82,9 @@ READ(ZAPP,ZITFKEY)
 		write "unexpected IO error '", iox.type, "'", !
 
 	}
+	*/
 
 	do in.open()
-
 
 
 	for  set REC=in.read(.ETYP) quit:+ETYP'=0  do {
@@ -99,6 +101,7 @@ READ(ZAPP,ZITFKEY)
 		set ^TMP("ZCLSIFIED","IN",i,ZCID)=ZCLASS
 	}
 	do in.close()
+	
 	if (ZHEADERFLG'=1)!(ZTAILFLG'=1) do {
 		set ER=1
 		if (ZHEADERFLG'=1) set RM="Invalid format:No Header" 
@@ -113,18 +116,18 @@ READ(ZAPP,ZITFKEY)
 	quit
 	
 GENTEST(ZAPP,ZITFKEY)
+
 	set ZPFDIR = $$TRNLNM^%ZFUNC("PROFILE_DIR")
 	type RecordZUTBLITFFTP itf = Db.getRecord("ZUTBLITFFTP","ZPFDIR,ZAPP,ZITFKEY",1)
-	set ZFNAME = itf.OUTLFS
+	set ZFNAME = itf.inlf
 	set ZFNAME = $$CFTPFUNC^ZITFUTL(ZFNAME)
-	set ZOUTPATH = itf.OUTLP
-	set ZOUTPATH = $$CFTPPATH^ZITFUTL(ZOUTPATH)
-	
+	set ZINLPATH = itf.inlp
+	set ZINLPATH = $$CFTPPATH^ZITFUTL(ZINLPATH)
 	type IO out =Class.new("IO")
-	set out.fileName =ZOUTPATH_"/"_ZFNAME
-	set out.openParams ="NEWV/WRITE"
+	set out.fileName =ZINLPATH_"/"_ZFNAME
 	set out.recordSize =1024
 	do out.open()
+	
 	set Header="H01"
 	set Tailer="T01"
 	set DATA1="0123456789"_"1"_$J("",29)
