@@ -135,7 +135,10 @@ DELIMOUT(ZOM,ZERRCD,ZERRDESC)
 			set ZSEGOM=ZSEGOM_";;"_ZARROUT("DurationUnit",i).get()
 			set ZSEGOM=ZSEGOM_";;"_ZARROUT("SubAccrueIntAmt",i).get()
 			set ZSEGOM=ZSEGOM_";;"_ZARROUT("SubSimulatedIntAmt",i).get()
+			// --2014/06/06 Ravipong Ch.--
+			set ZARROUT("SubEIR",i)=ZARROUT("SubIntRate",i).get()
 			set ZSEGOM=ZSEGOM_";;"_ZARROUT("SubEIR",i).get()
+			// --End 2014/06/06 Ravipong Ch.--
 			set ZSEGOM=ZSEGOM_";;"_ZARROUT("PassbkNum",i).get()
 			set ZSEGOM=ZSEGOM_";;"_ZARROUT("EffDt",i).get()
 			set ZSEGOM=ZSEGOM_";;"
