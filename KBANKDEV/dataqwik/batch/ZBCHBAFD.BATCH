@@ -76,10 +76,16 @@ PROC(CID)
 	if $D(^ZBAFD(CID))=1 quit	
 	do SYSVAR^SCADRV0()
 	set ZSpecType=""
+	/*
+	type RecordZUTBLKTBMISC zktbmisc=%CACHE("ZUTBLKTBMISC").getRecord("ZUTBLKTBMISC","INTRFACE='ZSPA'",1)
+	set ZSpecType=zktbmisc.PRODTYP
+	*/
+	
 	type ResultSet KTBMISC = Db.select("PRODTYP","ZUTBLKTBMISC","INTRFACE='ZSPA'")
 	while KTBMISC.next() do {
 		set ZSpecType=KTBMISC.getCol(1)
 	}
+	
 	if $D(^ZBAFD(CID)) quit
 	type String ZOM,ZARROUT
 	set ZOM=""
