@@ -275,7 +275,7 @@ PROC
 	//
 	//Validate Common Header
 	//if ZARRIN("FuncNm ").get().isNull() set ZERRCD="E9999",ZERRDESC="FuncNm field is Null"
-	if (ZARRIN("FuncNm").get()'="retrieveComSightAcctBal")!(ZARRIN("FuncNm").get().isNull()) set ZERRCD="E9999",ZERRDESC="Invalid FuncNm"
+	//if (ZARRIN("FuncNm").get()'="retrieveComSightAcctBal")!(ZARRIN("FuncNm").get().isNull()) set ZERRCD="E9999",ZERRDESC="Invalid FuncNm"
 	if $G(ZARRIN("RqUID")).isNull() set ZERRCD="E0014"
 	if $G(ZARRIN("RqDt")).isNull() set ZERRCD="E0016"
 	if ($G(ZARRIN("RqAppId")).isNull()) set ZERRCD="E0038"

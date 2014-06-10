@@ -1,13 +1,13 @@
 //DO NOT MODIFY  Replicate data From CMS|ZCMSREPL|||||||1
 
- 	/*
+	/*
 	ORIG: Ravipong Chumsai Na Ayuthaya  - 07/02/2012
 	DESC: Extract data from Table - UTBLBRCD
-	
+
 	04/06/2014 - Ravipong Ch.
 	Modified ADDCIF, Add "REQUESTACN" Flag  
 	*/
-	
+
 PROC	
 	do {
 		catch error {
@@ -20,9 +20,9 @@ PROC
 			write RM,!
 			write FROM,!
 			do ^UTLERR
-			
+
 		}
-		
+
 		do SYSVAR^SCADRV0()
 		set ZEXTDAT=(%SystemDate).toString("YEARMMDD")
 
@@ -36,9 +36,9 @@ PROC
 		do ZCTRCTCIF
 		do ZCTRCTCOL
 	}
-	
+
 	quit
-	
+
 CIF
 	do SYSVAR^SCADRV0()
 	set ZEXTDAT=%SystemDate
@@ -49,22 +49,22 @@ CIF
 	// Check whether the file exists or not.
 	do CHKIO(ZFID)
 	if ER =1 set RM =$$^MSG(2799,ZFID) quit
-	
+
 	set EXIT =0
-	
-	
+
+
 	type IO io =Class.new("IO")
 	set io.fileName =ZFID
 	set io.openParams ="READ"
 	set io.recordSize =1024
 	do io.open()
-	
+
 	type IO out =Class.new("IO")
 	set out.fileName =$$TRNLNM^%ZFUNC("PROFILE_DIR")_"/zmk/CIF_"_ZEXTDAT_".txt"
 	set out.openParams ="NEWV/WRITE"
 	set out.recordSize =1024
 	do out.open()
-	
+
 	set cifHead="ACN|THAI_TITLE|THAI_FNAME|THAI_LNAME|THAI_MNAME|CITIZEN_ID|TAX_ID|LEGAL_ADDR1|LEGAL_ADDR2|LEGAL_ADDR3|LEGAL_TAMBOL_CD|"
 	set cifHead=cifHead_"LEGAL_AMPHUR_CD|LEGAL_PROVINCE_CD|LEGAL_COUNTRY_CD|LEGAL_POSTAL_CD|HOME_PHONE|MOBILE_PHONE|OFFICE_PHONE|OFFICE_PHONE_EXT|"
 	set cifHead=cifHead_"JURISTIC_ID|MAILING_ADDR1|MAILING_ADDR2|MAILING_ADDR3|MAILING_TAMBOL_CD|MAILING_AMPHUR_CD|MAILING_PROVINCE_CD|MAILING_COUNTRY_CD|MAILING_POSTAL_CD|OFFICE_ADDR1|"
@@ -73,15 +73,15 @@ CIF
 
 	type Number i=0
 	do out.write(cifHead)
-	
+
 	for  set REC =io.read() { quit:EXIT
-		
-		
+
+
 		type Number ZACN
 		type String output
 		if REC[$C(13) set REC=$TR(REC,$C(13),"")
 		//if REC["Total" set EXIT =1 quit
-		
+
 		catch error {
 			new ET,RM
 			set ET=error.type
@@ -98,7 +98,7 @@ CIF
 		set ZACN=REC
 		if ZACN[" " set ZACN=$TR(ZACN," ","")
 		if Db.isDefined("CIF","ACN=:ZACN") do {
-			
+
 			type RecordCIF cif  = Db.getRecord("CIF","ACN =:ZACN")
 			set output.piece("|",1)  = cif.acn
 			set output.piece("|",2)  = cif.ZTITLE
@@ -106,7 +106,7 @@ CIF
 			set output.piece("|",4)  = cif.LNM
 			set output.piece("|",5)  = cif.MNAME
 			set output.piece("|",6)  = cif.ZCIZID
-	
+
 			set output.piece("|",7)  = cif.TAXID
 			set output.piece("|",8)  = cif.PAD1
 			set output.piece("|",9)  = cif.PAD2
@@ -116,7 +116,7 @@ CIF
 			set output.piece("|",13)  = cif.pstate
 			set output.piece("|",14)  = cif.pcntry
 			set output.piece("|",15)  = cif.pzip
-	
+
 			set output.piece("|",16)  = cif.HPH
 			set output.piece("|",17)  = cif.APH
 			set output.piece("|",18)  = cif.BPH
@@ -125,7 +125,7 @@ CIF
 			set output.piece("|",21)  = cif.mad1
 			set output.piece("|",22)  = cif.mad2
 			set output.piece("|",23)  = cif.mad3
-	
+
 			set output.piece("|",24)  = cif.ZMSDISCD
 			set output.piece("|",25)  = cif.mcity
 			set output.piece("|",26)  = cif.mstate
@@ -134,7 +134,7 @@ CIF
 			set output.piece("|",29)  = cif.zoad1
 			set output.piece("|",30)  = cif.zoad2
 			set output.piece("|",31)  = cif.zoad3
-	
+
 			set output.piece("|",32)  = cif.ZOSDISCD
 			set output.piece("|",33)  = cif.zocity
 			set output.piece("|",34)  = cif.zostate
@@ -150,21 +150,21 @@ CIF
 			set output.piece("|",44)  = cif.PERS
 			if (cif.PASNUM="") set output.piece("|",45)=" "
 			else set output.piece("|",45)  = cif.PASNUM
-			
+
 			do out.write(output_" ")
 			set i =i+1
 		}
-			
-	
+
+
 	}
 	do out.write("Total "_i)
 	write !,("Total CIF "_i)
 	do out.close()
 
 	do io.close()
-	
+
 	quit
-	
+
 ACN
 	do SYSVAR^SCADRV0()
 	//set ZEXTDAT=%SystemDate
@@ -175,25 +175,25 @@ ACN
 	do CHKIO(ZFID)
 	if ER =1 set RM =$$^MSG(2799,ZFID) quit
 	set (GRPDES,PRODDES,BRCDESC,STATDESC,MKTCDES,SUBDESC) = ""
-	
+
 	type IO io =Class.new("IO")
 	set io.fileName =ZFID
 	set io.openParams ="READ"
 	set io.recordSize =1024
 	do io.open()
-	
+
 	type IO out =Class.new("IO")
 	set out.fileName =$$TRNLNM^%ZFUNC("PROFILE_DIR")_"/zmk/ACN_"_ZEXTDAT_".txt"
 	set out.openParams ="NEWV/WRITE"
 	set out.recordSize =1024
 	do out.open()
-	
+
 	set acnHead="CID|PRODUCT_CLASS|PRODUCT_GRP|PRODUCT_GRP_DESC|PRODUCT_TYPE|PRODUCT_TYPE_DESC|ACCT_NAME|PRIMARY_CIF|ACCT_STATUS|ACCT_STATUS_DESC|"
 	set acnHead=acnHead_"OUTS_BAL|AVAIL_BAL|MASTER_ACCT_NO|ACCT_SUBTYPE|MARKET_CD|MARKET_CD_DESC|LIMIT_AMT|DT_OPENED|DT_CLOSED|OWNER_BR|OWNER_BR_DESC|"
 	set acnHead=acnHead_"INT_RECEIVE|INT_SUSPENSE|LEGAL_ID|TOTAL_DUE|MISC_CHARGE|LATE_CHARGE_AMT|INT_PASS_DUE|PRIN_PASS_DUE|LOAN_CLASS|RESCIDENCE_CLASS|DATE_OF_NOTE|"
 	set acnHead=acnHead_"OD_LIMIT|TOTAL_LOAN_BAL|UNPAID_FEE"
 	do out.write(acnHead)
-	
+
 	for  set REC =io.read() { quit:EXIT
 		type String output
 		if REC[$C(13) set REC=$TR(REC,$C(13),"")
@@ -203,58 +203,58 @@ ACN
 			set ET=error.type
 			set RM=error.description
 			set FROM=error.thrownAt
-				//set RM="ZCOLSAVE Crash"
+			//set RM="ZCOLSAVE Crash"
 			write !,RM
 			write !,REC
 			write !,"From ACN Row "_i
 			do ^UTLERR
-			
+
 		}
-		
+
 		set ZCHECK=REC.piece("|",1)
 		if ZCHECK["Total" set EXIT=1 quit
 		set ZCID = REC
 		if ZCID[" " set ZCID=$TR(ZCID," ","")
 		if Db.isDefined("ACN","CID=:ZCID") do {
-		
-			
+
+
 			type String output
 			type RecordACN acn  = Db.getRecord("ACN","CID=:ZCID")
 			if acn.getMode() =0 quit
 			set output.piece("|",36) =""
 			set ZCLS  = acn.CLS
 			set ZSUBT = acn.ZSUBT
-			
+
 			if ZCLS ="D" do {
-				
+
 				type RecordDEP dep  = Db.getRecord("DEP","CID =:ZCID")
 				set output.piece("|",1)  = dep.cid
 				set output.piece("|",2)  = dep.cls
 				set output.piece("|",3)  = dep.grp
-				
-				if 'dep.grp.isNull() do {			
+
+				if 'dep.grp.isNull() do {
 					type RecordSTBLGRP desc  = Db.getRecord("STBLGRP","CLS =:dep.cls,GRP =dep.grp",1)
-					if 'desc.getMode() =0 set GRPDES  = desc.des			
+					if 'desc.getMode() =0 set GRPDES  = desc.des
 				}
-				
+
 				set output.piece("|",4)  = GRPDES
 				set output.piece("|",5)  = dep.type
-				
+
 				if 'dep.type.isNull() do {
 					type RecordPRODCTL desc  = Db.getRecord("PRODCTL","TYPE =:dep.type",1)
 					if 'desc.getMode() =0 set PRODDES  = desc.des
 				}
-				
+
 				set output.piece("|",6)  = PRODDES
 				set output.piece("|",7)  = dep.title1
 				set output.piece("|",8)  = dep.acn
 				set output.piece("|",9)  = dep.zstatcd
-				
+
 				if 'dep.zstatcd.isNull() do {
 					type RecordZUTBLSTATD desc  = Db.getRecord("ZUTBLSTATD","ZSTATCD =:dep.zstatcd",1)
 					if 'desc.getMode() =0 set STATDESC  = desc.des
 				}
-				
+
 				set output.piece("|",10)  = STATDESC
 				set output.piece("|",11)  = dep.bal
 				set output.piece("|",12)  = dep.balavl
@@ -262,16 +262,16 @@ ACN
 				set output.piece("|",14)  = ""
 				set output.piece("|",15)  = ""
 				set output.piece("|",16)  = ""
-				set output.piece("|",17)  = dep.zcltot   
+				set output.piece("|",17)  = dep.zcltot
 				if dep.tld' =0,dep.tld' ="" set output.piece("|",18)  = dep.tld.toString("DD/MM/YEAR")
 				if dep.dtc' =0,dep.dtc' ="" set output.piece("|",19)  = dep.dtc.toString("DD/MM/YEAR")
 				set output.piece("|",20)  = dep.boo
-				
+
 				if 'dep.boo.isNull() do {
 					type RecordUTBLBRCD desc  = Db.getRecord("UTBLBRCD","BRCD =:dep.boo",1)
-					if 'desc.getMode() =0 set BRCDESC  = desc.desc		
+					if 'desc.getMode() =0 set BRCDESC  = desc.desc
 				}
-				
+
 				set output.piece("|",21)  = BRCDESC
 				set output.piece("|",22)  = dep.NEGACR+dep.NEGACRUN
 				set output.piece("|",23)  = dep.ZASINT
@@ -287,83 +287,83 @@ ACN
 					type RecordUTBLSUBT desc  = Db.getRecord("UTBLSUBT","GRP =:dep.grp,KEY =:ZSUBT",1)
 					if 'desc.getMode() =0 set SUBDESC  = desc.desc
 				}
-				
+
 				set output.piece("|",32)  = SUBDESC
 				set output.piece("|",33)  = ""
 				set output.piece("|",34)  = dep.ODLIM
 				set output.piece("|",36)  = ""_"|"
-				
-				
+
+
 			}
-		
+
 			if (ZCLS ="L") do {
-			type RecordLN ln  = Db.getRecord("LN","CID =:ZCID")
-				
+				type RecordLN ln  = Db.getRecord("LN","CID =:ZCID")
+
 				set output.piece("|",1)  = ln.cid
 				set output.piece("|",2)  = ln.cls
 				set output.piece("|",3)  = ln.grp
-				
+
 				if 'ln.grp.isNull() do {
 					type RecordSTBLGRP desc  = Db.getRecord("STBLGRP","CLS =:ln.cls,GRP =:ln.grp",1)
 					if 'desc.getMode() =0 set GRPDES  = desc.des
 				}
-				
+
 				set output.piece("|",4)  = GRPDES
 				set output.piece("|",5)  = ln.type
-				
+
 				if 'ln.type.isNull() do {
-					
+
 					type RecordPRODCTL desc  = Db.getRecord("PRODCTL","TYPE =:ln.type",1)
 					if 'desc.getMode() =0 set PRODDES  = desc.des
-				
+
 				}
-				
+
 				set output.piece("|",6)  = PRODDES
 				set output.piece("|",7)  = ln.title1
 				set output.piece("|",8)  = ln.acn
 				set output.piece("|",9)  = ln.stat
-				
+
 				if 'ln.stat.isNull() do {
-				
-				type RecordSTBLSTATL desc = Db.getRecord("STBLSTATL","STAT=:ln.stat",1)
-				if 'desc.getMode()=0 set STATDESC = desc.desc
-			
+
+					type RecordSTBLSTATL desc = Db.getRecord("STBLSTATL","STAT=:ln.stat",1)
+					if 'desc.getMode()=0 set STATDESC = desc.desc
+
 				}
 				set output.piece("|",10) = STATDESC
-				
+
 				set output.piece("|",11)  = ln.bal
 				set output.piece("|",12)  = ln.balavail
 				set output.piece("|",13)  = ""
 				set output.piece("|",14)  = ln.subt
 				set output.piece("|",15)  = ln.zmktcd
-				
+
 				if 'ln.zmktcd.isNull() do {
-					
+
 					type RecordZUTBLMKTCD desc  = Db.getRecord("ZUTBLMKTCD","GRP =:ln.grp,SUBT =:ln.subt,CODE =:ln.zmktcd",1)
 					if 'desc.getMode() =0 set MKTCDES  = desc.DESC
-					
+
 				}
 				set output.piece("|",16)  = MKTCDES
 				set output.piece("|",17)  = ln.crlmt
 				if ln.tld' =0,ln.tld' ="" set output.piece("|",18)  = ln.tld.toString("DD/MM/YEAR")
 				if ln.dtc' =0,ln.dtc' ="" set output.piece("|",19)  = ln.dtc.toString("DD/MM/YEAR")
 				set output.piece("|",20)  = ln.boo
-				
+
 				if 'ln.boo.isNull() do {
 					type RecordUTBLBRCD desc  = Db.getRecord("UTBLBRCD","BRCD =:ln.boo",1)
 					if 'desc.getMode() =0 set BRCDESC  = desc.desc
-				
+
 				}
 				set output.piece("|",21)  = BRCDESC
-				
+
 				if ln.ZDELSTAT =1 		set output.piece("|",22)  = ln.acr
 				if ln.ZDELSTAT =2 		set output.piece("|",22)  = 0
 				if 'ln.ZDELSTAT =2,ln.ZDELSTAT =1 set output.piece("|",22)  = ""
-				
+
 				if ln.ZDELSTAT =2 		set output.piece("|",23)  = ln.acr
 				if 'ln.ZDELSTAT =2 		set output.piece("|",23)  = 0
-				
-				
+
+
 				set output.piece("|",24)  = ln.zlgid
 				set output.piece("|",25)  = ln.gtdue
 				set output.piece("|",26)  = ln.mcnd
@@ -372,25 +372,25 @@ ACN
 				set output.piece("|",29)  = ln.dupr
 				set output.piece("|",30)  = ln.darcls
 				set output.piece("|",31)  = ln.rescls
-				
+
 				if 'ZSUBT.isNull() do {
 					type RecordUTBLSUBT desc  = Db.getRecord("UTBLSUBT","GRP =:ln.grp,KEY =:ZSUBT",1)
 					if 'desc.getMode() =0 set SUBDESC  = desc.desc
 				}
-				
+
 				set output.piece("|",32)  = SUBDESC
 				if ln.DTNT' =0,ln.DTNT' ="" set output.piece("|",33)  = ln.DTNT.toString("DD/MM/YEAR")
 				set output.piece("|",34)  = ""
 				set output.piece("|",35)  = ln.cctlb
 				set output.piece("|",36)  = ln.MCHG_"|"
-				
-				
-				
+
+
+
 			}
 			set ^ZCMS("CID",ZCID)=output
 			do out.write(output_" ")
 			set i=i+1
-		
+
 		}
 	}
 	do out.write("Total "_i)
@@ -398,10 +398,10 @@ ACN
 	do out.close()
 	set IOTYP ="RMS"
 	do io.close()
-	
+
 	quit
 
-	
+
 CHKIO(X)
 	// CHECK WHETHER THE FILE EXISTS OR NOT
 	set z =$$FILE^%ZOPEN(X,"READ",5)
@@ -412,15 +412,15 @@ CHKIO(X)
 	close X
 
 	quit
-	
+
 GET(INPUT)
-	//Ravipong Chumsai 
+	//Ravipong Chumsai
 	// 10/10/11
 	//This Linetag functions similiar to Db.select command but different aims to check the input parms and incapable to select more than 1 field
 	//The form of the input is in comma-separated  format where the first 2 parameters are "SELECT,FROM" Statement
 	//And follow by 2(n) consecutive WHERE statement ,for example This input string "CID,ACN,BAL,100,CLS,LN,"
 	//Will be translated to SELECT CID FROM ACN WHERE BAL ='100' AND CLS ='LN'
-	
+
 	set ret =""
 	new ER
 	set ER =0
@@ -431,31 +431,31 @@ GET(INPUT)
 	set k =2
 	new exit
 	set exit =0
-	
+
 	type String where =""
-	type Number Count  = INPUT.length(",")  
-	
+	type Number Count  = INPUT.length(",")
+
 	while (k<Count) do { quit:exit
-		
-	if $P(INPUT,",",k+2) ="" set ER =1, exit =1 quit
-	
+
+		if $P(INPUT,",",k+2) ="" set ER =1, exit =1 quit
+
 		if 'where.isNull() do {
-	
-		set where  = where_" AND "_$P(INPUT,",",1+k)_" ='"_$P(INPUT,",",k+2)_"'"
-	
+
+			set where  = where_" AND "_$P(INPUT,",",1+k)_" ='"_$P(INPUT,",",k+2)_"'"
+
 		}
 		else set where =$P(INPUT,",",1+k)_" ='"_$P(INPUT,",",k+2)_"'"
 		set k =k+2
 		if k =Count set exit =1
-		}
+	}
 	if ER quit ret
-	
+
 	type String exe()
 	type ResultSet x  = Db.select(s,f,where)
 	if x.next() set ret  = x.getCol(1)
-	
+
 	quit ret
-	
+
 ZCOL
 	type Number ER,EXIT
 	set TLO=$$TLO^UTLO
@@ -469,211 +469,211 @@ ZCOL
 	// Check whether the file exists or not.
 	do CHKIO(ZFID)
 	if ER =1 set RM =$$^MSG(2799,ZFID) quit
-	
+
 	set EXIT =0
 	set i=0
 	//type String REC
-	
+
 	type IO io =Class.new("IO")
 	set io.fileName =ZFID
 	set io.openParams ="READ"
 	set io.recordSize =1024
 	do io.open()
-		
+
 	type Number i,coll
 	set i=0
-	set EXIT=0	
+	set EXIT=0
 
-		
-		for  set REC =io.read() { quit:EXIT
-			if REC[$C(13) set REC=$TR(REC,$C(13),"")
-			catch error {
-				new ET,RM
-				set ET=error.type
-				set RM=error.description
-				set FROM=error.thrownAt
+
+	for  set REC =io.read() { quit:EXIT
+		if REC[$C(13) set REC=$TR(REC,$C(13),"")
+		catch error {
+			new ET,RM
+			set ET=error.type
+			set RM=error.description
+			set FROM=error.thrownAt
 			//set RM="ZCOLSAVE Crash"
-				write !,RM
-				write !,REC
-				write !,"From ZCOL Row "_i
-				do ^UTLERR
-			}
-			set ZCHECK=REC.piece("|",1)
-			if ZCHECK["Total" set EXIT=1 quit
-			
-			type Number coll  = REC.piece("|",34)
-			type RecordZCOL zcol = Db.getRecord("ZCOL","COLL=:coll",1)
-			set zcol.AMPHUR = REC.piece("|",1)
-			set zcol.AO = REC.piece("|",2)
-			set zcol.APDCODE = REC.piece("|",3)
-			set zcol.APPBOO = REC.piece("|",4)
-			set zcol.APPBY = REC.piece("|",5)
-			if REC.piece("|",6)'="" set zcol.APPDT = $$FDAT^%ZM(REC.piece("|",6),"DD/MM/YEAR")
-			set zcol.APPOFF1 = REC.piece("|",7)
-			set zcol.APPOFF2 = REC.piece("|",8)
-			set zcol.APPOFF3 = REC.piece("|",9)
-			set zcol.APPTID = REC.piece("|",10)
-			set zcol.APPVAL = REC.piece("|",11)
-			if REC.piece("|",12)'="" set zcol.ASDATE = $$FDAT^%ZM(REC.piece("|",12),"DD/MM/YEAR")
-			set zcol.BKNUMBER  = REC.piece("|",13)
-			set zcol.BLASTID  = REC.piece("|",14)
-			set zcol.BLDCODE  = REC.piece("|",15)
-			set zcol.BLDNAME  = REC.piece("|",16)
-			set zcol.BLDNUM  = REC.piece("|",17)
-			set zcol.BLDTYPE  = REC.piece("|",18)
-			set zcol.BLDVAL   = REC.piece("|",19)
-			set zcol.BOO  = REC.piece("|",20)
-			set zcol.BOOTFR = REC.piece("|",21)
-			set zcol.BOTCODE = REC.piece("|",22)
-			set zcol.BOTRSKRT = REC.piece("|",23)
-			set zcol.BSOI = REC.piece("|",24)
-			set zcol.BSTRTID = REC.piece("|",25)
-			set zcol.BUILDNO = REC.piece("|",26)
-			set zcol.CACN = REC.piece("|",27)
-			set zcol.CC = REC.piece("|",28)
-			if REC.piece("|",29)'="" set zcol.CCRDT = $$FDAT^%ZM(REC.piece("|",29),"DD/MM/YEAR")
-			set zcol.CCRNUM = REC.piece("|",30)
-			set zcol.CERNO = REC.piece("|",31)
-			set zcol.CID = REC.piece("|",32)
-			set zcol.CMDCD = REC.piece("|",33)
-			set zcol.COLL = REC.piece("|",34)
-			set zcol.COLSUBT = REC.piece("|",35)
-			set zcol.COLTYP = REC.piece("|",36)
-			set zcol.CONDPAR = REC.piece("|",37)
-			if REC.piece("|",38)'="" set zcol.CONVDT = $$FDAT^%ZM(REC.piece("|",38),"DD/MM/YEAR")
-			set zcol.CRCD = REC.piece("|",39)
-			if REC.piece("|",40)'="" set zcol.DATETRF = $$FDAT^%ZM(REC.piece("|",40),"DD/MM/YEAR")
-			set zcol.DESC = REC.piece("|",41)
-			if REC.piece("|",42)'="" set zcol.DOB = $$FDAT^%ZM(REC.piece("|",42),"DD/MM/YEAR")
-			set zcol.DOCLCT = REC.piece("|",43)
-			if REC.piece("|",44)'="" set zcol.DOD = $$FDAT^%ZM(REC.piece("|",44),"DD/MM/YEAR")
-			set zcol.ENGCAP = REC.piece("|",45)
-			set zcol.EXTRSKR = REC.piece("|",46)
-			set zcol.FLOOR = REC.piece("|",47)
-			set zcol.GRPNO = REC.piece("|",48)
-			set zcol.GTEL = REC.piece("|",49)
-			set zcol.INSREQ = REC.piece("|",50)
-			set zcol.KTBRKR = REC.piece("|",51)
-			set zcol.LNDINFO = REC.piece("|",52)
-			set zcol.LNDNO = REC.piece("|",53)
-			set zcol.LNDVAL = REC.piece("|",54)
-			set zcol.LNDVOL1 = REC.piece("|",55)
-			set zcol.LNDVOL2 = REC.piece("|",56)
-			set zcol.LNDVOL3 = REC.piece("|",57)
-			set zcol.LNDVOL4 = REC.piece("|",58)
-			set zcol.LOC1 = REC.piece("|",59)
-			set zcol.LOC2 = REC.piece("|",60)
-			set zcol.LOC3 = REC.piece("|",61)
-			set zcol.LQCD = REC.piece("|",62)
-			if REC.piece("|",63)'="" set zcol.LRTRVDT = $$FDAT^%ZM(REC.piece("|",63),"DD/MM/YEAR")
-			set zcol.MCODE1 = REC.piece("|",64)
-			set zcol.MCODE2 = REC.piece("|",65)
-			set zcol.NONCRM = REC.piece("|",66)
-			set zcol.OPRIMKEY = REC.piece("|",67)
-			set zcol.OWNLNDVOL1 = REC.piece("|",68)
-			set zcol.OWNLNDVOL2 = REC.piece("|",69)
-			set zcol.OWNLNDVOL3 = REC.piece("|",70)
-			set zcol.OWNLNDVOL4 = REC.piece("|",71)
-			set zcol.OWNPORTN = REC.piece("|",72)
-			set zcol.PACN = REC.piece("|",73)
-			set zcol.PAGENO = REC.piece("|",74)
-			set zcol.PARTLFLG = REC.piece("|",75)
-			set zcol.PAYPARTY = REC.piece("|",76)
-			set zcol.PCHPRICE = REC.piece("|",77)
-			set zcol.PCOLVAL = REC.piece("|",78)
-			set zcol.PERSONID = REC.piece("|",79)
-			set zcol.PROVINCE = REC.piece("|",80)
-			set zcol.RAVANG = REC.piece("|",81)
-			set zcol.REASON = REC.piece("|",82)
-			set zcol.REMARKS = REC.piece("|",83)
-			set zcol.RESPUNIT = REC.piece("|",84)
-			set zcol.RIGHBAL = REC.piece("|",85)
-			set zcol.RIGHVAL = REC.piece("|",86)
-			set zcol.RMAREA = REC.piece("|",87)
-			set zcol.RMKPORTN = REC.piece("|",88)
-			set zcol.RMNUMBER = REC.piece("|",89)
-			set zcol.ROAD = REC.piece("|",90)
-			set zcol.RSCD = REC.piece("|",91)
-			set zcol.RULCOST = REC.piece("|",92)
-			set zcol.SEQNO = REC.piece("|",93)
-			set zcol.SHRHLDRG = REC.piece("|",94)
-			set zcol.SHRTNAME = REC.piece("|",95)
-			set zcol.STCKNO = REC.piece("|",96)
-			set zcol.STOREY = REC.piece("|",97)
-			set zcol.SUBBOT = REC.piece("|",98)
-			set zcol.SYMBOL = REC.piece("|",99)
-			set zcol.TAMBOL = REC.piece("|",100)
-			set zcol.TOTPORTN = REC.piece("|",101)
-			set zcol.UNITCD = REC.piece("|",102)
-			if REC.piece("|",103)'="" set zcol.USEDSTDT = $$FDAT^%ZM(REC.piece("|",103),"DD/MM/YEAR")
-			set zcol.USEFULIF = REC.piece("|",104)
-			if REC.piece("|",105)'="" set zcol.ZATEEXP = $$FDAT^%ZM(REC.piece("|",105),"DD/MM/YEAR")
-			if REC.piece("|",106)'="" set zcol.ZATEISSUEDT = $$FDAT^%ZM(REC.piece("|",106),"DD/MM/YEAR")
-			set zcol.ZATEISSUER = REC.piece("|",107)
-			set zcol.ZATENUM = REC.piece("|",108)
-			set zcol.ZCERTBAL = REC.piece("|",109)
-			set zcol.ZCERTCID = REC.piece("|",110)
-			set zcol.ZCERTGRP = REC.piece("|",111)
-			set zcol.ZCERTID = REC.piece("|",112)
-			set zcol.ZCERTLOTH = REC.piece("|",113)
-			set zcol.ZCERTLOTL = REC.piece("|",114)
-			set zcol.ZCERTPERIOD = REC.piece("|",115)
-			set zcol.ZCERTUNIT = REC.piece("|",116)
-			if REC.piece("|",117)'="" set zcol.ZLGISSUEDT = $$FDAT^%ZM(REC.piece("|",117),"DD/MM/YEAR")
-			set zcol.ZLGNUM = REC.piece("|",118)
-			set zcol.ZRADUR = REC.piece("|",119)
-			if REC.piece("|",120)'="" set zcol.ZRAEXP = $$FDAT^%ZM(REC.piece("|",120),"DD/MM/YEAR")
-			set zcol.ZRAISSUER = REC.piece("|",121)
-			set zcol.ZRANUM = REC.piece("|",122)
-			set zcol.ZRATYPE = REC.piece("|",123)	
-			set zcol.BONDTYPE = REC.piece("|",124)
-			set zcol.BONDCODE = REC.piece("|",125)
-			set zcol.BONDNAME = REC.piece("|",126)
-			set zcol.ISSYEAR = REC.piece("|",127)
-			set zcol.BSEQ = REC.piece("|",128)
-			set zcol.BOWNNAME = REC.piece("|",129)
-			if REC.piece("|",130)'="" set zcol.BEXPDATE = $$FDAT^%ZM(REC.piece("|",130),"DD/MM/YEAR")
-			set zcol.BINTRATE = REC.piece("|",131)
-			set zcol.BUPRICE = REC.piece("|",132)
-			if REC.piece("|",133)'="" set zcol.MKDATE = $$FDAT^%ZM(REC.piece("|",133),"DD/MM/YEAR")
-			set zcol.MKPRICE = REC.piece("|",134)
-			set zcol.TOTBNVAL = REC.piece("|",135)
-			set zcol.LISTED = REC.piece("|",136)
-			set zcol.SENIORITY = REC.piece("|",137)
-			//set zcol.APPAMT = REC.piece("|",138)
-			set zcol.SHRTNAME = REC.piece("|",139)
-			set zcol.STCKTYP = REC.piece("|",140)
-			set zcol.STCKNAME = REC.piece("|",141)
-			set zcol.ISSNAME = REC.piece("|",142)
-			set zcol.TAXID = REC.piece("|",143)
-			if REC.piece("|",144)'="" set zcol.ISSDATE = $$FDAT^%ZM(REC.piece("|",144),"DD/MM/YEAR")
-			set zcol.NOSHARE = REC.piece("|",145)
-			set zcol.PARPRC = REC.piece("|",146)
-			if REC.piece("|",147)'="" set zcol.PARD = $$FDAT^%ZM(REC.piece("|",147),"DD/MM/YEAR")
-			set zcol.BKPRICE = REC.piece("|",148)
-			if REC.piece("|",149)'="" set zcol.BKDATE = $$FDAT^%ZM(REC.piece("|",149),"DD/MM/YEAR")
-			set zcol.ISSRSKRT = REC.piece("|",150)
-			set zcol.STCKTYP2 = REC.piece("|",151)
-			set zcol.RSKWOCL = REC.piece("|",152)
-			set zcol.STCKSHR = REC.piece("|",153)
-			set zcol.USEAGE = REC.piece("|",154)
-			set zcol.ZINS1ST = REC.piece("|",155)
-			set zcol.ZCERTCCID = REC.piece("|",156)
-			set zcol.valflg = REC.piece("|",157)
-			do zcol.save("/NOTRIGAFT/NOTRIGBEF/NOVALDD/NOVALREQ/NOVALRI")
+			write !,RM
+			write !,REC
+			write !,"From ZCOL Row "_i
+			do ^UTLERR
+		}
+		set ZCHECK=REC.piece("|",1)
+		if ZCHECK["Total" set EXIT=1 quit
 
-	
-	
-			set i=i+1
-			//write !,i_". "_coll
-				
-				
-		}		
-		write !,("Total ZCOL "_i)
-		do io.close()
+		type Number coll  = REC.piece("|",34)
+		type RecordZCOL zcol = Db.getRecord("ZCOL","COLL=:coll",1)
+		set zcol.AMPHUR = REC.piece("|",1)
+		set zcol.AO = REC.piece("|",2)
+		set zcol.APDCODE = REC.piece("|",3)
+		set zcol.APPBOO = REC.piece("|",4)
+		set zcol.APPBY = REC.piece("|",5)
+		if REC.piece("|",6)'="" set zcol.APPDT = $$FDAT^%ZM(REC.piece("|",6),"DD/MM/YEAR")
+		set zcol.APPOFF1 = REC.piece("|",7)
+		set zcol.APPOFF2 = REC.piece("|",8)
+		set zcol.APPOFF3 = REC.piece("|",9)
+		set zcol.APPTID = REC.piece("|",10)
+		set zcol.APPVAL = REC.piece("|",11)
+		if REC.piece("|",12)'="" set zcol.ASDATE = $$FDAT^%ZM(REC.piece("|",12),"DD/MM/YEAR")
+		set zcol.BKNUMBER  = REC.piece("|",13)
+		set zcol.BLASTID  = REC.piece("|",14)
+		set zcol.BLDCODE  = REC.piece("|",15)
+		set zcol.BLDNAME  = REC.piece("|",16)
+		set zcol.BLDNUM  = REC.piece("|",17)
+		set zcol.BLDTYPE  = REC.piece("|",18)
+		set zcol.BLDVAL   = REC.piece("|",19)
+		set zcol.BOO  = REC.piece("|",20)
+		set zcol.BOOTFR = REC.piece("|",21)
+		set zcol.BOTCODE = REC.piece("|",22)
+		set zcol.BOTRSKRT = REC.piece("|",23)
+		set zcol.BSOI = REC.piece("|",24)
+		set zcol.BSTRTID = REC.piece("|",25)
+		set zcol.BUILDNO = REC.piece("|",26)
+		set zcol.CACN = REC.piece("|",27)
+		set zcol.CC = REC.piece("|",28)
+		if REC.piece("|",29)'="" set zcol.CCRDT = $$FDAT^%ZM(REC.piece("|",29),"DD/MM/YEAR")
+		set zcol.CCRNUM = REC.piece("|",30)
+		set zcol.CERNO = REC.piece("|",31)
+		set zcol.CID = REC.piece("|",32)
+		set zcol.CMDCD = REC.piece("|",33)
+		set zcol.COLL = REC.piece("|",34)
+		set zcol.COLSUBT = REC.piece("|",35)
+		set zcol.COLTYP = REC.piece("|",36)
+		set zcol.CONDPAR = REC.piece("|",37)
+		if REC.piece("|",38)'="" set zcol.CONVDT = $$FDAT^%ZM(REC.piece("|",38),"DD/MM/YEAR")
+		set zcol.CRCD = REC.piece("|",39)
+		if REC.piece("|",40)'="" set zcol.DATETRF = $$FDAT^%ZM(REC.piece("|",40),"DD/MM/YEAR")
+		set zcol.DESC = REC.piece("|",41)
+		if REC.piece("|",42)'="" set zcol.DOB = $$FDAT^%ZM(REC.piece("|",42),"DD/MM/YEAR")
+		set zcol.DOCLCT = REC.piece("|",43)
+		if REC.piece("|",44)'="" set zcol.DOD = $$FDAT^%ZM(REC.piece("|",44),"DD/MM/YEAR")
+		set zcol.ENGCAP = REC.piece("|",45)
+		set zcol.EXTRSKR = REC.piece("|",46)
+		set zcol.FLOOR = REC.piece("|",47)
+		set zcol.GRPNO = REC.piece("|",48)
+		set zcol.GTEL = REC.piece("|",49)
+		set zcol.INSREQ = REC.piece("|",50)
+		set zcol.KTBRKR = REC.piece("|",51)
+		set zcol.LNDINFO = REC.piece("|",52)
+		set zcol.LNDNO = REC.piece("|",53)
+		set zcol.LNDVAL = REC.piece("|",54)
+		set zcol.LNDVOL1 = REC.piece("|",55)
+		set zcol.LNDVOL2 = REC.piece("|",56)
+		set zcol.LNDVOL3 = REC.piece("|",57)
+		set zcol.LNDVOL4 = REC.piece("|",58)
+		set zcol.LOC1 = REC.piece("|",59)
+		set zcol.LOC2 = REC.piece("|",60)
+		set zcol.LOC3 = REC.piece("|",61)
+		set zcol.LQCD = REC.piece("|",62)
+		if REC.piece("|",63)'="" set zcol.LRTRVDT = $$FDAT^%ZM(REC.piece("|",63),"DD/MM/YEAR")
+		set zcol.MCODE1 = REC.piece("|",64)
+		set zcol.MCODE2 = REC.piece("|",65)
+		set zcol.NONCRM = REC.piece("|",66)
+		set zcol.OPRIMKEY = REC.piece("|",67)
+		set zcol.OWNLNDVOL1 = REC.piece("|",68)
+		set zcol.OWNLNDVOL2 = REC.piece("|",69)
+		set zcol.OWNLNDVOL3 = REC.piece("|",70)
+		set zcol.OWNLNDVOL4 = REC.piece("|",71)
+		set zcol.OWNPORTN = REC.piece("|",72)
+		set zcol.PACN = REC.piece("|",73)
+		set zcol.PAGENO = REC.piece("|",74)
+		set zcol.PARTLFLG = REC.piece("|",75)
+		set zcol.PAYPARTY = REC.piece("|",76)
+		set zcol.PCHPRICE = REC.piece("|",77)
+		set zcol.PCOLVAL = REC.piece("|",78)
+		set zcol.PERSONID = REC.piece("|",79)
+		set zcol.PROVINCE = REC.piece("|",80)
+		set zcol.RAVANG = REC.piece("|",81)
+		set zcol.REASON = REC.piece("|",82)
+		set zcol.REMARKS = REC.piece("|",83)
+		set zcol.RESPUNIT = REC.piece("|",84)
+		set zcol.RIGHBAL = REC.piece("|",85)
+		set zcol.RIGHVAL = REC.piece("|",86)
+		set zcol.RMAREA = REC.piece("|",87)
+		set zcol.RMKPORTN = REC.piece("|",88)
+		set zcol.RMNUMBER = REC.piece("|",89)
+		set zcol.ROAD = REC.piece("|",90)
+		set zcol.RSCD = REC.piece("|",91)
+		set zcol.RULCOST = REC.piece("|",92)
+		set zcol.SEQNO = REC.piece("|",93)
+		set zcol.SHRHLDRG = REC.piece("|",94)
+		set zcol.SHRTNAME = REC.piece("|",95)
+		set zcol.STCKNO = REC.piece("|",96)
+		set zcol.STOREY = REC.piece("|",97)
+		set zcol.SUBBOT = REC.piece("|",98)
+		set zcol.SYMBOL = REC.piece("|",99)
+		set zcol.TAMBOL = REC.piece("|",100)
+		set zcol.TOTPORTN = REC.piece("|",101)
+		set zcol.UNITCD = REC.piece("|",102)
+		if REC.piece("|",103)'="" set zcol.USEDSTDT = $$FDAT^%ZM(REC.piece("|",103),"DD/MM/YEAR")
+		set zcol.USEFULIF = REC.piece("|",104)
+		if REC.piece("|",105)'="" set zcol.ZATEEXP = $$FDAT^%ZM(REC.piece("|",105),"DD/MM/YEAR")
+		if REC.piece("|",106)'="" set zcol.ZATEISSUEDT = $$FDAT^%ZM(REC.piece("|",106),"DD/MM/YEAR")
+		set zcol.ZATEISSUER = REC.piece("|",107)
+		set zcol.ZATENUM = REC.piece("|",108)
+		set zcol.ZCERTBAL = REC.piece("|",109)
+		set zcol.ZCERTCID = REC.piece("|",110)
+		set zcol.ZCERTGRP = REC.piece("|",111)
+		set zcol.ZCERTID = REC.piece("|",112)
+		set zcol.ZCERTLOTH = REC.piece("|",113)
+		set zcol.ZCERTLOTL = REC.piece("|",114)
+		set zcol.ZCERTPERIOD = REC.piece("|",115)
+		set zcol.ZCERTUNIT = REC.piece("|",116)
+		if REC.piece("|",117)'="" set zcol.ZLGISSUEDT = $$FDAT^%ZM(REC.piece("|",117),"DD/MM/YEAR")
+		set zcol.ZLGNUM = REC.piece("|",118)
+		set zcol.ZRADUR = REC.piece("|",119)
+		if REC.piece("|",120)'="" set zcol.ZRAEXP = $$FDAT^%ZM(REC.piece("|",120),"DD/MM/YEAR")
+		set zcol.ZRAISSUER = REC.piece("|",121)
+		set zcol.ZRANUM = REC.piece("|",122)
+		set zcol.ZRATYPE = REC.piece("|",123)
+		set zcol.BONDTYPE = REC.piece("|",124)
+		set zcol.BONDCODE = REC.piece("|",125)
+		set zcol.BONDNAME = REC.piece("|",126)
+		set zcol.ISSYEAR = REC.piece("|",127)
+		set zcol.BSEQ = REC.piece("|",128)
+		set zcol.BOWNNAME = REC.piece("|",129)
+		if REC.piece("|",130)'="" set zcol.BEXPDATE = $$FDAT^%ZM(REC.piece("|",130),"DD/MM/YEAR")
+		set zcol.BINTRATE = REC.piece("|",131)
+		set zcol.BUPRICE = REC.piece("|",132)
+		if REC.piece("|",133)'="" set zcol.MKDATE = $$FDAT^%ZM(REC.piece("|",133),"DD/MM/YEAR")
+		set zcol.MKPRICE = REC.piece("|",134)
+		set zcol.TOTBNVAL = REC.piece("|",135)
+		set zcol.LISTED = REC.piece("|",136)
+		set zcol.SENIORITY = REC.piece("|",137)
+		//set zcol.APPAMT = REC.piece("|",138)
+		set zcol.SHRTNAME = REC.piece("|",139)
+		set zcol.STCKTYP = REC.piece("|",140)
+		set zcol.STCKNAME = REC.piece("|",141)
+		set zcol.ISSNAME = REC.piece("|",142)
+		set zcol.TAXID = REC.piece("|",143)
+		if REC.piece("|",144)'="" set zcol.ISSDATE = $$FDAT^%ZM(REC.piece("|",144),"DD/MM/YEAR")
+		set zcol.NOSHARE = REC.piece("|",145)
+		set zcol.PARPRC = REC.piece("|",146)
+		if REC.piece("|",147)'="" set zcol.PARD = $$FDAT^%ZM(REC.piece("|",147),"DD/MM/YEAR")
+		set zcol.BKPRICE = REC.piece("|",148)
+		if REC.piece("|",149)'="" set zcol.BKDATE = $$FDAT^%ZM(REC.piece("|",149),"DD/MM/YEAR")
+		set zcol.ISSRSKRT = REC.piece("|",150)
+		set zcol.STCKTYP2 = REC.piece("|",151)
+		set zcol.RSKWOCL = REC.piece("|",152)
+		set zcol.STCKSHR = REC.piece("|",153)
+		set zcol.USEAGE = REC.piece("|",154)
+		set zcol.ZINS1ST = REC.piece("|",155)
+		set zcol.ZCERTCCID = REC.piece("|",156)
+		set zcol.valflg = REC.piece("|",157)
+		do zcol.save("/NOTRIGAFT/NOTRIGBEF/NOVALDD/NOVALREQ/NOVALRI")
+
+
+
+		set i=i+1
+		//write !,i_". "_coll
+
+
+	}
+	write !,("Total ZCOL "_i)
+	do io.close()
 	quit
-	
-		
+
+
 SETUP
 
 	//Dis-engage All Collateral/Contract Link
@@ -681,13 +681,14 @@ SETUP
 	do ZCOLOWNDIS
 	do ZCTCOLDIS
 	do ZCTRCIFDIS
-	do ZCTRACNDIS
-		
-	quit	
+	//2014/06/10 Cancle previous implementations for contract link.
+	//do ZCTRACNDIS
+
+	quit
 
 
 ZCOLOWNLINK	
-	
+
 	type Number ER,EXIT
 	set %UID=1
 	set TLO=$$TLO^UTLO
@@ -697,10 +698,10 @@ ZCOLOWNLINK
 	// Check whether the file exists or not.
 	do CHKIO(ZFID)
 	if ER =1 set RM =$$^MSG(2799,ZFID) quit
-	
+
 	set EXIT =0
-	
-	
+
+
 	type IO io =Class.new("IO")
 	set io.fileName =ZFID
 	set io.openParams ="READ"
@@ -708,45 +709,45 @@ ZCOLOWNLINK
 	do io.open()
 	set i=0
 
-		
-		for  set REC =io.read() { quit:EXIT
-			if REC[$C(13) set REC=$TR(REC,$C(13),"")
-			catch error {
-				new ET,RM
-				set ET=error.type
-				set RM=error.description
-				set FROM=error.thrownAt
-			//set RM="ZCOLSAVE Crash"
-				write !,RM
-				write !,REC
-				write !,"From ZCOLOWNLINK Row "_i
-				do ^UTLERR
-			}
-			type Number COLL,ACN
-			set ZCHECK=REC.piece("|",1)
-			if ZCHECK["Total" set EXIT=1 quit
-			set COLL=REC.piece("|",2)
-			set ACN = REC.piece("|",1)
-			
-			//if ^ZCOL(COLL,65831).data() do Db.delete("ZCOLOWNLINK","COLL=:COLL")
 
-				
-			type RecordZCOLOWNLINK zown = Db.getRecord("ZCOLOWNLINK","COLL=:COLL,ACN=:ACN",1)
-			set zown.ACN = REC.piece("|",1)
-			set zown.COLL = REC.piece("|",2)
-			set zown.PAROWNFLG=REC.piece("|",3)
-			
-			do zown.save("/NOTRIGAFT/NOTRIGBEF/NOVALDD/NOVALREQ/NOVALRI")
-			set i=i+1
-			
+	for  set REC =io.read() { quit:EXIT
+		if REC[$C(13) set REC=$TR(REC,$C(13),"")
+		catch error {
+			new ET,RM
+			set ET=error.type
+			set RM=error.description
+			set FROM=error.thrownAt
+			//set RM="ZCOLSAVE Crash"
+			write !,RM
+			write !,REC
+			write !,"From ZCOLOWNLINK Row "_i
+			do ^UTLERR
 		}
-	
-		write !,("Total ZCOLOWNLINK "_i)
-		do io.close()
+		type Number COLL,ACN
+		set ZCHECK=REC.piece("|",1)
+		if ZCHECK["Total" set EXIT=1 quit
+		set COLL=REC.piece("|",2)
+		set ACN = REC.piece("|",1)
+
+		//if ^ZCOL(COLL,65831).data() do Db.delete("ZCOLOWNLINK","COLL=:COLL")
+
+
+		type RecordZCOLOWNLINK zown = Db.getRecord("ZCOLOWNLINK","COLL=:COLL,ACN=:ACN",1)
+		set zown.ACN = REC.piece("|",1)
+		set zown.COLL = REC.piece("|",2)
+		set zown.PAROWNFLG=REC.piece("|",3)
+
+		do zown.save("/NOTRIGAFT/NOTRIGBEF/NOVALDD/NOVALREQ/NOVALRI")
+		set i=i+1
+
+	}
+
+	write !,("Total ZCOLOWNLINK "_i)
+	do io.close()
 	quit
-	
+
 ZCONTRACT
-	
+
 	type Number ER,EXIT
 	set (ER,EXIT,i)=0
 	set ZEXTDAT=%SystemDate.toString("YEARMMDD")
@@ -754,59 +755,59 @@ ZCONTRACT
 	// Check whether the file exists or not.
 	do CHKIO(ZFID)
 	if ER =1 set RM =$$^MSG(2799,ZFID) quit
-	
+
 	set EXIT =0
-	
-	
+
+
 	type IO io =Class.new("IO")
 	set io.fileName =ZFID
 	set io.openParams ="READ"
 	set io.recordSize =1024
 	do io.open()
 
-		for  set REC =io.read() { quit:EXIT
-			if REC[$C(13) set REC=$TR(REC,$C(13),"")
-			catch error {
-				new ET,RM
-				set ET=error.type
-				set RM=error.description
-				set FROM=error.thrownAt
+	for  set REC =io.read() { quit:EXIT
+		if REC[$C(13) set REC=$TR(REC,$C(13),"")
+		catch error {
+			new ET,RM
+			set ET=error.type
+			set RM=error.description
+			set FROM=error.thrownAt
 			//set RM="ZCOLSAVE Crash"
-				write !,RM
-				write !,REC
-				write !,"From ZCONTRACT Row "_i
-				do ^UTLERR
-			}
-			
-			set ZCHECK=REC.piece("|",1)
-			if ZCHECK["Total" set EXIT=1 quit
-			set ZCTRCT = REC.piece("|",7)
-			type RecordZCONTRACT zctrct = Db.getRecord("ZCONTRACT","CTRCT=:ZCTRCT",1)
-			set zctrct.BOO= REC.piece("|",1)
-			set zctrct.CC= REC.piece("|",2)
-			set zctrct.CONTRREL= REC.piece("|",3)
-			set zctrct.CONVDT= REC.piece("|",4)
-			if REC.piece("|",5)'="" set zctrct.CRTDATE = $$FDAT^%ZM(REC.piece("|",5),"DD/MM/YEAR")
-			set zctrct.CRTUSER= REC.piece("|",6)
-			set zctrct.CTRCT= REC.piece("|",7)
-			if REC.piece("|",8)'="" set zctrct.CTRCTDT = $$FDAT^%ZM(REC.piece("|",8),"DD/MM/YEAR")
-			set zctrct.CTRSTAT= REC.piece("|",9)
-			set zctrct.MCTRCT= REC.piece("|",10)
-			set zctrct.PLDGAMT= REC.piece("|",11)
-			set zctrct.PLDGSEQ= REC.piece("|",12)
-			if REC.piece("|",13)'="" set zctrct.RELDATE = $$FDAT^%ZM(REC.piece("|",13),"DD/MM/YEAR")
-			set zctrct.REMARKS= REC.piece("|",14)
-			set zctrct.RESPUNIT= REC.piece("|",15)
-			
-			do zctrct.save("/NOTRIGAFT/NOTRIGBEF/NOVALDD/NOVALREQ/NOVALRI")
-			set i=i+1
+			write !,RM
+			write !,REC
+			write !,"From ZCONTRACT Row "_i
+			do ^UTLERR
 		}
-		write !,("Total ZCONTRACT "_i)
-		do io.close()
+
+		set ZCHECK=REC.piece("|",1)
+		if ZCHECK["Total" set EXIT=1 quit
+		set ZCTRCT = REC.piece("|",7)
+		type RecordZCONTRACT zctrct = Db.getRecord("ZCONTRACT","CTRCT=:ZCTRCT",1)
+		set zctrct.BOO= REC.piece("|",1)
+		set zctrct.CC= REC.piece("|",2)
+		set zctrct.CONTRREL= REC.piece("|",3)
+		set zctrct.CONVDT= REC.piece("|",4)
+		if REC.piece("|",5)'="" set zctrct.CRTDATE = $$FDAT^%ZM(REC.piece("|",5),"DD/MM/YEAR")
+		set zctrct.CRTUSER= REC.piece("|",6)
+		set zctrct.CTRCT= REC.piece("|",7)
+		if REC.piece("|",8)'="" set zctrct.CTRCTDT = $$FDAT^%ZM(REC.piece("|",8),"DD/MM/YEAR")
+		set zctrct.CTRSTAT= REC.piece("|",9)
+		set zctrct.MCTRCT= REC.piece("|",10)
+		set zctrct.PLDGAMT= REC.piece("|",11)
+		set zctrct.PLDGSEQ= REC.piece("|",12)
+		if REC.piece("|",13)'="" set zctrct.RELDATE = $$FDAT^%ZM(REC.piece("|",13),"DD/MM/YEAR")
+		set zctrct.REMARKS= REC.piece("|",14)
+		set zctrct.RESPUNIT= REC.piece("|",15)
+
+		do zctrct.save("/NOTRIGAFT/NOTRIGBEF/NOVALDD/NOVALREQ/NOVALRI")
+		set i=i+1
+	}
+	write !,("Total ZCONTRACT "_i)
+	do io.close()
 	quit
-	
+
 ZCTRCTACN
-	
+	kill ^TMP("CMSRELICATE")
 	type Number ER,EXIT
 	set (ER,EXIT,i)=0
 	set ZEXTDAT=%SystemDate.toString("YEARMMDD")
@@ -814,51 +815,93 @@ ZCTRCTACN
 	// Check whether the file exists or not.
 	do CHKIO(ZFID)
 	if ER =1 set RM =$$^MSG(2799,ZFID) quit
-	
+
 	set EXIT =0
-	
-	
+
+
 	type IO io =Class.new("IO")
 	set io.fileName =ZFID
 	set io.openParams ="READ"
 	set io.recordSize =1024
 	do io.open()
-	
 
-		for  set REC =io.read() { quit:EXIT
-			if REC[$C(13) set REC=$TR(REC,$C(13),"")
-			catch error {
-				new ET,RM
-				set ET=error.type
-				set RM=error.description
-				set FROM=error.thrownAt
+
+	for  set REC =io.read() { quit:EXIT
+		if REC[$C(13) set REC=$TR(REC,$C(13),"")
+		catch error {
+			new ET,RM
+			set ET=error.type
+			set RM=error.description
+			set FROM=error.thrownAt
 			//set RM="ZCOLSAVE Crash"
-				write !,RM
-				write !,REC
-				write !,"From ZCTRCTACN Row "_i
-				do ^UTLERR
-			}
-			set ZCHECK=REC.piece("|",1)
-			if ZCHECK["Total" set EXIT=1 quit
-			type Number ZCID,ZCTRCT
-			
-			set ZCID=REC.piece("|",1)
-			set ZCTRCT=REC.piece("|",2)
-			
-			//if ^ZCTRCT(ZCTRCT,70).data() do Db.delete("ZCTRCTACN","CTRCT=:ZCTRCT")
-			
+			write !,RM
+			write !,REC
+			write !,"From ZCTRCTACN Row "_i
+			do ^UTLERR
+		}
+		set ZCHECK=REC.piece("|",1)
+		if ZCHECK["Total" set EXIT=1 quit
+		type Number ZCID,ZCTRCT,ZFLG
+
+		set ZCID=+REC.piece("|",1)
+		set ZCTRCT=+REC.piece("|",2)
+		//2014/06/10
+		set ZFLG=+REC.piece("|",3)
+		if (ZCID.isNumber()=0)!(ZCTRCT.isNumber()=0)!(ZFLG.isNumber()=0) quit
+		if ZFLG=0 do {	//Delete Only 1 Record
+			if ^ZCTRCT(ZCTRCT,70,ZCID).data() do Db.delete("ZCTRCTACN","CID=:ZCID,CTRCT=:ZCTRCT")
+		}
+		else if ZFLG=1 do {
+			set ^TMP("CMSRELICATE","ZCTRCTACN",ZCTRCT,ZCID)=ZFLG	//Save in tmp to process
+			/*
+			if ^ZCTRCT(ZCTRCT,70).data() do Db.delete("ZCTRCTACN","CTRCT=:ZCTRCT")
 			type RecordZCTRCTACN acn = Db.getRecord("ZCTRCTACN","CID=:ZCID,CTRCT=:ZCTRCT",1)
 			set acn.CID=ZCID
 			set acn.CTRCT=ZCTRCT
 			do acn.save("/NOTRIGAFT/NOTRIGBEF/NOVALDD/NOVALREQ/NOVALRI")
 			set i=i+1
+			*/
 		}
-		write !,("Total ZCTRCTACN "_i)
-		do io.close()
+
+	}
+	do io.close()
+	do PROCCTRCTACN
+
 	quit
-	
+
+PROCCTRCTACN
+
+	type Number i
+	set i=$O(^TMP("CMSRELICATE","ZCTRCTACN",""))	//Delete all existing record then add new relation
+	while 'i.isNull() do {
+		type Number ZCTRCT
+		set ZCTRCT=i
+		do Db.delete("ZCTRCTACN","CTRCT=:ZCTRCT")
+		set i=$O(^TMP("CMSRELICATE","ZCTRCTACN",i))
+	}
+	set j=$O(^TMP("CMSRELICATE","ZCTRCTACN","")
+	while 'j.isNull() do {
+		type Number ZCTRCT,k
+		set ZCTRCT=j
+		set k=$O(^TMP("CMSRELICATE","ZCTRCTACN",j,""))
+		while 'k.isNull() do {
+			type Number ZCID
+			set ZCID=k
+			type RecordZCTRCTACN acn = Db.getRecord("ZCTRCTACN","CTRCT=:ZCTRCT,CID=:ZCID",1)
+			set acn.CID=ZCID
+			set acn.CTRCT=ZCTRCT
+			do acn.save("/NOTRIGAFT/NOTRIGBEF/NOVALDD/NOVALREQ/NOVALRI")
+			set k=$O(^TMP("CMSRELICATE","ZCTRCTACN",j,k))
+
+		}
+		set j=$O(^TMP("CMSRELICATE","ZCTRCTACN",j)
+		
+	}
+	quit
+
+
 ZCTRCTCIF
-	
+
 	type Number ER,EXIT
 	set (ER,EXIT,i)=0
 	set ZEXTDAT=%SystemDate.toString("YEARMMDD")
@@ -866,47 +909,47 @@ ZCTRCTCIF
 	// Check whether the file exists or not.
 	do CHKIO(ZFID)
 	if ER =1 set RM =$$^MSG(2799,ZFID) quit
-	
+
 	set EXIT =0
-	
-	
+
+
 	type IO io =Class.new("IO")
 	set io.fileName =ZFID
 	set io.openParams ="READ"
 	set io.recordSize =1024
 	do io.open()
-	
-		
-		for  set REC =io.read() { quit:EXIT
-			if REC[$C(13) set REC=$TR(REC,$C(13),"")
-			catch error {
-				new ET,RM
-				set ET=error.type
-				set RM=error.description
-				set FROM=error.thrownAt
+
+
+	for  set REC =io.read() { quit:EXIT
+		if REC[$C(13) set REC=$TR(REC,$C(13),"")
+		catch error {
+			new ET,RM
+			set ET=error.type
+			set RM=error.description
+			set FROM=error.thrownAt
 			//set RM="ZCOLSAVE Crash"
-				write !,"From ZCTRCTCIF Row "_i
-				do ^UTLERR
-			}
-			type Number ZACN,ZCTRCT
-			set ZCHECK=REC.piece("|",1)
-			if ZCHECK["Total" set EXIT=1 quit
-			set ZACN=REC.piece("|",1)
-			set ZCTRCT=REC.piece("|",2)
-			//if ^ZCTRCT(ZCTRCT,100).data() do Db.delete("ZCTRCTCIF","CTRCT=:ZCTRCT")
-			
-			type RecordZCTRCTCIF cif = Db.getRecord("ZCTRCTCIF","ACN=:ZACN,CTRCT=:ZCTRCT",1)
-			//set cif.ACN=ZACN
-			//set cif.ZCTRCT=ZCTRCT
-			do cif.save("/NOTRIGAFT/NOTRIGBEF/NOVALDD/NOVALREQ/NOVALRI")
-			set i=i+1
+			write !,"From ZCTRCTCIF Row "_i
+			do ^UTLERR
 		}
-		write !,("Total ZCTRCTCIF "_i)
-		do io.close()
+		type Number ZACN,ZCTRCT
+		set ZCHECK=REC.piece("|",1)
+		if ZCHECK["Total" set EXIT=1 quit
+		set ZACN=REC.piece("|",1)
+		set ZCTRCT=REC.piece("|",2)
+		//if ^ZCTRCT(ZCTRCT,100).data() do Db.delete("ZCTRCTCIF","CTRCT=:ZCTRCT")
+
+		type RecordZCTRCTCIF cif = Db.getRecord("ZCTRCTCIF","ACN=:ZACN,CTRCT=:ZCTRCT",1)
+		//set cif.ACN=ZACN
+		//set cif.ZCTRCT=ZCTRCT
+		do cif.save("/NOTRIGAFT/NOTRIGBEF/NOVALDD/NOVALREQ/NOVALRI")
+		set i=i+1
+	}
+	write !,("Total ZCTRCTCIF "_i)
+	do io.close()
 	quit
-	
+
 ZCTRCTCOL
-	
+
 	type Number ER,EXIT
 	set (ER,EXIT,i)=0
 	set ZEXTDAT=%SystemDate.toString("YEARMMDD")
@@ -914,10 +957,10 @@ ZCTRCTCOL
 	// Check whether the file exists or not.
 	do CHKIO(ZFID)
 	if ER =1 set RM =$$^MSG(2799,ZFID) quit
-	
+
 	set EXIT =0
-	
-	
+
+
 	type IO io =Class.new("IO")
 	set io.fileName =ZFID
 	set io.openParams ="READ"
@@ -926,42 +969,42 @@ ZCTRCTCOL
 
 
 
-		for  set REC =io.read() { quit:EXIT
-			if REC[$C(13) set REC=$TR(REC,$C(13),"")
-			catch error {
-				new ET,RM
-				set ET=error.type
-				set RM=error.description
-				set FROM=error.thrownAt
+	for  set REC =io.read() { quit:EXIT
+		if REC[$C(13) set REC=$TR(REC,$C(13),"")
+		catch error {
+			new ET,RM
+			set ET=error.type
+			set RM=error.description
+			set FROM=error.thrownAt
 			//set RM="ZCOLSAVE Crash"
-				write !,RM
-				write !,REC
-				write !,"From ZCTRCTCOL Row "_i
-				do ^UTLERR
-			}
-			type Number ZCOLL,ZCTRCT
-			
-			
-			set ZCHECK=REC.piece("|",1)
-			if ZCHECK["Total" set EXIT=1 quit
-			set ZCTRCT=REC.piece("|",1)
-			set ZCOLL=REC.piece("|",2)
-			//if ^ZCTRCT(ZCTRCT,80).data() do Db.delete("ZCTRCTCOL","CTRCT=:ZCTRCT")
-			
-			type RecordZCTRCTCOL col = Db.getRecord("ZCTRCTCOL","COLL=:ZCOLL,CTRCT=:ZCTRCT",1)
-			set col.CCSTAT = REC.piece("|",3)
-			set col.PLDGVAL = REC.piece("|",4)
-			if REC.piece("|",5)'="" set col.RELDATE = $$FDAT^%ZM(REC.piece("|",5),"DD/MM/YEAR")
-			else set col.RELDATE=""
-			do col.save("/NOTRIGAFT/NOTRIGBEF/NOVALDD/NOVALREQ/NOVALRI")
-			set i=i+1
-			
+			write !,RM
+			write !,REC
+			write !,"From ZCTRCTCOL Row "_i
+			do ^UTLERR
 		}
-		write !,("Total ZCTRCTCOL "_i)
-		do io.close()	
+		type Number ZCOLL,ZCTRCT
+
+
+		set ZCHECK=REC.piece("|",1)
+		if ZCHECK["Total" set EXIT=1 quit
+		set ZCTRCT=REC.piece("|",1)
+		set ZCOLL=REC.piece("|",2)
+		//if ^ZCTRCT(ZCTRCT,80).data() do Db.delete("ZCTRCTCOL","CTRCT=:ZCTRCT")
+
+		type RecordZCTRCTCOL col = Db.getRecord("ZCTRCTCOL","COLL=:ZCOLL,CTRCT=:ZCTRCT",1)
+		set col.CCSTAT = REC.piece("|",3)
+		set col.PLDGVAL = REC.piece("|",4)
+		if REC.piece("|",5)'="" set col.RELDATE = $$FDAT^%ZM(REC.piece("|",5),"DD/MM/YEAR")
+		else set col.RELDATE=""
+		do col.save("/NOTRIGAFT/NOTRIGBEF/NOVALDD/NOVALREQ/NOVALRI")
+		set i=i+1
+
+	}
+	write !,("Total ZCTRCTCOL "_i)
+	do io.close()
 	quit
-	
-	
+
+
 ADDACN
 	do SYSVAR^SCADRV0()
 	type Date ZEXTDAT
@@ -972,14 +1015,14 @@ ADDACN
 	// Check whether the file exists or not.
 	do CHKIO(ZFID)
 	if ER =1 set RM =$$^MSG(2799,ZFID) quit
-	
+
 	type IO io =Class.new("IO")
 	set io.fileName =ZFID
 	set io.openParams ="READ"
 	set io.recordSize =1024
 	do io.open()
-	
-	
+
+
 	for  set REC =io.read() { quit:EXIT
 		type String output
 		if REC[$C(13) set REC=$TR(REC,$C(13),"")
@@ -989,13 +1032,13 @@ ADDACN
 			set ET=error.type
 			set RM=error.description
 			set FROM=error.thrownAt
-				//set RM="ZCOLSAVE Crash"
+			//set RM="ZCOLSAVE Crash"
 			write !,RM
 			write !,REC
 			write !,"From ACN Row "_i
 			do ^UTLERR
 		}
-		
+
 		set ZCHECK=REC.piece("|",1)
 		if ZCHECK["Total" set EXIT=1 quit
 		set ZCID = REC
@@ -1004,30 +1047,30 @@ ADDACN
 			if '$D(^ZCONV("CID",ZCID))=1 set ^ZCONV("CID",ZCID)=""
 		}
 	}
-	
+
 	quit
-	
+
 GENACN
 
 	do SYSVAR^SCADRV0()
 	type Date ZEXTDAT
 	set ZEXTDAT=(%SystemDate-1).toString("YEARMMDD")
 	type Number i
-	
+
 	type IO out =Class.new("IO")
 	set out.fileName =$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTCMS")_"/ToCMS/ACN_"_ZEXTDAT_".txt"
 	set out.openParams ="NEWV/WRITE"
 	set out.recordSize =1024
 	do out.open()
-	
+
 	set acnHead="CID|PRODUCT_CLASS|PRODUCT_GRP|PRODUCT_GRP_DESC|PRODUCT_TYPE|PRODUCT_TYPE_DESC|ACCT_NAME|PRIMARY_CIF|ACCT_STATUS|ACCT_STATUS_DESC|"
 	set acnHead=acnHead_"OUTS_BAL|AVAIL_BAL|MASTER_ACCT_NO|ACCT_SUBTYPE|MARKET_CD|MARKET_CD_DESC|LIMIT_AMT|DT_OPENED|DT_CLOSED|OWNER_BR|OWNER_BR_DESC|"
 	set acnHead=acnHead_"INT_RECEIVE|INT_SUSPENSE|LEGAL_ID|TOTAL_DUE|MISC_CHARGE|LATE_CHARGE_AMT|INT_PASS_DUE|PRIN_PASS_DUE|LOAN_CLASS|RESCIDENCE_CLASS|DATE_OF_NOTE|"
 	set acnHead=acnHead_"OD_LIMIT|TOTAL_LOAN_BAL|UNPAID_FEE"
 	do out.write(acnHead)
-	
+
 	set i=0
-	
+
 	set ZPOINT=$O(^ZCMS("CID",""))
 	while 'ZPOINT.isNull() do {
 		type String ZDATA
@@ -1038,7 +1081,7 @@ GENACN
 	}
 	do out.write("Total "_i)
 	do out.close()
-	
+
 	quit
 
 ADDCIF
@@ -1051,14 +1094,14 @@ ADDCIF
 	// Check whether the file exists or not.
 	do CHKIO(ZFID)
 	if ER =1 set RM =$$^MSG(2799,ZFID) quit
-	
+
 	type IO io =Class.new("IO")
 	set io.fileName =ZFID
 	set io.openParams ="READ"
 	set io.recordSize =1024
 	do io.open()
-	
-	
+
+
 	for  set REC =io.read() { quit:EXIT
 		type String output
 		if REC[$C(13) set REC=$TR(REC,$C(13),"")
@@ -1068,13 +1111,13 @@ ADDCIF
 			set ET=error.type
 			set RM=error.description
 			set FROM=error.thrownAt
-				//set RM="ZCOLSAVE Crash"
+			//set RM="ZCOLSAVE Crash"
 			write !,RM
 			write !,REC
 			write !,"From CIF Row "_i
 			do ^UTLERR
 		}
-		
+
 		set ZCHECK=REC.piece("|",1)
 		if ZCHECK["Total" set EXIT=1 quit
 		set ZACN = REC
@@ -1084,21 +1127,21 @@ ADDCIF
 			if '$D(^ZCONV("ACN",ZACN))=1 set ^ZCONV("ACN",ZACN)=ZFLG
 		}
 	}
-	
+
 	quit
-	
+
 GENCIF
-	
+
 	do SYSVAR^SCADRV0()
 	type Date ZEXTDAT
 	set ZEXTDAT=(%SystemDate).toString("YEARMMDD")
-	
+
 	type IO out =Class.new("IO")
 	set out.fileName =$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTCMS")_"/ToCMS/CIF_"_ZEXTDAT_".txt"
 	set out.openParams ="NEWV/WRITE"
 	set out.recordSize =1024
 	do out.open()
-	
+
 	set cifHead="ACN|THAI_TITLE|THAI_FNAME|THAI_LNAME|THAI_MNAME|CITIZEN_ID|TAX_ID|LEGAL_ADDR1|LEGAL_ADDR2|LEGAL_ADDR3|LEGAL_TAMBOL_CD|"
 	set cifHead=cifHead_"LEGAL_AMPHUR_CD|LEGAL_PROVINCE_CD|LEGAL_COUNTRY_CD|LEGAL_POSTAL_CD|HOME_PHONE|MOBILE_PHONE|OFFICE_PHONE|OFFICE_PHONE_EXT|"
 	set cifHead=cifHead_"JURISTIC_ID|MAILING_ADDR1|MAILING_ADDR2|MAILING_ADDR3|MAILING_TAMBOL_CD|MAILING_AMPHUR_CD|MAILING_PROVINCE_CD|MAILING_COUNTRY_CD|MAILING_POSTAL_CD|OFFICE_ADDR1|"
@@ -1108,7 +1151,7 @@ GENCIF
 	type Number i=0
 	do out.write(cifHead)
 	set i=0
-	
+
 	set ZPOINT=$O(^ZCMS("ACN",""))
 	while 'ZPOINT.isNull() do {
 		type String ZDATA
@@ -1119,9 +1162,9 @@ GENCIF
 	}
 	do out.write("Total "_i)
 	do out.close()
-	
+
 	quit
-	
+
 ZCOLOWNDIS
 
 	type Number ER,EXIT
@@ -1133,14 +1176,14 @@ ZCOLOWNDIS
 	// Check whether the file exists or not.
 	do CHKIO(ZFID1)
 	if ER =1 set RM =$$^MSG(2799,ZFID) quit
-	
+
 	type IO io1 =Class.new("IO")
 	set io1.fileName =ZFID1
 	set io1.openParams ="READ"
 	set io1.recordSize =1024
 	do io1.open()
 
-		
+
 	for  set REC =io1.read() { quit:EXIT
 		if REC[$C(13) set REC=$TR(REC,$C(13),"")
 		catch error {
@@ -1152,7 +1195,7 @@ ZCOLOWNDIS
 			write !,RM
 			write !,REC
 			do ^UTLERR
-				//write !,"From ZCTRCTACN Row "_i
+			//write !,"From ZCTRCTACN Row "_i
 		}
 		type Number COLL,ACN
 		set ZCHECK=REC.piece("|",1)
@@ -1162,9 +1205,9 @@ ZCOLOWNDIS
 		if ^ZCOL(COLL,65831).data() do Db.delete("ZCOLOWNLINK","COLL=:COLL")
 	}
 	do io1.close()
-		
+
 	quit
-	
+
 ZCTRACNDIS
 
 	type Number ER,EXIT
@@ -1174,14 +1217,14 @@ ZCTRACNDIS
 	// Check whether the file exists or not.
 	do CHKIO(ZFID2)
 	if ER =1 set RM =$$^MSG(2799,ZFID) quit
-	
+
 	type IO io2 =Class.new("IO")
 	set io2.fileName =ZFID2
 	set io2.openParams ="READ"
 	set io2.recordSize =1024
 	do io2.open()
 
-		
+
 	for  set REC =io2.read() { quit:EXIT
 		if REC[$C(13) set REC=$TR(REC,$C(13),"")
 		catch error {
@@ -1195,16 +1238,16 @@ ZCTRACNDIS
 		set ZCHECK=REC.piece("|",1)
 		if ZCHECK["Total" set EXIT=1 quit
 		type Number ZCID,ZCTRCT
-			
+
 		set ZCID=REC.piece("|",1)
-		set ZCTRCT=REC.piece("|",2)		
+		set ZCTRCT=REC.piece("|",2)
 		if ^ZCTRCT(ZCTRCT,70).data() do Db.delete("ZCTRCTACN","CTRCT=:ZCTRCT")
-			
+
 	}
 	do io2.close()
-		
+
 	quit
-	
+
 ZCTRCIFDIS
 
 	type Number ER,EXIT
@@ -1214,14 +1257,14 @@ ZCTRCIFDIS
 	// Check whether the file exists or not.
 	do CHKIO(ZFID3)
 	if ER =1 set RM =$$^MSG(2799,ZFID) quit
-	
+
 	type IO io3 =Class.new("IO")
 	set io3.fileName =ZFID3
 	set io3.openParams ="READ"
 	set io3.recordSize =1024
 	do io3.open()
 
-		
+
 	for  set REC =io3.read() { quit:EXIT
 		if REC[$C(13) set REC=$TR(REC,$C(13),"")
 		catch error {
@@ -1233,7 +1276,7 @@ ZCTRCIFDIS
 			write !,RM
 			write !,REC
 			do ^UTLERR
-				//write !,"From ZCTRCTACN Row "_i
+			//write !,"From ZCTRCTACN Row "_i
 		}
 		type Number ZACN,ZCTRCT
 		set ZCHECK=REC.piece("|",1)
@@ -1242,9 +1285,9 @@ ZCTRCIFDIS
 		set ZCTRCT=REC.piece("|",2)
 		if ^ZCTRCT(ZCTRCT,100).data() do Db.delete("ZCTRCTCIF","CTRCT=:ZCTRCT")
 	}
-		
+
 	do io3.close()
-		
+
 	quit
 
 ZCTCOLDIS
@@ -1264,7 +1307,7 @@ ZCTCOLDIS
 	set io4.recordSize =1024
 	do io4.open()
 
-		
+
 	for  set REC =io4.read() { quit:EXIT
 		if REC[$C(13) set REC=$TR(REC,$C(13),"")
 		catch error {
@@ -1276,21 +1319,17 @@ ZCTCOLDIS
 			write !,RM
 			write !,REC
 			do ^UTLERR
-				//write !,"From ZCTRCTACN Row "_i
+			//write !,"From ZCTRCTACN Row "_i
 		}
-		type Number ZCOLL,ZCTRCT			
+		type Number ZCOLL,ZCTRCT
 		set ZCHECK=REC.piece("|",1)
 		if ZCHECK["Total" set EXIT=1 quit
 		set ZCTRCT=REC.piece("|",1)
 		set ZCOLL=REC.piece("|",2)
 		if ^ZCTRCT(ZCTRCT,80).data() do Db.delete("ZCTRCTCOL","CTRCT=:ZCTRCT")
-			
+
 	}
 
 	do io4.close()
-		
-	quit	
-	
 
-
-	
+	quit

@@ -27,7 +27,7 @@
 
 	do Runtime.rollback()
 	if PID="ACN" do PROC(SEQ)
-	else if PID="REQUESTACN" do PROC(SEQ)
+	else if PID="REQUESTACN" do ZCIF(ACN)
 	
 	quit
 		
