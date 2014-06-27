@@ -1,0 +1,51 @@
+//DO NOT MODIFY  Batch for BlockUnblockTranList|ZBCHBLOC||||||DTJFM|TJD=:ZTJD|0|100|32000|ZTJD|0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+---------- OPEN    ------ Section marker
+
+	
+	do EXTRACT^ZBLOCKEX
+	do SYSVAR^SCADRV0()
+	
+	
+	new %TAB,%READ
+	set %TAB("ZTJD")="/DES=Run Date/REQ/TYP=D/LEN=6"
+	set %READ="@@%FN,,ZTJD"
+	
+	do ^UTLREAD if VFMQ="Q" set %BatchExit = 1 quit
+	
+	kill ^TMP("ZBLOCKEXT")
+	
+	//set ZTJD=%SystemDate-1
+	//set ZTJD=63461
+	
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	do EXTRACT^ZBLOCKEX
+	
+---------- THRINIT ------ Section marker
+
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	
+	do Runtime.rollback()
+	
+	do PROC(TJD,CLS,GRP,TYP,CID,TSEQ)
+	
+	quit
+
+PROC(TJD,CLS,GRP,TYP,CID,TSEQ)
+	type RecordDTJFM test = Db.getRecord("DTJFM","TJD,CLS,GRP,TYP,CID,TSEQ")
+	do PROC^ZBLOCKEX(.test)
+	
+	quit
+
+---------- THREXIT ------ Section marker

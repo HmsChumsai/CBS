@@ -7,12 +7,12 @@
 
 ---------- OPEN    ------ Section marker
 
-	
+
 	set %TAB("ZITFKEY")="/DES=ZITFKEY/REQ/TYP=T/LEN=20"
 	set %TAB("ZAPP")="/DES=ZAPP/REQ/TYP=N/LEN=10"
 	set %READ="@@%FN/REV/CEN,,ZITFKEY,ZAPP"
 	do ^UTLREAD if VFMQ="Q" set %BatchExit=1 quit
-	
+
 	kill ^TMP("ZRINQBS",ZAPP,ZITFKEY,"OUT")
 	set (ZFIN,ZOUT)=""
 	/*
@@ -22,7 +22,7 @@
 	else if (ZITF)="BALINQ" set ZFOUT="SHARP.RGSRES.CUSTBAL.BATCH"
 	*/
 	if (ZITFKEY="")!(ZAPP="") set %BatchExit=1 quit
-	
+
 
 ---------- SCHINIT ------ Section marker
 
@@ -39,7 +39,7 @@
 ---------- THREXEC ------ Section marker
 
 ---------- EXEC    ------ Section marker
-	
+
 	do Runtime.rollback()
 	new ZARROUT
 	if APPID'=ZAPP quit
@@ -76,7 +76,7 @@ EXTRACT(ZAPP,ZITFKEY)
 	set ZFNAME = $$CFTPFUNC^ZITFUTL(ZFNAME)
 	set ZOUTPATH = itf.OUTLP
 	set ZOUTPATH = $$CFTPPATH^ZITFUTL(ZOUTPATH)
-	
+
 	type Number toTalRec
 	set toTalRec=0
 	do SYSVAR^SCADRV0()
@@ -146,7 +146,7 @@ ZREJ(ZSEQ,ZCID,ZCAUSE)
 	set ZARROUT("ErrorDesc")=$J("",256)
 	set ZERRCD=ZCAUSE
 	set ZARROUT("ErrorCode")=$$PADDING(ZCAUSE,1,30)
-	
+
 	//type ResultSet zerdesc = Db.select("ERRDESC","ZUTBLITFERCD","ERRCD=:ZERRCD")
 	/*
 	while zerdesc.next() do {
@@ -155,7 +155,7 @@ ZREJ(ZSEQ,ZCID,ZCAUSE)
 	*/
 	type RecordZUTBLITFERCD zerdesc = %CACHE("ZUTBLITFERCD").getRecord("ZUTBLITFERCD","ERRCD=:ZERRCD",1)
 	set ZARROUT("ErrorDesc")=$$PADDING(zerdesc.ERRDESC,1,256)
-	
+
 	set ZOM=$$PADDING(ZCID,2,10)
 	set ZOM=ZOM_$J("",360)			//Name TH
 	set ZOM=ZOM_$J("",9)			//ProductCode
@@ -268,21 +268,15 @@ BALSIGN(zbal)
 
 READ(ZAPP,ZITFKEY)
 
+	do SYSVAR^SCADRV0()
+	set (ER,RM)=0
+
 	set ZPFDIR = $$TRNLNM^%ZFUNC("PROFILE_DIR")
 	type RecordZUTBLITFFTP itf = Db.getRecord("ZUTBLITFFTP","ZPFDIR,ZAPP,ZITFKEY",1)
 	set ZFNAME = itf.inlf
 	set ZFNAME = $$CFTPFUNC^ZITFUTL(ZFNAME)
 	set ZINLPATH = itf.inlp
 	set ZINLPATH = $$CFTPPATH^ZITFUTL(ZINLPATH)
-	
-	/*
-	if (ZITF)="BALINQ-1" set ZFIN="CMINRQ"
-	else if (ZITF)="BALINQ-2" set ZFIN="CMHVINRQ_R01"
-	else if (ZITF)="BALINQ-3" set ZFIN="CMHVINRQ_R02"
-	else if (ZITF)="BALINQ" set ZFIN="SHARP.RGSREQ.ACCT.TCB.BATCH"
-	else set ER=1,RM="Invalid ITF" quit
-	*/
-	
 
 	type Number i,EXIT,ZHEADERFLG,ZTAILFLG
 	set (ZHEADERFLG,ZTAILFLG)=0
@@ -324,30 +318,49 @@ READ(ZAPP,ZITFKEY)
 
 	do in.open()
 
-
+	kill ^TMP("ZRINQBS",ZAPP,ZITFKEY,"IN")
+	type Date ZBUSDT
+	type Number toTalRec
 
 	for  set REC=in.read(.ETYP) quit:+ETYP'=0  do {
 		type String output
 		type Number ZCID
 		if REC="" quit
 		set ZCID=""
-		if REC["H01" set ZHEADERFLG=1 quit //Skipp header
+		if $E(REC,1,3)="H01" do { quit //Skipp header
+			set ZHEADERFLG=1
+			set ZBUSDT=$$FDAT^%ZM($E(REC,37,46),"YEAR/MM/DD")
+
+		}
+		//if REC["H01" set ZHEADERFLG=1 quit //Skipp header
+		if $E(REC,1,3)="T01" do { quit
+			set ZTAILFLG=1  //quit when reached footer
+			set toTalRec=+$E(REC,4,18)
+		}
 		set i=i+1
-		if REC["T01" set ZTAILFLG=1 quit //quit when reached footer
+
 		set ZCID=+$E(REC,1,10)
 		set ^TMP("ZRINQBS",ZAPP,ZITFKEY,"IN",i,ZCID)=""
 	}
 	do in.close()
-	if (ZHEADERFLG'=1)!(ZTAILFLG'=1) do {
+	if ZBUSDT'=%SystemDate set RM="Invalid Bussiness Date",ER=1 do REJECT
+	else if i'=toTalRec set RM="Invalid total record",ER=1 do REJECT
+	else if (ZHEADERFLG'=1)!(ZTAILFLG'=1) do {
 		set ER=1
-		if (ZHEADERFLG'=1) set RM="Invalid format:No Header" 
-		else set RM="Invalid format:No Tailer" 
-		kill ^TMP("ZRINQBS",ZAPP,ZITFKEY,"IN")
+		if (ZHEADERFLG'=1) set RM="Invalid format:No Header"
+		else set RM="Invalid format:No Tailer"
+		//kill ^TMP("ZRINQBS",ZAPP,ZITFKEY,"IN")
+		do REJECT
 	}
 	else do {
 		write !,"SUCCESS"
 		set ER=0
 	}
+
+	quit
+	
+REJECT
+	kill ^TMP("ZRINQBS",ZAPP,ZITFKEY,"IN")
 
 	quit
 
@@ -428,8 +441,10 @@ PADDING(array,flg,fixL)
 		if in<0 set in=-in
 		set pre=$P(in,".",1)
 		set suf=$P(in,".",2)
-		set out=pre_$E(suf,1,2)	//2 Decimal
-		set zlength=out.length()
+		//2014/06/19 fixed error if input ending wiht .00
+		if suf="" set out=pre_"00"
+		else set out=pre_$E(suf*100,1,2)	//2 Decimal
+		//set zlength=out.length()
 		set out=out.zero(fixL)
 		//set out=in_ZERO
 	}

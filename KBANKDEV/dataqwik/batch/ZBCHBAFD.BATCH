@@ -205,7 +205,7 @@ EXTRACT
 
 	type public Date ZTJD
 	type public Boolean ZFULL
-	type String FILENAME
+	type String FILENAME,IOTYP
 
 	type RecordCUVAR cuvar=Db.getRecord("CUVAR")
 	type String ZSTAMP,ZTIM,ZDAT
@@ -281,7 +281,10 @@ EXTRACT
 	set Footer=RecType_TotalRec_TotalSum_TotalDebitSum_TotalCreditSum
 
 	do out.write(Footer)
+	set IOTYP="RMS"
 	do out.close()
+	
+	kill ^ZBAFD
 
 
 	quit

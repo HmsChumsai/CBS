@@ -39,10 +39,12 @@ PROC(ZCID,ZCLASS)
 	do lpm.save()
 
 	quit
-	
+
 READ(ZAPP,ZITFKEY)
 
-	
+	do SYSVAR^SCADRV0()
+	set (ER,RM)=0
+
 	type Number i,ZHEADERFLG,ZTAILFLG
 	type String ZFNM,REC
 	new ETYP
@@ -61,39 +63,28 @@ READ(ZAPP,ZITFKEY)
 	set in.fileName =ZINLPATH_"/"_ZFNAME
 	set in.openParams ="READ"
 	set in.recordSize =1024
-	//do in.open()
-	/*
-	catch iox {
-
-		// if device has been opened, close it
-
-		if in.device'="" do in.close()
-
-		// if not an IO exception, it's not for us
-
-		if iox'["%PSL-E-IO" throw iox
-
-		// handle the IO exceptions
-
-		if iox["IOOPEN" write "Open failed", ! quit
-
-		if iox["IOEOF"  write "Reached end of file", ! quit
-
-		write "unexpected IO error '", iox.type, "'", !
-
-	}
-	*/
 
 	do in.open()
 
+	kill ^TMP("ZCLSIFIED","IN")
+
+	type Date ZBUSDT
+	type Number toTalRec
 
 	for  set REC=in.read(.ETYP) quit:+ETYP'=0  do {
 		type String ZPOSTFLG=""
 		type Number ZCID,ZCLASS
 		set (ZCID,ZCLASS)=""
 		if REC="" quit
-		if REC["H01" set ZHEADERFLG=1 quit //Skipp header
-		if REC["T01" set ZTAILFLG=1 quit //quit when reached footer
+		if $E(REC,1,3)="H01" do { quit //Skipp header
+			set ZHEADERFLG=1
+			set ZBUSDT=$$FDAT^%ZM($E(REC,37,46),"YEAR/MM/DD")
+		}
+		//if REC["H01" set ZHEADERFLG=1 quit //Skipp header
+		if $E(REC,1,3)="T01" do { quit
+			set ZTAILFLG=1  //quit when reached footer
+			set toTalRec=+$E(REC,4,18)
+		}
 		if $L(REC)<>40 quit
 		set i=i+1
 		set ZCID=+$E(REC,1,10)
@@ -101,12 +92,15 @@ READ(ZAPP,ZITFKEY)
 		set ^TMP("ZCLSIFIED","IN",i,ZCID)=ZCLASS
 	}
 	do in.close()
-	
-	if (ZHEADERFLG'=1)!(ZTAILFLG'=1) do {
+
+	if ZBUSDT'=%SystemDate set RM="Invalid Bussiness Date",ER=1 do REJECT
+	else if i'=toTalRec set RM="Invalid total record",ER=1 do REJECT
+	else if (ZHEADERFLG'=1)!(ZTAILFLG'=1) do {
 		set ER=1
-		if (ZHEADERFLG'=1) set RM="Invalid format:No Header" 
-		else set RM="Invalid format:No Tailer" 
-		kill ^TMP("ZCLSIFIED","IN")
+		if (ZHEADERFLG'=1) set RM="Invalid format:No Header"
+		else set RM="Invalid format:No Tailer"
+		//kill ^TMP("ZRINQBS",ZAPP,ZITFKEY,"IN")
+		do REJECT
 	}
 	else do {
 		write !,"SUCCESS"
@@ -114,7 +108,12 @@ READ(ZAPP,ZITFKEY)
 	}
 
 	quit
-	
+
+REJECT
+	kill ^TMP("ZCLSIFIED","IN")
+
+	quit
+
 GENTEST(ZAPP,ZITFKEY)
 
 	set ZPFDIR = $$TRNLNM^%ZFUNC("PROFILE_DIR")
@@ -127,7 +126,7 @@ GENTEST(ZAPP,ZITFKEY)
 	set out.fileName =ZINLPATH_"/"_ZFNAME
 	set out.recordSize =1024
 	do out.open()
-	
+
 	set Header="H01"
 	set Tailer="T01"
 	set DATA1="0123456789"_"1"_$J("",29)

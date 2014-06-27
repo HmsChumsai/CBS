@@ -174,10 +174,10 @@ PROC(CID)
 
 	if ZARROUT("INL_AMT")="" set ZARROUT("INL_SIGN")="+"
 	
-	if ZDEP.BAL<0,ZDEP.ZPRODCDNEG'="" set ZARROUT("COA_PD_FTR_CD")=ZDEP.ZPRODCDNEG
-	else set ZARROUT("COA_PD_FTR_CD")=ZDEP.ZPRODCD
+	//if ZDEP.BAL<0,ZDEP.ZPRODCDNEG'="" set ZARROUT("COA_PD_FTR_CD")=ZDEP.ZPRODCDNEG
+	//else set ZARROUT("COA_PD_FTR_CD")=ZDEP.ZPRODCD
 	
-	//set ZARROUT("COA_PD_FTR_CD")=ZDEP.ZPRODCD
+	set ZARROUT("COA_PD_FTR_CD")=ZDEP.ZPRODCD
 	set ZSTATCD=ZDEP.ZSTATCD
 	type ResultSet zstatd = Db.select("ZKBSTATD","ZUTBLSTATD","ZSTATCD=:ZSTATCD")
 	while zstatd.next() do {
@@ -230,10 +230,10 @@ BALSGN(input)
 	quit output
 
 EXTRACT
-
+	
 	type public Date ZTJD
 	type public Boolean ZFULL
-	type String FILENAME
+	type String FILENAME,IOTYP
 
 	type RecordCUVAR cuvar=Db.getRecord("CUVAR")
 	type String ZSTAMP,ZTIM,ZDAT
@@ -313,7 +313,10 @@ EXTRACT
 	set Footer=RecType_TotalRec_TotalSum_TotalDebitSum_TotalCreditSum_Filler
 
 	do out.write(Footer)
+	set IOTYP="RMS"
 	do out.close()
+	
+	kill ^ZBASD
 
 
 	quit
@@ -357,9 +360,17 @@ PADDING(array,flg,fixL)
 	}
 	if flg=4 do {
 		type Number in
-		set in=array.get()
+		set in=+array.get()
 		if in<0 set in=-in
-		set out=in.zero(fixL,2,1,0)
+		if in["." do { 
+			if in.length()>(fixL+1) set out=(10**(fixL))-1
+			else set out=in.zero(fixL,2,1,0)
+		}
+		else if in.length()>fixL set out=(10**(fixL))-1 
+		else set out=in.zero(fixL,2,1,0)
+		//else in.length()>fixL+1 set out=(10**(fixL))-1 quit	
+		//if in.length()>fixL set out=(10**(fixL))-1 quit		//if input length > fixL,fill 9  
+		
 	}
 	//Default value for mandatory date
 	if flg=5 do {

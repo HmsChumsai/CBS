@@ -1,0 +1,1445 @@
+//DO NOT MODIFY  DEP Extract|ZBCHDEP||||||DEP|||100|32000|ZTJD,ZRND,ZEOM,ZBOM,BCHEOM,ZEDWPATH,ZSEPATH,SAINTFLG|0|||10|10|0||0||0
+---------- REVHIST ------ Section marker
+
+	
+		30 Apr 2014 - Wiphak
+				- Fix SAV INT file, extract only SAV account
+	
+		17 Apr 2014 - Nattapon Tu.
+				- Add code for LPM (Monthly payment)
+	
+		04 Apr 2014 - Pheraphat Nu.
+				- Add Code For LPM(DDA)
+	
+	
+		03 Apr 2014 - Nattapon Tu.
+			 	- Add code for LPM (LIM)
+		
+		28 Mar 2014 - Pheraphat Nu.
+				- Add Code For LPM(RFL)
+	
+	
+		24 Mar 2014 - Parisa Th.
+		              Add code for Deposit Account with Latest Status.
+	                     
+	
+	
+	
+---------- OPEN    ------ Section marker
+
+	
+	do SYSVAR^SCADRV0()
+	set ZTJD=%SystemDate-1
+	set ZCJD=%CurrentDate
+	set ZRND=$$DAT^%ZM(ZTJD,"YEARMMDD")
+	
+	set ZBOM=$$BOMJD^SCADAT(ZTJD)
+	set ZEOM=$$EOMJD^SCADAT(ZTJD)
+	set BCHEOM=0
+	if ZTJD=ZEOM set BCHEOM=1
+	set SAINTFLG=0
+	
+	if (+ZRND.extract(5,6)=6)!(+ZRND.extract(5,6)=12) do {
+		if BCHEOM set SAINTFLG=1
+	}
+	
+	if $G(ZRUNSINT)'="" do {
+		set SAINTFLG=1
+	}
+	//SE Path
+	set ZSEPATH=$$EXTPATH^ZSTMEG("se",ZRND)
+	
+	//EDW Path
+	set ZEDWPATH=$$EXTPATH^ZSTMEG("edw",ZRND)
+	
+	new Z,INVFIL
+	set (Z,INVFIL)=""
+	
+	//check junk files
+	set INVFIL=$$SYS^%ZFUNC("ls "_ZEDWPATH_"/src_pf_ar_ca_dly*"_" 2>/dev/null")
+	if INVFIL=0 do {
+		//Remove src_pf_ar_ca_dly file
+		set Z=$$SYS^%ZFUNC("rm "_ZEDWPATH_"/src_pf_ar_ca_dly*")
+	}
+	
+	set INVFIL=$$SYS^%ZFUNC("ls "_ZEDWPATH_"/src_pf_ar_ca_fnc_st_dly*"_" 2>/dev/null")
+	if INVFIL=0 do {
+		//Remove src_pf_ar_ca_fnc_st_dly file
+		set Z=$$SYS^%ZFUNC("rm "_ZEDWPATH_"/src_pf_ar_ca_fnc_st_dly*")
+	}
+	
+	set INVFIL=$$SYS^%ZFUNC("ls "_ZEDWPATH_"/src_pf_ar_sa_dly*"_" 2>/dev/null")
+	if INVFIL=0 do {
+		//Remove src_pf_ar_sa_dly file
+		set Z=$$SYS^%ZFUNC("rm "_ZEDWPATH_"/src_pf_ar_sa_dly*")
+	}
+	
+	set INVFIL=$$SYS^%ZFUNC("ls "_ZEDWPATH_"/src_pf_ar_sa_fnc_st_dly*"_" 2>/dev/null")
+	if INVFIL=0 do {
+		//Remove src_pf_ar_sa_fnc_st_dly file
+		set Z=$$SYS^%ZFUNC("rm "_ZEDWPATH_"/src_pf_ar_sa_fnc_st_dly*")
+	}
+	
+	set INVFIL=$$SYS^%ZFUNC("ls "_ZEDWPATH_"/src_pf_ar_fx_dly*"_" 2>/dev/null")
+	if INVFIL=0 do {
+		//Remove src_pf_ar_fx_dly file
+		set Z=$$SYS^%ZFUNC("rm "_ZEDWPATH_"/src_pf_ar_fx_dly*")
+	}
+	
+	set INVFIL=$$SYS^%ZFUNC("ls "_ZEDWPATH_"/src_pf_ar_fx_fnc_st_dly*"_" 2>/dev/null")
+	if INVFIL=0 do {
+		//Remove src_pf_ar_fx_fnc_st_dly file
+		set Z=$$SYS^%ZFUNC("rm "_ZEDWPATH_"/src_pf_ar_fx_fnc_st_dly*")
+	}
+	
+	set INVFIL=$$SYS^%ZFUNC("ls "_ZEDWPATH_"/src_pf_ar_sf_dly*"_" 2>/dev/null")
+	if INVFIL=0 do {
+		//Remove src_pf_ar_sf_dly file
+		set Z=$$SYS^%ZFUNC("rm "_ZEDWPATH_"/src_pf_ar_sf_dly*")
+	}
+	
+	set INVFIL=$$SYS^%ZFUNC("ls "_ZEDWPATH_"/src_pf_ar_sf_fnc_st_dly*"_" 2>/dev/null")
+	if INVFIL=0 do {
+		//Remove src_pf_ar_sf_fnc_st_dly file
+		set Z=$$SYS^%ZFUNC("rm "_ZEDWPATH_"/src_pf_ar_sf_fnc_st_dly*")
+	}
+	
+	set INVFIL=$$SYS^%ZFUNC("ls "_ZEDWPATH_"/src_pf_ar_ca_hld_dly*"_" 2>/dev/null")
+	if INVFIL=0 do {
+		//Remove src_pf_ar_sf_fnc_st_dly file
+		set Z=$$SYS^%ZFUNC("rm "_ZEDWPATH_"/src_pf_ar_ca_hld_dly*")
+	}
+	
+	set INVFIL=$$SYS^%ZFUNC("ls "_ZEDWPATH_"/src_pf_ar_sa_hld_dly*"_" 2>/dev/null")
+	if INVFIL=0 do {
+		//Remove src_pf_ar_sf_fnc_st_dly file
+		set Z=$$SYS^%ZFUNC("rm "_ZEDWPATH_"/src_pf_ar_sa_hld_dly*")
+	}
+	
+	set INVFIL=$$SYS^%ZFUNC("ls "_ZEDWPATH_"/src_pf_ar_fx_hld_dly*"_" 2>/dev/null")
+	if INVFIL=0 do {
+		//Remove src_pf_ar_sf_fnc_st_dly file
+		set Z=$$SYS^%ZFUNC("rm "_ZEDWPATH_"/src_pf_ar_fx_hld_dly*")
+	}
+	
+	set INVFIL=$$SYS^%ZFUNC("ls "_ZEDWPATH_"/src_pf_ar_sf_hld_dly*"_" 2>/dev/null")
+	if INVFIL=0 do {
+		//Remove src_pf_ar_sf_fnc_st_dly file
+		set Z=$$SYS^%ZFUNC("rm "_ZEDWPATH_"/src_pf_ar_sf_hld_dly*")
+	}
+	
+	//Statement Engine section of OD,ENC,ITD
+	set INVFIL=$$SYS^%ZFUNC("ls "_ZSEPATH_"/STMEP.CBS.CRLIM*"_" 2>/dev/null")
+	if INVFIL=0 do {
+		//Remove src_pf_ar_sf_fnc_st_dly file
+		set Z=$$SYS^%ZFUNC("rm "_ZSEPATH_"/STMEP.CBS.CRLIM*")
+	}
+	
+	//EDW - Current Limit Arrangement
+	set INVFIL=$$SYS^%ZFUNC("ls "_ZEDWPATH_"/src_pf_ar_ca_limit_dly*"_" 2>/dev/null")
+	if INVFIL=0 do {
+		//Remove src_pf_ar_sf_fnc_st_dly file
+		set Z=$$SYS^%ZFUNC("rm "_ZEDWPATH_"/src_pf_ar_ca_limit_dly*")
+	}
+	
+	//EDW Open IO
+	new ZFNAME
+	set ZFNAME=""
+	type IO io1,io2,io3,io4,io5,io6,io7,io8,io9,io10,io11,io12,io13,io14
+	
+	set ZFNAME="src_pf_ar_ca_dly.txt"
+	do OPENIO^ZSTMEG(ZEDWPATH,"NEWV/WRITE",ZFNAME,.io1)
+	
+	set ZFNAME="src_pf_ar_ca_fnc_st_dly.txt"
+	do OPENIO^ZSTMEG(ZEDWPATH,"NEWV/WRITE",ZFNAME,.io2)
+	
+	set ZFNAME="src_pf_ar_sa_dly.txt"
+	do OPENIO^ZSTMEG(ZEDWPATH,"NEWV/WRITE",ZFNAME,.io3)
+	
+	set ZFNAME="src_pf_ar_sa_fnc_st_dly.txt"
+	do OPENIO^ZSTMEG(ZEDWPATH,"NEWV/WRITE",ZFNAME,.io4)
+	
+	set ZFNAME="src_pf_ar_fx_dly.txt"
+	do OPENIO^ZSTMEG(ZEDWPATH,"NEWV/WRITE",ZFNAME,.io5)
+	
+	set ZFNAME="src_pf_ar_fx_fnc_st_dly.txt"
+	do OPENIO^ZSTMEG(ZEDWPATH,"NEWV/WRITE",ZFNAME,.io6)
+	
+	set ZFNAME="src_pf_ar_sf_dly.txt"
+	do OPENIO^ZSTMEG(ZEDWPATH,"NEWV/WRITE",ZFNAME,.io7)
+	
+	set ZFNAME="src_pf_ar_sf_fnc_st_dly.txt"
+	do OPENIO^ZSTMEG(ZEDWPATH,"NEWV/WRITE",ZFNAME,.io8)
+	
+	set ZFNAME="src_pf_ar_ca_hld_dly.txt"
+	do OPENIO^ZSTMEG(ZEDWPATH,"NEWV/WRITE",ZFNAME,.io9)
+	
+	set ZFNAME="src_pf_ar_sa_hld_dly.txt"
+	do OPENIO^ZSTMEG(ZEDWPATH,"NEWV/WRITE",ZFNAME,.io10)
+	
+	set ZFNAME="src_pf_ar_fx_hld_dly.txt"
+	do OPENIO^ZSTMEG(ZEDWPATH,"NEWV/WRITE",ZFNAME,.io11)
+	
+	set ZFNAME="src_pf_ar_sf_hld_dly.txt"
+	do OPENIO^ZSTMEG(ZEDWPATH,"NEWV/WRITE",ZFNAME,.io12)
+	
+	//SE CBSSavingIntBal
+	if SAINTFLG do {
+		type IO iose
+		set INVFIL=$$SYS^%ZFUNC("ls "_ZSEPATH_"/STMEP.CBS.SA.INT*"_" 2>/dev/null")
+		if INVFIL=0 do {
+			//Remove src_pf_ar_sf_fnc_st_dly file
+			set Z=$$SYS^%ZFUNC("rm "_ZSEPATH_"/STMEP.CBS.SA.INT*")
+		}
+		
+		set ZFNAME="STMEP.CBS.SA.INT"
+		do OPENIO^ZSTMEG(ZSEPATH,"NEWV/WRITE",ZFNAME,.iose)
+		
+		do SEHEAD^ZSTMEG("SavInt",.iose,15)
+		set IOTYP="RMS"
+		do iose.close()
+		
+		kill ^ZSECNTINT
+	}
+	
+	//SE OD Limit of Current Account
+	set ZFNAME="STMEP.CBS.CRLIM"
+	do OPENIO^ZSTMEG(ZSEPATH,"NEWV/WRITE",ZFNAME,.io13)
+	do SEHEAD^ZSTMEG("ODLimit",.io13,55)
+	
+	//EDW - Current Limit Arrangement
+	set ZFNAME="src_pf_ar_ca_limit_dly.txt"
+	do OPENIO^ZSTMEG(ZEDWPATH,"NEWV/WRITE",ZFNAME,.io14)
+	
+	do HEADER^ZEDW(io1)
+	do HEADER^ZEDW(io2)
+	do HEADER^ZEDW(io3)
+	do HEADER^ZEDW(io4)
+	do HEADER^ZEDW(io5)
+	do HEADER^ZEDW(io6)
+	do HEADER^ZEDW(io7)
+	do HEADER^ZEDW(io8)
+	do HEADER^ZEDW(io9)
+	do HEADER^ZEDW(io10)
+	do HEADER^ZEDW(io11)
+	do HEADER^ZEDW(io12)
+	do HEADER^ZEDW(io14)
+	
+	set IOTYP="RMS"
+	do io1.close()
+	do io2.close()
+	do io3.close()
+	do io4.close()
+	do io5.close()
+	do io6.close()
+	do io7.close()
+	do io8.close()
+	do io9.close()
+	do io10.close()
+	do io11.close()
+	do io12.close()
+	do io13.close()
+	do io14.close()
+	
+	kill ^ZEDWCNTCA
+	kill ^ZEDWCNTSA
+	kill ^ZEDWCNTFX
+	kill ^ZEDWCNTSF
+	
+	kill ^ZFNCCNTCA
+	kill ^ZFNCCNTSA
+	kill ^ZFNCCNTFX
+	kill ^ZFNCCNTSF
+	
+	kill ^ZHLDCNTCA
+	kill ^ZHLDCNTSA
+	kill ^ZHLDCNTFX
+	kill ^ZHLDCNTSF
+	
+	kill ^ZSECNTOD
+	kill ^ZCLIMCNT
+	
+	
+	//24 Mar 2014 - Parisa Th.
+	type String X,ZAIPATH,ZAINAME,ZSYSDT,ZHREC
+	set (X,ZAIPATH,ZAINAME,ZHREC)=""
+	type Number ZTMPFILE
+	set (ZTMPFILE)=0
+	
+	new IOTYP
+	type IO ioai
+	
+	set ZAIPATH=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")
+	set ZAINAME="ACCT_INF_FULL_"_ZRND
+	
+	//Check Temp Files
+	set ZTMPFILE=$$SYS^%ZFUNC("ls "_ZAIPATH_"/"_"TMP_"_ZAINAME_"*"_" 2>/dev/null")
+	if ZTMPFILE=0 do {
+		
+		//Remove src_pf_ar_ca_dly file
+		set X=$$SYS^%ZFUNC("rm "_ZAIPATH_"/"_"TMP_"_ZAINAME_"*")
+		
+	}
+	
+	do OPENIO^ZSTMEG(ZAIPATH,"NEWV/WRITE",ZAINAME,.ioai)
+	
+	set ZSYSDT=$$DAT^%ZM(%CurrentDate,"YEAR-MM-DD")_"T"_$$TIM^%ZM(%CurrentTime,"24:60:SS")
+	
+	//Header
+	set ZHREC=""
+	set ZHREC=ZHREC_"H01".blank(3)
+	set ZHREC=ZHREC_ZSYSDT.blank(33)
+	set ZHREC=ZHREC_$$DAT^%ZM(ZTJD,"YEAR-MM-DD").blank(10)
+	set ZHREC=ZHREC_"668".blank(5)
+	set ZHREC=ZHREC_"AcctInf".blank(8)
+	set ZHREC=ZHREC_"1".zero(6)
+	set ZHREC=ZHREC_"".blank(575)
+	
+	do ioai.write(ZHREC)
+	
+	set IOTYP="RMS"
+	do ioai.close()
+	
+	kill ^TMP("ZAIFULL")
+	//24 Mar 2014 - End
+	
+	
+	
+	//---- LPM  (Pheraphat Nu.) 28 Mar 2014 --------
+	#if $$VALID^%ZRTNS("ZLPMEXT")=1
+	do ZRFLOPEN^ZLPMEXT(ZTJD)
+	#endif
+	//----------------------------------------------
+	
+	
+	//---- LPM  (Pheraphat Nu.) 04 Apr 2014 --------
+	#if $$VALID^%ZRTNS("ZLPMEXT")=1
+	do ZDDAOPEN^ZLPMEXT(ZTJD)
+	#endif
+	//----------------------------------------------
+	
+	
+	
+	//Nattpon Tu. 03/04/2014 add LPM (LIM)
+	#if $$VALID^%ZRTNS("ZLPMEXT")=1
+	do ZLIMOPEN^ZLPMEXT(ZTJD)
+	#endif
+	//Nattapon Tu. --END--
+	
+	//Nattpon Tu. 17/04/2014 add LPM (Monthly payment)
+	#if $$VALID^%ZRTNS("ZLPMMTHP")=1
+	do ZMTHOPEN^ZLPMMTHP(ZTJD)
+	#endif
+	//Nattapon Tu. --END--
+	
+	
+	
+---------- SCHINIT ------ Section marker
+
+---------- SCHEXEC ------ Section marker
+
+---------- SCHPOST ------ Section marker
+
+---------- SCHEXIT ------ Section marker
+
+	
+	//CAT file Statement Engine
+	new CHK
+	new PATH
+	set PATH=ZEDWPATH
+	
+	//Cat src_pf_ar_ca_dly
+	set CHK=$$SYS^%ZFUNC("cat "_PATH_"/zsrc_pf_ar_ca_dly_* >> "_PATH_"/src_pf_ar_ca_dly.txt")
+	if CHK=0 set Z=$$SYS^%ZFUNC("rm "_PATH_"/zsrc_pf_ar_ca_dly_*")
+	else  set ER=1,RM="Error Merging file: "_PATH_"/zsrc_pf_ar_ca_dly_*" do EXC quit
+	
+	//Cat src_pf_ar_ca_fnc_st_dly
+	set CHK=$$SYS^%ZFUNC("cat "_PATH_"/zsrc_pf_ar_ca_fnc_st_dly_* >> "_PATH_"/src_pf_ar_ca_fnc_st_dly.txt")
+	if CHK=0 set Z=$$SYS^%ZFUNC("rm "_PATH_"/zsrc_pf_ar_ca_fnc_st_dly_*")
+	else  set ER=1,RM="Error Merging file: "_PATH_"/zsrc_pf_ar_ca_fnc_st_dly_*" do EXC quit
+	
+	//Cat src_pf_ar_sa_dly
+	set CHK=$$SYS^%ZFUNC("cat "_PATH_"/zsrc_pf_ar_sa_dly_* >> "_PATH_"/src_pf_ar_sa_dly.txt")
+	if CHK=0 set Z=$$SYS^%ZFUNC("rm "_PATH_"/zsrc_pf_ar_sa_dly_*")
+	else  set ER=1,RM="Error Merging file: "_PATH_"/zsrc_pf_ar_sa_dly_*" do EXC quit
+	
+	//Cat src_pf_ar_sa_fnc_st_dly
+	set CHK=$$SYS^%ZFUNC("cat "_PATH_"/zsrc_pf_ar_sa_fnc_st_dly_* >> "_PATH_"/src_pf_ar_sa_fnc_st_dly.txt")
+	if CHK=0 set Z=$$SYS^%ZFUNC("rm "_PATH_"/zsrc_pf_ar_sa_fnc_st_dly_*")
+	else  set ER=1,RM="Error Merging file: "_PATH_"/zsrc_pf_ar_sa_fnc_st_dly_*" do EXC quit
+	
+	//Cat src_pf_ar_fx_dly
+	set CHK=$$SYS^%ZFUNC("cat "_PATH_"/zsrc_pf_ar_fx_dly_* >> "_PATH_"/src_pf_ar_fx_dly.txt")
+	if CHK=0 set Z=$$SYS^%ZFUNC("rm "_PATH_"/zsrc_pf_ar_fx_dly_*")
+	else  set ER=1,RM="Error Merging file: "_PATH_"/zsrc_pf_ar_fx_dly_*" do EXC quit
+	
+	//Cat src_pf_ar_fx_fnc_st_dly
+	set CHK=$$SYS^%ZFUNC("cat "_PATH_"/zsrc_pf_ar_fx_fnc_st_dly_* >> "_PATH_"/src_pf_ar_fx_fnc_st_dly.txt")
+	if CHK=0 set Z=$$SYS^%ZFUNC("rm "_PATH_"/zsrc_pf_ar_fx_fnc_st_dly_*")
+	else  set ER=1,RM="Error Merging file: "_PATH_"/zsrc_pf_ar_fx_fnc_st_dly_*" do EXC quit
+	
+	//Cat src_pf_ar_sf_dly
+	set CHK=$$SYS^%ZFUNC("cat "_PATH_"/zsrc_pf_ar_sf_dly_* >> "_PATH_"/src_pf_ar_sf_dly.txt")
+	if CHK=0 set Z=$$SYS^%ZFUNC("rm "_PATH_"/zsrc_pf_ar_sf_dly_*")
+	else  set ER=1,RM="Error Merging file: "_PATH_"/zsrc_pf_ar_sf_dly_*" do EXC quit
+	
+	//Cat src_pf_ar_sf_fnc_st_dly
+	set CHK=$$SYS^%ZFUNC("cat "_PATH_"/zsrc_pf_ar_sf_fnc_st_dly_* >> "_PATH_"/src_pf_ar_sf_fnc_st_dly.txt")
+	if CHK=0 set Z=$$SYS^%ZFUNC("rm "_PATH_"/zsrc_pf_ar_sf_fnc_st_dly_*")
+	else  set ER=1,RM="Error Merging file: "_PATH_"/zsrc_pf_ar_sf_fnc_st_dly_*" do EXC quit
+	
+	//Cat src_pf_ar_ca_hld_dly
+	set CHK=$$SYS^%ZFUNC("cat "_PATH_"/zsrc_pf_ar_ca_hld_dly_* >> "_PATH_"/src_pf_ar_ca_hld_dly.txt")
+	if CHK=0 set Z=$$SYS^%ZFUNC("rm "_PATH_"/zsrc_pf_ar_ca_hld_dly_*")
+	else  set ER=1,RM="Error Merging file: "_PATH_"/zsrc_pf_ar_ca_hld_dly_*" do EXC quit
+	
+	//Cat src_pf_ar_sa_hld_dly
+	set CHK=$$SYS^%ZFUNC("cat "_PATH_"/zsrc_pf_ar_sa_hld_dly_* >> "_PATH_"/src_pf_ar_sa_hld_dly.txt")
+	if CHK=0 set Z=$$SYS^%ZFUNC("rm "_PATH_"/zsrc_pf_ar_sa_hld_dly_*")
+	else  set ER=1,RM="Error Merging file: "_PATH_"/zsrc_pf_ar_sa_hld_dly_*" do EXC quit
+	
+	//Cat src_pf_ar_fx_hld_dly
+	set CHK=$$SYS^%ZFUNC("cat "_PATH_"/zsrc_pf_ar_fx_hld_dly_* >> "_PATH_"/src_pf_ar_fx_hld_dly.txt")
+	if CHK=0 set Z=$$SYS^%ZFUNC("rm "_PATH_"/zsrc_pf_ar_fx_hld_dly_*")
+	else  set ER=1,RM="Error Merging file: "_PATH_"/zsrc_pf_ar_fx_hld_dly_*" do EXC quit
+	
+	//Cat src_pf_ar_sf_hld_dly
+	set CHK=$$SYS^%ZFUNC("cat "_PATH_"/zsrc_pf_ar_sf_hld_dly_* >> "_PATH_"/src_pf_ar_sf_hld_dly.txt")
+	if CHK=0 set Z=$$SYS^%ZFUNC("rm "_PATH_"/zsrc_pf_ar_sf_hld_dly_*")
+	else  set ER=1,RM="Error Merging file: "_PATH_"/zsrc_pf_ar_sf_hld_dly_*" do EXC quit
+	
+	//Cat STMEP.CBS.CRLIM file
+	set CHK=$$SYS^%ZFUNC("cat "_ZSEPATH_"/STMEP.CBS.CRLIM_* >> "_ZSEPATH_"/STMEP.CBS.CRLIM")
+	if CHK=0 set Z=$$SYS^%ZFUNC("rm "_ZSEPATH_"/STMEP.CBS.CRLIM_*")
+	else  set ER=1,RM="Error Merging file: "_ZSEPATH_"/STMEP.CBS.CRLIM_*" do EXC quit
+	
+	//SE CBSSavingIntBal
+	if SAINTFLG do {
+		//Cat STMEP.CBS.SA.INT file
+		set CHK=$$SYS^%ZFUNC("cat "_ZSEPATH_"/STMEP.CBS.SA.INT_* >> "_ZSEPATH_"/STMEP.CBS.SA.INT")
+		if CHK=0 set Z=$$SYS^%ZFUNC("rm "_ZSEPATH_"/STMEP.CBS.SA.INT_*")
+		else  set ER=1,RM="Error Merging file: "_ZSEPATH_"/STMEP.CBS.SA.INT_*" do EXC quit
+		
+		type public IO iose
+		set ZSENAM="STMEP.CBS.SA.INT"
+		do OPENIO^ZSTMEG(ZSEPATH,"APPEND",ZSENAM,.iose)
+		
+		new ZXPID,ZSAINTCNT
+		set ZXPID=""
+		set ZSAINTCNT=0
+		
+		for  set ZXPID=$O(^ZSECNTINT(ZXPID)) quit:ZXPID=""  do {
+			set ZSAINTCNT=ZSAINTCNT+^ZSECNTINT(ZXPID)
+		}
+		
+		do SETAILER^ZSTMEG(ZSAINTCNT,iose,62)
+		set IOTYP="RMS"
+		do iose.close()
+		
+		kill ^ZSECNTINT
+	}
+	
+	//Cat src_pf_ar_ca_limit_dly
+	set CHK=$$SYS^%ZFUNC("cat "_PATH_"/zsrc_pf_ar_ca_limit_dly_* >> "_PATH_"/src_pf_ar_ca_limit_dly.txt")
+	if CHK=0 set Z=$$SYS^%ZFUNC("rm "_PATH_"/zsrc_pf_ar_ca_limit_dly_*")
+	else  set ER=1,RM="Error Merging file: "_PATH_"/zsrc_pf_ar_ca_limit_dly_*" do EXC quit
+	
+	//EDW
+	type public IO io1,io2,io3,io4,io5,io6,io7,io8,io9,io10,io11,io12,io13,io14
+	set ZEDWNAM="src_pf_ar_ca_dly.txt"
+	do OPENIO^ZSTMEG(PATH,"APPEND",ZEDWNAM,.io1)
+	
+	set ZEDWNAM="src_pf_ar_ca_fnc_st_dly.txt"
+	do OPENIO^ZSTMEG(PATH,"APPEND",ZEDWNAM,.io2)
+	
+	set ZEDWNAM="src_pf_ar_sa_dly.txt"
+	do OPENIO^ZSTMEG(PATH,"APPEND",ZEDWNAM,.io3)
+	
+	set ZEDWNAM="src_pf_ar_sa_fnc_st_dly.txt"
+	do OPENIO^ZSTMEG(PATH,"APPEND",ZEDWNAM,.io4)
+	
+	set ZEDWNAM="src_pf_ar_fx_dly.txt"
+	do OPENIO^ZSTMEG(PATH,"APPEND",ZEDWNAM,.io5)
+	
+	set ZEDWNAM="src_pf_ar_fx_fnc_st_dly.txt"
+	do OPENIO^ZSTMEG(PATH,"APPEND",ZEDWNAM,.io6)
+	
+	set ZEDWNAM="src_pf_ar_sf_dly.txt"
+	do OPENIO^ZSTMEG(PATH,"APPEND",ZEDWNAM,.io7)
+	
+	set ZEDWNAM="src_pf_ar_sf_fnc_st_dly.txt"
+	do OPENIO^ZSTMEG(PATH,"APPEND",ZEDWNAM,.io8)
+	
+	set ZEDWNAM="src_pf_ar_ca_hld_dly.txt"
+	do OPENIO^ZSTMEG(PATH,"APPEND",ZEDWNAM,.io9)
+	
+	set ZEDWNAM="src_pf_ar_sa_hld_dly.txt"
+	do OPENIO^ZSTMEG(PATH,"APPEND",ZEDWNAM,.io10)
+	
+	set ZEDWNAM="src_pf_ar_fx_hld_dly.txt"
+	do OPENIO^ZSTMEG(PATH,"APPEND",ZEDWNAM,.io11)
+	
+	set ZEDWNAM="src_pf_ar_sf_hld_dly.txt"
+	do OPENIO^ZSTMEG(PATH,"APPEND",ZEDWNAM,.io12)
+	
+	//Statement Engine OD,ENC,ITD
+	set ZSENAM="STMEP.CBS.CRLIM"
+	do OPENIO^ZSTMEG(ZSEPATH,"APPEND",ZSENAM,.io13)
+	
+	//EDW - Current Limit Arrangement
+	set ZEDWNAM="src_pf_ar_ca_limit_dly.txt"
+	do OPENIO^ZSTMEG(PATH,"APPEND",ZEDWNAM,.io14)
+	
+	new ZXPID,ZEDWCNTCA,ZEDWCNTSA,ZEDWCNTFX,ZEDWCNTSF,ZFNCCNTCA,ZFNCCNTSA,ZFNCCNTFX,ZFNCCNTSF
+	new ZHLDCNTCA,ZHLDCNTSA,ZHLDCNTFX,ZHLDCNTSF,ZSECNTOD,ZCLIMCNT
+	set ZXPID=""
+	set (ZEDWCNTCA,ZEDWCNTSA,ZEDWCNTFX,ZEDWCNTSF,ZFNCCNTCA,ZFNCCNTSA,ZFNCCNTFX,ZFNCCNTSF,ZCLIMCNT)=0
+	set (ZHLDCNTCA,ZHLDCNTSA,ZHLDCNTFX,ZHLDCNTSF,ZSECNTOD)=0
+	
+	for  set ZXPID=$O(^ZEDWCNTCA(ZXPID)) quit:ZXPID=""  do {
+		set ZEDWCNTCA=ZEDWCNTCA+^ZEDWCNTCA(ZXPID)
+		set ZEDWCNTSA=ZEDWCNTSA+^ZEDWCNTSA(ZXPID)
+		set ZEDWCNTFX=ZEDWCNTFX+^ZEDWCNTFX(ZXPID)
+		set ZEDWCNTSF=ZEDWCNTSF+^ZEDWCNTSF(ZXPID)
+		set ZFNCCNTCA=ZFNCCNTCA+^ZFNCCNTCA(ZXPID)
+		set ZFNCCNTSA=ZFNCCNTSA+^ZFNCCNTSA(ZXPID)
+		set ZFNCCNTFX=ZFNCCNTFX+^ZFNCCNTFX(ZXPID)
+		set ZFNCCNTSF=ZFNCCNTSF+^ZFNCCNTSF(ZXPID)
+		set ZHLDCNTCA=ZHLDCNTCA+^ZHLDCNTCA(ZXPID)
+		set ZHLDCNTSA=ZHLDCNTSA+^ZHLDCNTSA(ZXPID)
+		set ZHLDCNTFX=ZHLDCNTFX+^ZHLDCNTFX(ZXPID)
+		set ZHLDCNTSF=ZHLDCNTSF+^ZHLDCNTSF(ZXPID)
+		set ZSECNTOD=ZSECNTOD+^ZSECNTOD(ZXPID)
+		set ZCLIMCNT=ZCLIMCNT+^ZCLIMCNT(ZXPID)
+	}
+	
+	do SETAILER^ZSTMEG(ZSECNTOD,io13,62)
+	
+	do TAILER^ZEDW(ZEDWCNTCA,io1)
+	do TAILER^ZEDW(ZFNCCNTCA,io2)
+	do TAILER^ZEDW(ZEDWCNTSA,io3)
+	do TAILER^ZEDW(ZFNCCNTSA,io4)
+	do TAILER^ZEDW(ZEDWCNTFX,io5)
+	do TAILER^ZEDW(ZFNCCNTFX,io6)
+	do TAILER^ZEDW(ZEDWCNTSF,io7)
+	do TAILER^ZEDW(ZFNCCNTSF,io8)
+	do TAILER^ZEDW(ZHLDCNTCA,io9)
+	do TAILER^ZEDW(ZHLDCNTSA,io10)
+	do TAILER^ZEDW(ZHLDCNTFX,io11)
+	do TAILER^ZEDW(ZHLDCNTSF,io12)
+	do TAILER^ZEDW(ZCLIMCNT,io14)
+	
+	set IOTYP="RMS"
+	do io1.close()
+	do io2.close()
+	do io3.close()
+	do io4.close()
+	do io5.close()
+	do io6.close()
+	do io7.close()
+	do io8.close()
+	do io9.close()
+	do io10.close()
+	do io11.close()
+	do io12.close()
+	do io13.close()
+	do io14.close()
+	
+	kill ^ZEDWCNTCA
+	kill ^ZEDWCNTSA
+	kill ^ZEDWCNTFX
+	kill ^ZEDWCNTSF
+	
+	kill ^ZFNCCNTCA
+	kill ^ZFNCCNTSA
+	kill ^ZFNCCNTFX
+	kill ^ZFNCCNTSF
+	
+	kill ^ZHLDCNTCA
+	kill ^ZHLDCNTSA
+	kill ^ZHLDCNTFX
+	kill ^ZHLDCNTSF
+	
+	kill ^ZSECNTOD
+	kill ^ZCLIMCNT
+	
+	//24 Mar 2014 - Parisa Th.
+	type String X,ZAIPATH,ZAINAME,ZRPID,ZTREC
+	set (X,ZAIPATH,ZAINAME,ZRPID,ZTREC)=""
+	type Number ZMERGE,ZSUMREC
+	set (ZMERGE,ZSUMREC)=0
+	
+	set ZAIPATH=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")
+	set ZAINAME="ACCT_INF_FULL_"_ZRND
+	
+	//Merge File
+	set ZMERGE=$$SYS^%ZFUNC("cat "_ZAIPATH_"/TMP_"_ZAINAME_"* >> "_ZAIPATH_"/"_ZAINAME)
+	if ZMERGE=0 set X=$$SYS^%ZFUNC("rm "_ZAIPATH_"/TMP_"_ZAINAME_"*")
+	else  set ER=1,RM="Error Merging file: "_ZAIPATH_"/TMP_"_ZAINAME_"*" do EXC^ZACINFFL quit
+	
+	type IO ioai
+	
+	do OPENIO^ZSTMEG(ZAIPATH,"APPEND",ZAINAME,.ioai)
+	
+	for  set ZRPID=$O(^TMP("ZAIFULL",ZRPID)) quit:ZRPID=""  do {
+		
+    		set ZSUMREC=ZSUMREC+($G(^TMP("ZAIFULL",ZRPID)))
+    		
+	}
+	
+	set ZTREC=""
+	set ZTREC=ZTREC_"T01".blank(3)
+	set ZTREC=ZTREC_ZSUMREC.zero(15)
+	set ZTREC=ZTREC_"".blank(622)
+	
+	do ioai.write(ZTREC)
+	
+	set IOTYP="RMS"
+	do ioai.close()
+	
+	kill ^TMP("ZAIFULL")
+	//24 Mar 2014 - End
+	
+	
+	//---- LPM  (Pheraphat Nu.) 28 Mar 2014 --------
+	#if $$VALID^%ZRTNS("ZLPMEXT")=1
+	do ZRFLEND^ZLPMEXT(ZTJD)
+	#endif
+	//----------------------------------------------
+	
+	
+	//---- LPM  (Pheraphat Nu.) 04 Apr 2014 --------
+	#if $$VALID^%ZRTNS("ZLPMEXT")=1
+	do ZDDAEND^ZLPMEXT(ZTJD)
+	#endif
+	//----------------------------------------------
+	
+	
+	
+	//Nattpon Tu. 03/04/2014 add LPM (LIM)
+	#if $$VALID^%ZRTNS("ZLPMEXT")=1
+	do ZLIMEND^ZLPMEXT(ZTJD)
+	#endif
+	//Nattapon Tu. --END--
+	
+	//Nattpon Tu. 17/04/2014 add LPM (Monthly payment)
+	#if $$VALID^%ZRTNS("ZLPMMTHP")=1
+	do ZMTHEND^ZLPMMTHP(ZTJD)
+	#endif
+	//Nattapon Tu. --END--
+	
+	quit
+	
+
+---------- THRINIT ------ Section marker
+
+	new IOTYP,ZEDWNAM,ZSENAM
+	set (ZEDWNAM,ZSENAM)=""
+	type public String ZPID
+	set ZPID=%ProcessID
+	
+	//EDW
+	type public IO io1,io2,io3,io4,io5,io6,io7,io8,io9,io10,io11,io12,io13
+	set ZEDWNAM="zsrc_pf_ar_ca_dly_"_ZPID
+	do OPENIO^ZSTMEG(ZEDWPATH,"APPEND",ZEDWNAM,.io1)
+	
+	set ZEDWNAM="zsrc_pf_ar_ca_fnc_st_dly_"_ZPID
+	do OPENIO^ZSTMEG(ZEDWPATH,"APPEND",ZEDWNAM,.io2)
+	
+	set ZEDWNAM="zsrc_pf_ar_sa_dly_"_ZPID
+	do OPENIO^ZSTMEG(ZEDWPATH,"APPEND",ZEDWNAM,.io3)
+	
+	set ZEDWNAM="zsrc_pf_ar_sa_fnc_st_dly_"_ZPID
+	do OPENIO^ZSTMEG(ZEDWPATH,"APPEND",ZEDWNAM,.io4)
+	
+	set ZEDWNAM="zsrc_pf_ar_fx_dly_"_ZPID
+	do OPENIO^ZSTMEG(ZEDWPATH,"APPEND",ZEDWNAM,.io5)
+	
+	set ZEDWNAM="zsrc_pf_ar_fx_fnc_st_dly_"_ZPID
+	do OPENIO^ZSTMEG(ZEDWPATH,"APPEND",ZEDWNAM,.io6)
+	
+	set ZEDWNAM="zsrc_pf_ar_sf_dly_"_ZPID
+	do OPENIO^ZSTMEG(ZEDWPATH,"APPEND",ZEDWNAM,.io7)
+	
+	set ZEDWNAM="zsrc_pf_ar_sf_fnc_st_dly_"_ZPID
+	do OPENIO^ZSTMEG(ZEDWPATH,"APPEND",ZEDWNAM,.io8)
+	
+	set ZEDWNAM="zsrc_pf_ar_ca_hld_dly_"_ZPID
+	do OPENIO^ZSTMEG(ZEDWPATH,"APPEND",ZEDWNAM,.io9)
+	
+	set ZEDWNAM="zsrc_pf_ar_sa_hld_dly_"_ZPID
+	do OPENIO^ZSTMEG(ZEDWPATH,"APPEND",ZEDWNAM,.io10)
+	
+	set ZEDWNAM="zsrc_pf_ar_fx_hld_dly_"_ZPID
+	do OPENIO^ZSTMEG(ZEDWPATH,"APPEND",ZEDWNAM,.io11)
+	
+	set ZEDWNAM="zsrc_pf_ar_sf_hld_dly_"_ZPID
+	do OPENIO^ZSTMEG(ZEDWPATH,"APPEND",ZEDWNAM,.io12)
+	
+	//SE CBSSavingIntBal
+	if SAINTFLG do {
+		type public IO iose
+		set ZSENAM="STMEP.CBS.SA.INT_"_ZPID
+		do OPENIO^ZSTMEG(ZSEPATH,"APPEND",ZSENAM,.iose)
+		
+		set ^ZSECNTINT(ZPID)=0
+	}
+	
+	//SE OD Limit of Current Account 
+	set ZSENAM="STMEP.CBS.CRLIM_"_ZPID
+	do OPENIO^ZSTMEG(ZSEPATH,"APPEND",ZSENAM,.io13)
+	
+	//EDW - Current Limit Arrangement
+	set ZEDWNAM="zsrc_pf_ar_ca_limit_dly_"_ZPID  
+	do OPENIO^ZSTMEG(ZEDWPATH,"APPEND",ZEDWNAM,.io14)
+	
+	set ^ZSECNTOD(ZPID)=0
+	
+	//Count Arrangement Deposit Daily
+	set ^ZEDWCNTCA(ZPID)=0
+	set ^ZEDWCNTSA(ZPID)=0
+	set ^ZEDWCNTFX(ZPID)=0
+	set ^ZEDWCNTSF(ZPID)=0
+	
+	//Count FNC File
+	set ^ZFNCCNTCA(ZPID)=0
+	set ^ZFNCCNTSA(ZPID)=0
+	set ^ZFNCCNTFX(ZPID)=0
+	set ^ZFNCCNTSF(ZPID)=0
+	
+	//Count File Hold
+	set ^ZHLDCNTCA(ZPID)=0
+	set ^ZHLDCNTSA(ZPID)=0
+	set ^ZHLDCNTFX(ZPID)=0
+	set ^ZHLDCNTSF(ZPID)=0
+	
+	//Count Current Limit Arrangement
+	set ^ZCLIMCNT(ZPID)=0
+	
+	//24 Mar 2014 - Parisa Th.
+	type String ZTAIPATH,ZTAINAME
+	set (ZTAIPATH,ZTAINAME)=""
+	
+	type public IO iotai
+	
+	set ZTAIPATH=$$TRNLNM^%ZFUNC("SCAU_SPOOL_EXTF")
+	set ZTAINAME="TMP_ACCT_INF_FULL_"_ZRND_"_"_ZPID
+	
+	do OPENIO^ZSTMEG(ZTAIPATH,"APPEND",ZTAINAME,.iotai)
+	//24 Mar 2014 - End
+	
+	
+	
+	
+	//---- LPM  (Pheraphat Nu.) 28 Mar 2014--------
+	#if $$VALID^%ZRTNS("ZLPMEXT")=1
+	do ZRFLTHINIT^ZLPMEXT(ZTJD)
+	#endif
+	//---------------------------------------------
+	
+	//---- LPM  (Pheraphat Nu.) 04 Apr 2014--------
+	#if $$VALID^%ZRTNS("ZLPMEXT")=1
+	do ZDDATHINIT^ZLPMEXT(ZTJD)
+	#endif
+	//---------------------------------------------
+	
+	
+	//Nattpon Tu. 03/04/2014 add LPM (LIM)
+	#if $$VALID^%ZRTNS("ZLPMEXT")=1
+	do ZLIMTHINIT^ZLPMEXT(ZTJD)
+	#endif
+	//Nattapon Tu. --END--
+	
+	//Nattpon Tu. 17/04/2014 add LPM (Monthly payment)
+	#if $$VALID^%ZRTNS("ZLPMMTHP")=1
+	do ZMTHTHINIT^ZLPMMTHP(ZTJD)
+	#endif
+	//Nattapon Tu. --END--
+	
+---------- THREXEC ------ Section marker
+
+---------- EXEC    ------ Section marker
+
+	do Runtime.rollback()
+	type public Cache %CACHE()
+	
+	type public IO io1,io2,io3,io4,io5,io6,io7,io8,io9,io10,io11,io12,io13,io14
+	
+	type RecordDEP zdep=Db.getRecord("DEP","CID")
+	
+	//24 Mar 2014 - Parisa Th.
+	type public IO iotai
+	
+	#if $$VALID^%ZRTNS("ZACINFFL")=1
+	do ACCTINF^ZACINFFL(zdep,ZPID,iotai)
+	#endif
+	//24 Mar 2014 - End
+	
+	
+	//---- LPM  (Pheraphat Nu.) 28 Mar 2014 --------
+	#if $$VALID^%ZRTNS("ZLPMEXT")=1
+	do ZRFLEXC^ZLPMEXT(zdep,ZTJD)
+	#endif
+	//----------------------------------------------
+	
+	
+	//---- LPM  (Pheraphat Nu.) 04 Apr 2014 --------
+	#if $$VALID^%ZRTNS("ZLPMEXT")=1
+	do ZDDAEXC^ZLPMEXT(zdep,ZTJD)
+	#endif
+	//----------------------------------------------
+	
+
+	//Nattpon Tu. 03/04/2014 add LPM (LIM)
+	#if $$VALID^%ZRTNS("ZLPMEXT")=1
+	do ZLIMEXC^ZLPMEXT(zdep,ZTJD)
+	#endif
+	//Nattapon Tu. --END--
+	
+	//Nattpon Tu. 17/04/2014 add LPM (Monthly payment)
+	#if $$VALID^%ZRTNS("ZLPMMTHP")=1
+	do ZMTHEXC^ZLPMMTHP(zdep,ZTJD)
+	#endif
+	//Nattapon Tu. --END--
+	
+	
+	new ZFIXFLG,ZSFIXFLG,ZSTAT
+	set (ZFIXFLG,ZSFIXFLG,ZSTAT)=0
+	
+	if zdep.grp="CD" do {
+		type RecordZUTBLKTBMISC zktbmisc=%CACHE("ZUTBLKTBMISC").getRecord("ZUTBLKTBMISC","INTRFACE='ZSPA'",1)
+		//if '(zktbmisc.prodtyp[zdep.type) set ZFIXFLG=1
+		if zktbmisc.prodtyp[zdep.type set ZSFIXFLG=1
+		else  set ZFIXFLG=1
+	}
+	
+	set ZSTAT=$$KACSTAT^ZSTMEG(zdep)
+	if ZSTAT=4 set ZOTSNDBAL=+zdep.eodbal
+	
+	//EDW Section
+	if ZSTAT=4 do {
+		
+		//SE CBSSavingIntBal
+		if SAINTFLG do {
+			
+			// phak
+			// extract only SAV , active account
+			if zdep.grp="SAV" do {
+				do SESAINTB^ZSTMEG(zdep,iose)
+				set ^ZSECNTINT(ZPID)=^ZSECNTINT(ZPID)+1
+			}
+		}
+		
+		if zdep.grp="DDA" do {
+			//Arrangement Current Deposit Daily
+			do CADLY^ZEDW(zdep,io1)
+			//Count Record file c/a
+			set ^ZEDWCNTCA(ZPID)=^ZEDWCNTCA(ZPID)+1
+			
+			//Current Arrangement Financial Status
+			new ZRFLG,ZMISNUM
+			set (ZRFLG,ZMISNUM)=""
+			//type ResultSet rsRFLG=Db.select("RFLG,STDT","RFLG","CID=:zdep.cid AND EXDT>:ZTJD")
+			type ResultSet rsRFLG=Db.select("RFLG,STDT,EXDT","RFLG","CID=:zdep.cid")	
+			while rsRFLG.next() do {
+				if (rsRFLG.getCol("EXDT")'=""),(rsRFLG.getCol("EXDT")<=ZTJD) quit
+				set ZRFLG=rsRFLG.getCol("RFLG")
+				set ZMISNUM=+ZRFLG
+				if ZMISNUM=0 quit
+				type RecordUTBLRFLG zurflg=%CACHE("UTBLRFLG").getRecord("UTBLRFLG","GRP=:zdep.grp,RFLG=:ZRFLG",1)
+				if zurflg.ZSYSFLG quit
+				
+				type RecordRFLG zrflg=Db.getRecord("RFLG","CID=:zdep.cid,RFLG=:ZRFLG",1)
+				do CAFNCST^ZEDW(zdep,zrflg,io2)
+				
+				set ^ZFNCCNTCA(ZPID)=^ZFNCCNTCA(ZPID)+1
+			}
+			if (zdep.ZWFMF=1)!(zdep.ZWFWD=1)!(zdep.ZWFOT=1) do {
+				new ZRFLG
+				set ZRFLG=""
+				if zdep.ZWFMF=1 do {
+					set ZRFLG="2501"
+					do M25CAFNC^ZEDW(zdep,ZRFLG,io2)
+					set ^ZFNCCNTCA(ZPID)=^ZFNCCNTCA(ZPID)+1	
+				} 
+				if zdep.ZWFWD=1 do {
+					set ZRFLG="2502"
+					do M25CAFNC^ZEDW(zdep,ZRFLG,io2)
+					set ^ZFNCCNTCA(ZPID)=^ZFNCCNTCA(ZPID)+1	
+				}  
+				if zdep.ZWFOT=1 do {
+					set ZRFLG="2503"
+					do M25CAFNC^ZEDW(zdep,ZRFLG,io2)
+					set ^ZFNCCNTCA(ZPID)=^ZFNCCNTCA(ZPID)+1
+				}
+				
+			}
+			
+			//Current Arrangement Hold Daily
+			new ZSEQ
+			set ZSEQ=""
+			type ResultSet rsPHLD=Db.select("SEQ","PHLD","CID=:zdep.cid")
+			while rsPHLD.next() do {
+				set ZSEQ=rsPHLD.getCol("SEQ")
+				type RecordPHLD zphld=Db.getRecord("PHLD","CID=:zdep.cid,SEQ=:ZSEQ",1)
+				
+				if zphld.expdt=ZTJD quit
+				
+				do CAHLD^ZEDW(zdep,zphld,io9)
+				set ^ZHLDCNTCA(ZPID)=^ZHLDCNTCA(ZPID)+1
+			}
+			
+			//Statement Engine section OD
+			new ZODSEQ
+			set ZODSEQ=""
+			type ResultSet rsODT=Db.select("SEQ","ZODTIER","CID=:zdep.cid")
+			while rsODT.next() do {
+				set ZODSEQ=rsODT.getCol("SEQ")
+				type RecordZODTIER zodtier=Db.getRecord("ZODTIER","CID=:zdep.cid,SEQ=:ZODSEQ",1)
+				
+				// not active if ACTIVATE='N'
+				if 'zodtier.ACTIVATE quit 
+				// not active if start date is in future
+			        if (ZTJD<zodtier.STDT) quit
+				// not active if there is an expiration date and that date is in past
+				if (zodtier.EXPDT'="")&(ZTJD>zodtier.EXPDT) quit
+				
+				do SEODLIM^ZSTMEG(zodtier,zdep,io13)
+				set ^ZSECNTOD(ZPID)=^ZSECNTOD(ZPID)+1
+				
+			}
+			
+			//Statement Engine section ENC
+			if (zdep.zencflg),(zdep.zencdlim>0) do {
+				do SEENC^ZSTMEG(zdep,io13)
+				set ^ZSECNTOD(ZPID)=^ZSECNTOD(ZPID)+1
+			}
+			 
+			//Statement Engine section ITD
+			if (zdep.zitdflg),(zdep.zitdlim>0) do {
+				do SEITD^ZSTMEG(zdep,io13)
+				set ^ZSECNTOD(ZPID)=^ZSECNTOD(ZPID)+1
+			}
+			
+			//EDW - Current Limit Arrangement 	
+			do CALIMREC^ZEDW(zdep,ZPID,io14)
+			
+		}
+		
+		if zdep.grp="SAV" do {
+			//Arrangement Saving Deposit Daily
+			do SADLY^ZEDW(zdep,io3)
+			//Count Record file s/a
+			set ^ZEDWCNTSA(ZPID)=^ZEDWCNTSA(ZPID)+1
+			
+			//Saving Arrangement Financial Status Daily
+			new ZRFLG,ZMISNUM
+			set (ZRFLG,ZMISNUM)=""
+			//type ResultSet rsRFLG=Db.select("RFLG,STDT,EXDT","RFLG","CID=:zdep.cid AND EXDT>:ZTJD")
+			type ResultSet rsRFLG=Db.select("RFLG,STDT,EXDT","RFLG","CID=:zdep.cid")	
+			while rsRFLG.next() do {
+				if (rsRFLG.getCol("EXDT")'=""),(rsRFLG.getCol("EXDT")<=ZTJD) quit
+				set ZRFLG=rsRFLG.getCol("RFLG")
+				set ZMISNUM=+ZRFLG
+				if ZMISNUM=0 quit
+				type RecordUTBLRFLG zurflg=%CACHE("UTBLRFLG").getRecord("UTBLRFLG","GRP=:zdep.grp,RFLG=:ZRFLG",1)
+				if zurflg.ZSYSFLG quit
+				
+				type RecordRFLG zrflg=Db.getRecord("RFLG","CID=:zdep.cid,RFLG=:ZRFLG",1)
+				do SAFNCST^ZEDW(zdep,zrflg,io4)
+				set ^ZFNCCNTSA(ZPID)=^ZFNCCNTSA(ZPID)+1
+			}
+			if (zdep.ZWFMF=1)!(zdep.ZWFWD=1)!(zdep.ZWFOT=1) do {
+				new ZRFLG
+				set ZRFLG=""
+				if zdep.ZWFMF=1 do {
+					set ZRFLG="2501"
+					do M25SAFNC^ZEDW(zdep,ZRFLG,io4)
+					set ^ZFNCCNTSA(ZPID)=^ZFNCCNTSA(ZPID)+1	
+				} 
+				if zdep.ZWFWD=1 do {
+					set ZRFLG="2502"
+					do M25SAFNC^ZEDW(zdep,ZRFLG,io4)
+					set ^ZFNCCNTSA(ZPID)=^ZFNCCNTSA(ZPID)+1	
+				}  
+				if zdep.ZWFOT=1 do {
+					set ZRFLG="2503"
+					do M25SAFNC^ZEDW(zdep,ZRFLG,io4)
+					set ^ZFNCCNTSA(ZPID)=^ZFNCCNTSA(ZPID)+1
+				}
+				
+			}
+			
+			//Saving Arrangement Hold Daily
+			new ZSEQ
+			set ZSEQ=""
+			type ResultSet rsPHLD=Db.select("SEQ","PHLD","CID=:zdep.cid")
+			while rsPHLD.next() do {
+				set ZSEQ=rsPHLD.getCol("SEQ")
+				type RecordPHLD zphld=Db.getRecord("PHLD","CID=:zdep.cid,SEQ=:ZSEQ",1)
+				
+				if zphld.expdt=ZTJD quit
+				
+				do SAHLD^ZEDW(zdep,zphld,io10)
+				set ^ZHLDCNTSA(ZPID)=^ZHLDCNTSA(ZPID)+1
+			}
+			
+			
+		}
+			
+		if zdep.grp="CD" do {
+			//Fix
+			if ZFIXFLG do {
+				//Arrangement Fixed Deposit Daily
+				do FXDLY^ZEDW(zdep,io5)
+				//Count Record file Fix
+				set ^ZEDWCNTFX(ZPID)=^ZEDWCNTFX(ZPID)+1
+				
+				//Fixed Arrangement Financial Status Daily
+				new ZRFLG,ZMISNUM
+				set (ZRFLG,ZMISNUM)=""
+				//type ResultSet rsRFLG=Db.select("RFLG,STDT","RFLG","CID=:zdep.cid AND EXDT>:ZTJD")
+				type ResultSet rsRFLG=Db.select("RFLG,STDT,EXDT","RFLG","CID=:zdep.cid")	
+				while rsRFLG.next() do {
+					if (rsRFLG.getCol("EXDT")'=""),(rsRFLG.getCol("EXDT")<=ZTJD) quit
+					set ZRFLG=rsRFLG.getCol("RFLG")
+					set ZMISNUM=+ZRFLG
+					if ZMISNUM=0 quit
+					type RecordUTBLRFLG zurflg=%CACHE("UTBLRFLG").getRecord("UTBLRFLG","GRP=:zdep.grp,RFLG=:ZRFLG",1)
+					if zurflg.ZSYSFLG quit
+					
+					type RecordRFLG zrflg=Db.getRecord("RFLG","CID=:zdep.cid,RFLG=:ZRFLG",1)
+					do FXFNCST^ZEDW(zdep,zrflg,io6)
+					set ^ZFNCCNTFX(ZPID)=^ZFNCCNTFX(ZPID)+1
+				}
+				if (zdep.ZWFMF=1)!(zdep.ZWFWD=1)!(zdep.ZWFOT=1) do {
+					new ZRFLG
+					set ZRFLG=""
+					if zdep.ZWFMF=1 do {
+						set ZRFLG="2501"
+						do M25FXFNC^ZEDW(zdep,ZRFLG,io6)
+						set ^ZFNCCNTFX(ZPID)=^ZFNCCNTFX(ZPID)+1	
+					} 
+					if zdep.ZWFWD=1 do {
+						set ZRFLG="2502"
+						do M25FXFNC^ZEDW(zdep,ZRFLG,io6)
+						set ^ZFNCCNTFX(ZPID)=^ZFNCCNTFX(ZPID)+1	
+					}  
+					if zdep.ZWFOT=1 do {
+						set ZRFLG="2503"
+						do M25FXFNC^ZEDW(zdep,ZRFLG,io6)
+						set ^ZFNCCNTFX(ZPID)=^ZFNCCNTFX(ZPID)+1
+					}
+					
+				}
+				
+				//Fixed Arrangement Hold Daily
+				new ZSEQ
+				set ZSEQ=""
+				type ResultSet rsPHLD=Db.select("SEQ","PHLD","CID=:zdep.cid")
+				while rsPHLD.next() do {
+					set ZSEQ=rsPHLD.getCol("SEQ")
+					type RecordPHLD zphld=Db.getRecord("PHLD","CID=:zdep.cid,SEQ=:ZSEQ",1)
+					
+					if zphld.expdt=ZTJD quit
+					
+					do FXHLD^ZEDW(zdep,zphld,io11)
+					set ^ZHLDCNTFX(ZPID)=^ZHLDCNTFX(ZPID)+1
+				}
+				
+				
+			}
+			//Special Fix
+			if ZSFIXFLG do {
+				//Arrangement Special Fixed Deposit Daily
+				do SFDLY^ZEDW(zdep,io7)
+				//Special Fixed Arrangement Financial Status Daily
+				new ZRFLG,ZMISNUM
+				set (ZRFLG,ZMISNUM)=""
+				//type ResultSet rsRFLG=Db.select("RFLG,STDT","RFLG","CID=:zdep.cid AND EXDT>:ZTJD")
+				type ResultSet rsRFLG=Db.select("RFLG,STDT,EXDT","RFLG","CID=:zdep.cid")	
+				while rsRFLG.next() do {
+					if (rsRFLG.getCol("EXDT")'=""),(rsRFLG.getCol("EXDT")<=ZTJD) quit
+					set ZRFLG=rsRFLG.getCol("RFLG")
+					set ZMISNUM=+ZRFLG
+					if ZMISNUM=0 quit
+					type RecordUTBLRFLG zurflg=%CACHE("UTBLRFLG").getRecord("UTBLRFLG","GRP=:zdep.grp,RFLG=:ZRFLG",1)
+					if zurflg.ZSYSFLG quit
+					
+					type RecordRFLG zrflg=Db.getRecord("RFLG","CID=:zdep.cid,RFLG=:ZRFLG",1)
+					do SFFNCST^ZEDW(zdep,zrflg,io8)
+					set ^ZFNCCNTSF(ZPID)=^ZFNCCNTSF(ZPID)+1
+				}
+				if (zdep.ZWFMF=1)!(zdep.ZWFWD=1)!(zdep.ZWFOT=1) do {
+					new ZRFLG
+					set ZRFLG=""
+					if zdep.ZWFMF=1 do {
+						set ZRFLG="2501"
+						do M25SFFNC^ZEDW(zdep,ZRFLG,io8)
+						set ^ZFNCCNTSF(ZPID)=^ZFNCCNTSF(ZPID)+1	
+					} 
+					if zdep.ZWFWD=1 do {
+						set ZRFLG="2502"
+						do M25SFFNC^ZEDW(zdep,ZRFLG,io8)
+						set ^ZFNCCNTSF(ZPID)=^ZFNCCNTSF(ZPID)+1	
+					}  
+					if zdep.ZWFOT=1 do {
+						set ZRFLG="2503"
+						do M25SFFNC^ZEDW(zdep,ZRFLG,io8)
+						set ^ZFNCCNTSF(ZPID)=^ZFNCCNTSF(ZPID)+1
+					}
+					
+				}
+				
+				//Special Fixed Arrangement Hold Daily
+				new ZSEQ
+				set ZSEQ=""
+				type ResultSet rsPHLD=Db.select("SEQ","PHLD","CID=:zdep.cid")
+				while rsPHLD.next() do {
+					set ZSEQ=rsPHLD.getCol("SEQ")
+					type RecordPHLD zphld=Db.getRecord("PHLD","CID=:zdep.cid,SEQ=:ZSEQ",1)
+					
+					if zphld.expdt=ZTJD quit
+					
+					do SFHLD^ZEDW(zdep,zphld,io12)
+					set ^ZHLDCNTSF(ZPID)=^ZHLDCNTSF(ZPID)+1
+				}
+				
+				//Count Record file Special Fix
+				set ^ZEDWCNTSF(ZPID)=^ZEDWCNTSF(ZPID)+1	
+			}
+			
+		}
+		
+	}
+	
+	//Account Closed
+	if ZSTAT=7 do {
+		if ('BCHEOM) do {
+			if zdep.dtc=ZTJD do {
+				do GENCLOSE(zdep)
+			}
+		}
+		
+		if BCHEOM do {
+			if (zdep.dtc>=ZBOM),(zdep.dtc<=ZEOM) do {
+				do GENCLOSE(zdep)
+			}
+		}
+		
+	}
+	
+	quit
+	
+
+GENCLOSE(RecordDEP zdep)
+	type public Cache %CACHE()
+	
+	if zdep.grp="DDA" do {
+		//Arrangement Current Deposit Daily
+		do CADLY^ZEDW(zdep,io1)
+		//Count Record file c/a
+		set ^ZEDWCNTCA(ZPID)=^ZEDWCNTCA(ZPID)+1
+		
+		//Current Arrangement Financial Status
+		new ZRFLG,ZMISNUM
+		set (ZRFLG,ZMISNUM)=""
+		//type ResultSet rsRFLG=Db.select("RFLG,STDT,EXDT","RFLG","CID=:zdep.cid AND EXDT>:ZTJD")
+		type ResultSet rsRFLG=Db.select("RFLG,STDT,EXDT","RFLG","CID=:zdep.cid")	
+		while rsRFLG.next() do {
+			if (rsRFLG.getCol("EXDT")'=""),(rsRFLG.getCol("EXDT")<=ZTJD) quit
+			set ZRFLG=rsRFLG.getCol("RFLG")
+			set ZMISNUM=+ZRFLG
+			if ZMISNUM=0 quit
+			type RecordUTBLRFLG zurflg=%CACHE("UTBLRFLG").getRecord("UTBLRFLG","GRP=:zdep.grp,RFLG=:ZRFLG",1)
+			if zurflg.ZSYSFLG quit
+			
+			type RecordRFLG zrflg=Db.getRecord("RFLG","CID=:zdep.cid,RFLG=:ZRFLG",1)
+			do CAFNCST^ZEDW(zdep,zrflg,io2)
+			set ^ZFNCCNTCA(ZPID)=^ZFNCCNTCA(ZPID)+1
+		}
+		if (zdep.ZWFMF=1)!(zdep.ZWFWD=1)!(zdep.ZWFOT=1) do {
+			new ZRFLG
+			set ZRFLG=""
+			if zdep.ZWFMF=1 do {
+				set ZRFLG="2501"
+				do M25CAFNC^ZEDW(zdep,ZRFLG,io2)
+				set ^ZFNCCNTCA(ZPID)=^ZFNCCNTCA(ZPID)+1	
+			} 
+			if zdep.ZWFWD=1 do {
+				set ZRFLG="2502"
+				do M25CAFNC^ZEDW(zdep,ZRFLG,io2)
+				set ^ZFNCCNTCA(ZPID)=^ZFNCCNTCA(ZPID)+1	
+			}  
+			if zdep.ZWFOT=1 do {
+				set ZRFLG="2503"
+				do M25CAFNC^ZEDW(zdep,ZRFLG,io2)
+				set ^ZFNCCNTCA(ZPID)=^ZFNCCNTCA(ZPID)+1
+			}
+			
+		}
+		
+		//Current Arrangement Hold Daily
+		new ZSEQ
+		set ZSEQ=""
+		type ResultSet rsPHLD=Db.select("SEQ","PHLD","CID=:zdep.cid")
+		while rsPHLD.next() do {
+			set ZSEQ=rsPHLD.getCol("SEQ")
+			type RecordPHLD zphld=Db.getRecord("PHLD","CID=:zdep.cid,SEQ=:ZSEQ",1)
+			
+			if zphld.expdt=ZTJD quit
+			
+			do CAHLD^ZEDW(zdep,zphld,io9)
+			set ^ZHLDCNTCA(ZPID)=^ZHLDCNTCA(ZPID)+1
+		}
+		
+		//EDW - Current Limit Arrangement 	
+		do CALIMREC^ZEDW(zdep,ZPID,io14)
+	}
+	
+	if zdep.grp="SAV" do {
+		//Arrangement Saving Deposit Daily
+		do SADLY^ZEDW(zdep,io3)
+		//Count Record file s/a
+		set ^ZEDWCNTSA(ZPID)=^ZEDWCNTSA(ZPID)+1
+		
+		//Saving Arrangement Financial Status Daily
+		new ZRFLG,ZMISNUM
+		set (ZRFLG,ZMISNUM)=""
+		//type ResultSet rsRFLG=Db.select("RFLG,STDT","RFLG","CID=:zdep.cid AND EXDT>:ZTJD")
+		type ResultSet rsRFLG=Db.select("RFLG,STDT,EXDT","RFLG","CID=:zdep.cid")	
+		while rsRFLG.next() do {
+			if (rsRFLG.getCol("EXDT")'=""),(rsRFLG.getCol("EXDT")<=ZTJD) quit
+			set ZRFLG=rsRFLG.getCol("RFLG")
+			set ZMISNUM=+ZRFLG
+			if ZMISNUM=0 quit
+			type RecordUTBLRFLG zurflg=%CACHE("UTBLRFLG").getRecord("UTBLRFLG","GRP=:zdep.grp,RFLG=:ZRFLG",1)
+			if zurflg.ZSYSFLG quit
+			
+			type RecordRFLG zrflg=Db.getRecord("RFLG","CID=:zdep.cid,RFLG=:ZRFLG",1)
+			do SAFNCST^ZEDW(zdep,zrflg,io4)
+			set ^ZFNCCNTSA(ZPID)=^ZFNCCNTSA(ZPID)+1
+		}
+		if (zdep.ZWFMF=1)!(zdep.ZWFWD=1)!(zdep.ZWFOT=1) do {
+			new ZRFLG
+			set ZRFLG=""
+			if zdep.ZWFMF=1 do {
+				set ZRFLG="2501"
+				do M25SAFNC^ZEDW(zdep,ZRFLG,io4)
+				set ^ZFNCCNTSA(ZPID)=^ZFNCCNTSA(ZPID)+1	
+			} 
+			if zdep.ZWFWD=1 do {
+				set ZRFLG="2502"
+				do M25SAFNC^ZEDW(zdep,ZRFLG,io4)
+				set ^ZFNCCNTSA(ZPID)=^ZFNCCNTSA(ZPID)+1	
+			}  
+			if zdep.ZWFOT=1 do {
+				set ZRFLG="2503"
+				do M25SAFNC^ZEDW(zdep,ZRFLG,io4)
+				set ^ZFNCCNTSA(ZPID)=^ZFNCCNTSA(ZPID)+1
+			}
+			
+		}
+		
+		//Saving Arrangement Hold Daily
+		new ZSEQ
+		set ZSEQ=""
+		type ResultSet rsPHLD=Db.select("SEQ","PHLD","CID=:zdep.cid")
+		while rsPHLD.next() do {
+			set ZSEQ=rsPHLD.getCol("SEQ")
+			type RecordPHLD zphld=Db.getRecord("PHLD","CID=:zdep.cid,SEQ=:ZSEQ",1)
+			
+			if zphld.expdt=ZTJD quit
+			
+			do SAHLD^ZEDW(zdep,zphld,io10)
+			set ^ZHLDCNTSA(ZPID)=^ZHLDCNTSA(ZPID)+1
+		}
+	}
+		
+	if zdep.grp="CD" do {
+		//Fix
+		if ZFIXFLG do {
+			//Arrangement Fixed Deposit Daily
+			do FXDLY^ZEDW(zdep,io5)
+			//Count Record file Fix
+			set ^ZEDWCNTFX(ZPID)=^ZEDWCNTFX(ZPID)+1
+			
+			//Fixed Arrangement Financial Status Daily
+			new ZRFLG,ZMISNUM
+			set (ZRFLG,ZMISNUM)=""
+			//type ResultSet rsRFLG=Db.select("RFLG,STDT","RFLG","CID=:zdep.cid AND EXDT>:ZTJD")
+			type ResultSet rsRFLG=Db.select("RFLG,STDT,EXDT","RFLG","CID=:zdep.cid")	
+			while rsRFLG.next() do {
+				if (rsRFLG.getCol("EXDT")'=""),(rsRFLG.getCol("EXDT")<=ZTJD) quit
+				set ZRFLG=rsRFLG.getCol("RFLG")
+				set ZMISNUM=+ZRFLG
+				if ZMISNUM=0 quit
+				type RecordUTBLRFLG zurflg=%CACHE("UTBLRFLG").getRecord("UTBLRFLG","GRP=:zdep.grp,RFLG=:ZRFLG",1)
+				if zurflg.ZSYSFLG quit
+				
+				type RecordRFLG zrflg=Db.getRecord("RFLG","CID=:zdep.cid,RFLG=:ZRFLG",1)
+				do FXFNCST^ZEDW(zdep,zrflg,io6)
+				set ^ZFNCCNTFX(ZPID)=^ZFNCCNTFX(ZPID)+1
+			}
+			if (zdep.ZWFMF=1)!(zdep.ZWFWD=1)!(zdep.ZWFOT=1) do {
+				new ZRFLG
+				set ZRFLG=""
+				if zdep.ZWFMF=1 do {
+					set ZRFLG="2501"
+					do M25FXFNC^ZEDW(zdep,ZRFLG,io6)
+					set ^ZFNCCNTFX(ZPID)=^ZFNCCNTFX(ZPID)+1	
+				} 
+				if zdep.ZWFWD=1 do {
+					set ZRFLG="2502"
+					do M25FXFNC^ZEDW(zdep,ZRFLG,io6)
+					set ^ZFNCCNTFX(ZPID)=^ZFNCCNTFX(ZPID)+1	
+				}  
+				if zdep.ZWFOT=1 do {
+					set ZRFLG="2503"
+					do M25FXFNC^ZEDW(zdep,ZRFLG,io6)
+					set ^ZFNCCNTFX(ZPID)=^ZFNCCNTFX(ZPID)+1
+				}
+				
+			}
+			
+			//Fixed Arrangement Hold Daily
+			new ZSEQ
+			set ZSEQ=""
+			type ResultSet rsPHLD=Db.select("SEQ","PHLD","CID=:zdep.cid")
+			while rsPHLD.next() do {
+				set ZSEQ=rsPHLD.getCol("SEQ")
+				type RecordPHLD zphld=Db.getRecord("PHLD","CID=:zdep.cid,SEQ=:ZSEQ",1)
+				
+				if zphld.expdt=ZTJD quit
+				
+				do FXHLD^ZEDW(zdep,zphld,io11)
+				set ^ZHLDCNTFX(ZPID)=^ZHLDCNTFX(ZPID)+1
+			}
+		}
+		//Special Fix
+		if ZSFIXFLG do {
+			//Arrangement Special Fixed Deposit Daily
+			do SFDLY^ZEDW(zdep,io7)
+			//Count Record file Special Fix
+			set ^ZEDWCNTSF(ZPID)=^ZEDWCNTSF(ZPID)+1
+			
+			//Special Fixed Arrangement Financial Status Daily
+			new ZRFLG,ZMISNUM
+			set (ZRFLG,ZMISNUM)=""
+			//type ResultSet rsRFLG=Db.select("RFLG,STDT","RFLG","CID=:zdep.cid AND EXDT>:ZTJD")
+			type ResultSet rsRFLG=Db.select("RFLG,STDT,EXDT","RFLG","CID=:zdep.cid")	
+			while rsRFLG.next() do {
+				if (rsRFLG.getCol("EXDT")'=""),(rsRFLG.getCol("EXDT")<=ZTJD) quit
+				set ZRFLG=rsRFLG.getCol("RFLG")
+				set ZMISNUM=+ZRFLG
+				if ZMISNUM=0 quit
+				type RecordUTBLRFLG zurflg=%CACHE("UTBLRFLG").getRecord("UTBLRFLG","GRP=:zdep.grp,RFLG=:ZRFLG",1)
+				if zurflg.ZSYSFLG quit
+				
+				type RecordRFLG zrflg=Db.getRecord("RFLG","CID=:zdep.cid,RFLG=:ZRFLG",1)
+				do SFFNCST^ZEDW(zdep,zrflg,io8)
+				set ^ZFNCCNTSF(ZPID)=^ZFNCCNTSF(ZPID)+1
+			}
+			if (zdep.ZWFMF=1)!(zdep.ZWFWD=1)!(zdep.ZWFOT=1) do {
+				new ZRFLG
+				set ZRFLG=""
+				if zdep.ZWFMF=1 do {
+					set ZRFLG="2501"
+					do M25SFFNC^ZEDW(zdep,ZRFLG,io8)
+					set ^ZFNCCNTSF(ZPID)=^ZFNCCNTSF(ZPID)+1	
+				} 
+				if zdep.ZWFWD=1 do {
+					set ZRFLG="2502"
+					do M25SFFNC^ZEDW(zdep,ZRFLG,io8)
+					set ^ZFNCCNTSF(ZPID)=^ZFNCCNTSF(ZPID)+1	
+				}  
+				if zdep.ZWFOT=1 do {
+					set ZRFLG="2503"
+					do M25SFFNC^ZEDW(zdep,ZRFLG,io8)
+					set ^ZFNCCNTSF(ZPID)=^ZFNCCNTSF(ZPID)+1
+				}
+				
+			}
+			
+			//Special Fixed Arrangement Hold Daily
+			new ZSEQ
+			set ZSEQ=""
+			type ResultSet rsPHLD=Db.select("SEQ","PHLD","CID=:zdep.cid")
+			while rsPHLD.next() do {
+				set ZSEQ=rsPHLD.getCol("SEQ")
+				type RecordPHLD zphld=Db.getRecord("PHLD","CID=:zdep.cid,SEQ=:ZSEQ",1)
+				
+				if zphld.expdt=ZTJD quit
+				
+				do SFHLD^ZEDW(zdep,zphld,io12)
+				set ^ZHLDCNTSF(ZPID)=^ZHLDCNTSF(ZPID)+1
+			}
+				
+		}
+		
+	}
+	
+	
+	quit
+	
+	
+EXC	// Log error to dayend
+	
+	if $G(%FN)="" set %FN="ZBCHDEP"
+	if $G(DESC)="" set DESC="Batch DEP Extract"
+	if RM.get()="" set RM=ET.get()
+	do LOG^UTLEXC($T(+0),"*",DESC,SEQNUM.get(),CID.get(),%ZTSEQ.get(),RM.get())
+	kill RM,%ZTSEQ
+	
+	quit
+	
+	
+---------- THREXIT ------ Section marker
+
+	do CLOSEIO^ZSTMEG(io1)
+	do CLOSEIO^ZSTMEG(io2)
+	do CLOSEIO^ZSTMEG(io3)
+	do CLOSEIO^ZSTMEG(io4)
+	do CLOSEIO^ZSTMEG(io5)
+	do CLOSEIO^ZSTMEG(io6)
+	do CLOSEIO^ZSTMEG(io7)
+	do CLOSEIO^ZSTMEG(io8)
+	do CLOSEIO^ZSTMEG(io9)
+	do CLOSEIO^ZSTMEG(io10)
+	do CLOSEIO^ZSTMEG(io11)
+	do CLOSEIO^ZSTMEG(io12)
+	do CLOSEIO^ZSTMEG(io13)
+	do CLOSEIO^ZSTMEG(io14)
+	
+	//24 Mar 2014 - Parisa Th.
+	do CLOSEIO^ZSTMEG(iotai)
+	//24 Mar 2014 - End
+	
+	//---- LPM  (Pheraphat Nu.) 28 Mar 2014 --------
+	#if $$VALID^%ZRTNS("ZLPMEXT")=1
+	do ZRFLTHEXIT^ZLPMEXT(ZTJD)
+	#endif
+	//----------------------------------------------
+	
+	
+	//---- LPM  (Pheraphat Nu.) 04 Apr 2014 --------
+	#if $$VALID^%ZRTNS("ZLPMEXT")=1
+	do ZDDATHEXIT^ZLPMEXT(ZTJD)
+	#endif
+	//----------------------------------------------
+	
+	//Nattpon Tu. 03/04/2014 add LPM (LIM)
+	#if $$VALID^%ZRTNS("ZLPMEXT")=1
+	do ZLIMTHEXIT^ZLPMEXT(ZTJD)
+	#endif
+	//Nattapon Tu. --END--
+	
+	//Nattpon Tu. 17/04/2014 add LPM (Monthly Payment)
+	#if $$VALID^%ZRTNS("ZLPMMTHP")=1
+	do ZMTHTHEXIT^ZLPMMTHP(ZTJD)
+	#endif
+	//Nattapon Tu. --END--
+	
+	quit
+	
+

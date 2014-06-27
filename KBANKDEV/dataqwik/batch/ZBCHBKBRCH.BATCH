@@ -72,16 +72,7 @@ LOG(COMMENT,ZSEQ,ZBK,ZBRCD,ZDATA)
 
 READ(ZAPP,ZITFKEY)
 
-	/*
-	do SYSVAR^SCADRV0()
-	set ZDATE=%SystemDate.toString("YEARMMDD")
-	type Date zvalidDt=%SystemDate.toString("YEAR-MM-DD")
-	type IO in =Class.new("IO")
-	set in.fileName =$$TRNLNM^%ZFUNC("$SCAU_SPOOL")_"/CMBNKBRNCH_"_ZDATE
-	set in.openParams ="READ"
-	set in.recordSize =1024
-	do in.open()
-	*/
+
 
 	//----------------
 	do SYSVAR^SCADRV0()
@@ -134,33 +125,22 @@ READ(ZAPP,ZITFKEY)
 	type Number EXIT
 	set EXIT=0
 
-	//for  set REC=in.read(.ETYP) quit:+ETYP'=0  do {
 	for  set REC=in.read(.ETYP) quit:+ETYP'=0  do {
-		if REC="" set ETYP=1 quit
 		type Number BankNumber,BranchNumber
 		type Number ClearingHouseCodeI,ClearingHouseCodeII,ActiveStatus
 		type String output
 		set output=""
-		if REC["H01" do { quit
-			set BusinessDt=$E(REC,37,46)
-			if zvalidDt'=BusinessDt set ^TMP("ZBKBRCHLOG","HEADER")="Invalid BusinessDt",EXIT=1
+		if $E(REC,1,3)="H01" do { quit //Skipp header
 			set ZHEADERFLG=1
-			//set ^TMP("ZBKBRCH","LOG","HEADER"
+			set ZBUSDT=$$FDAT^%ZM($E(REC,37,46),"YEAR/MM/DD")
+
 		}
-		if REC["T01" do { quit
-			set EXIT=1
-			set ZTAILFLG=1
+		if $E(REC,1,3)="T01" do { quit
+			set ZTAILFLG=1  //quit when reached footer
+			set toTalRec=+$E(REC,4,18)
 		}
 		set i=i+1
-		if ($L(REC)>72) do { quit
-
-			set ^TMP("ZBKBRCHLOG2","FAILED",i)="RECORD LENGHT EXCEED 72"_"|"_REC
-			write !,i_","_"RECORD LENGHT EXCEED 72"_"|"_REC
-		}
-		if ($L(+REC)=1) do { quit
-			set ^TMP("ZBKBRCHLOG2","FAILED",i)="RECORD NOT VALID"_"|"_REC
-			write !,i_","_"RECORD NOT VALID"_"|"_REC
-		}
+		if ($L(REC)>72)  quit
 
 		set BankNumber=$E(REC,1,3)
 		set BranchNumber=$E(REC,4,7)
@@ -185,16 +165,23 @@ READ(ZAPP,ZITFKEY)
 	}
 
 	do in.close()
-	if (ZHEADERFLG'=1)!(ZTAILFLG'=1) do {
+	if ZBUSDT'=%SystemDate set RM="Invalid Bussiness Date",ER=1 do REJECT
+	else if i'=toTalRec set RM="Invalid total record",ER=1 do REJECT
+	else if (ZHEADERFLG'=1)!(ZTAILFLG'=1) do {
 		set ER=1
 		if (ZHEADERFLG'=1) set RM="Invalid format:No Header"
 		else set RM="Invalid format:No Tailer"
-		kill ^TMP("ZRINQBS",ZAPP,ZITFKEY,"IN")
+		//kill ^TMP("ZRINQBS",ZAPP,ZITFKEY,"IN")
+		do REJECT
 	}
 	else do {
 		write !,"SUCCESS"
 		set ER=0
 	}
+	quit
+
+REJECT
+	kill ^TMP("ZBKBRCH")
 
 	quit
 

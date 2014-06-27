@@ -1,0 +1,606 @@
+//DO NOT MODIFY  Interface utility|ZITFUTL|||||||1
+	/*
+	 ORIG: 1 - 17/10/2013
+	 DESC: Interface utility
+
+	 ---- Comments -------------------------------------------------------
+	 function list
+	 
+	 	ISNUM		: check is number
+	 	ISINT		: check is integer
+	 	CONVENC		: convert amount between profile and mainframe
+		NSMLOG		: log message NSMLOG
+		CHKMAN		: Limit length and set Mandatory Field for Web service
+		FMTAMT		: Format amount to Cobol fixed length field
+		CONDATE		: convert date to julian date
+		CFTPPATH	: Convert FTP path string
+		CFTPFUNC	: Convert FTP function string
+
+	 ---- Revision History ------------------------------------------------
+	
+	 28 May 2014 Anchalee Ch.
+	 		- Modified section CFTPFUNC, replaced '-' with '_' from variable
+	 		  o CBS_YEARMMDD_B-1 -> CBS_YEARMMDD_B_1
+	 		  o CBS_MMMYY_M-1 -> CBS_MMMYY_M_1
+	 
+	 16 May 2014 Anchalee Ch.
+	 		- Added section KBPRODCD and DFPRODCD to return KBank Product Code.
+	
+	 09 May 2014 Anchalee Ch.
+	 		- Modified CFTPFUNC to sort the most frequent used formats
+	 		  to the top of code and add format "CBS_YEARMMDD_B-1",
+	 		  "CBS_MMMYY_M-1" and "CBS_MMMYY".
+	
+	 06 May 2014 Pherapaht Nu.
+	 		- cancle >edit ISNUM AND ISINT for Check Input "space"
+	
+	 30 Apr 2014 Komkrit Vi.
+	 		- edit ISNUM AND ISINT for Check Input "space"
+	 23 Apr 2014 Komkrit Vi.
+	 		- Add line tag CFTPPATH
+	 		- Add line tag CFTPFUNC
+	 
+	 14 Mar 2014 Chawapol It.
+	 		- Add line tag CONDATE
+	 
+	 27 Jan 2014 Pheraphat Nu.
+	 		- Allow Mandatory Field can be null // For line tag CHKMAN
+	 		- Add line tag FMTAMT
+	 		
+	18 Feb 2014 Komkrit vi.
+	 		- edit validate NUMBER aand Integer // For ling tag ISNUM and ISINT
+	
+	 ****** Consider using setAuditFlag for all objects in this procedure
+	   example :do dep.setAuditFlag(1)
+
+	*/
+	
+ISNUM(NUM,LENGTH)
+	/*
+	Input	- NUM 	 : Input Message
+		- LENGTH : Length that want to validate	
+		
+	Return 	- 0 : "NUM isn't Number" or "Length of NUM isn't equal LENGTH Value" 
+		- 1 : NUM is Number
+	*/	
+	new ZRESULT
+	set ZRESULT=1
+	
+	set NUM=NUM.trim()
+	//if NUM.isNull() quit 0		// 30 Apr 2014  // 06 May 2014 cancle thiscode 
+	
+	if (LENGTH.get()'="") & (NUM.length()'=LENGTH) set ZRESULT=0
+	
+	if 'ZRESULT quit ZRESULT
+	set NUM=NUM.trim(-1,"0")
+	
+	if NUM.isNull() quit 1
+	
+	set ZRESULT=NUM.isNumber()
+	
+	quit ZRESULT
+	
+ISINT(NUM,LENGTH)
+	/*
+	Input	- NUM 	 : Input Message
+		- LENGTH : Length that want to validate	
+		
+	Return 	- 0 : "NUM isn't Integer" or "Length of NUM isn't equal LENGTH Value" 
+		- 1 : NUM is Integer
+	*/	
+	new ZRESULT
+	set ZRESULT=1
+	
+	set NUM=NUM.trim()
+	//if NUM.isNull() quit 0		// 30 Apr 2014   // 06 May 2014 cancle thiscode 
+	
+	if (LENGTH.get()'="") & (NUM.length()'=LENGTH) set ZRESULT=0
+	
+	if 'ZRESULT quit ZRESULT
+	set NUM=NUM.trim(-1,"0")
+	
+	if NUM.isNull() quit 1
+	
+	set ZRESULT=NUM.isInteger()
+	
+	quit ZRESULT
+
+CONVENC(SRC,IM,OM,ZER,ZRM)
+	/*
+		SCR:	Source (1=Profile, 2=Mainframe)
+		IM:	Input Message		OM:	Output Message
+		ERRCD:	Error Flag		ERRDESC:Response Error Message	
+	*/
+	if (SRC.get()'=1)&(SRC.get()'=2) set ZER=1, ZRM="Error: Invalid Input source." quit
+	if IM.get()="" set ZER=1, ZRM="Error: Input value is null." quit
+		
+	//ASC
+	if SRC=1 do {
+		if 'IM.isInteger() set ZER=1, ZRM="Error: Input Format" quit
+		do ASC(IM,.OM,.ZER,.ZRM)
+	}
+	
+	//EBC
+	if SRC=2 do {
+		/*
+		Correct		: All digits are number except the last digits, Ex. 00012J		
+		Incorrect	: Ex. 12A43D, -123K
+		*/
+		
+		if IM.isNumber() set ZER=1, ZRM="Error: Input Format" quit
+		
+		type Number ZCHK
+		
+		//Extract only valuable numeric digits
+		set ZCHK=IM.extract(1,IM.length()-1)
+		set ZCHK=ZCHK.trim(-1,"0")
+		
+		if (ZCHK'="" & (('ZCHK.isInteger()) ! (ZCHK<0))) set ZER=1, ZRM="Error: Input Format" quit
+		do EBC(IM,.OM,.ZER,.ZRM)
+	}
+
+	quit
+
+
+ASC(IM,OM,ZER,ZRM)
+	/*
+	Convert from ASCII to Converted EBCDIC
+	*/
+	
+	type Number ZLAST=0
+	
+	//Get last string to compare
+	set ZLAST=IM.extract(IM.length())
+	
+	//Positive Number
+	if IM>=0 do { quit
+		//replace last string which is 0 with {
+		if ZLAST=0 set OM=IM.extract(1,IM.length()-1)_"{"
+		//replace last string which is 1-9 with A-I
+		else  set OM=IM.extract(1,IM.length()-1)_$C($A(ZLAST)+16)
+		}
+	
+	//Negative Number
+	if IM<0 do {
+		//remove sign and replace last string which is 0 with }
+		if ZLAST=0 set OM=IM.extract(2,IM.length()-1)_"}"
+		//remove sign and replace last string which is 1-9 with J-R
+		else  set OM=IM.extract(2,IM.length()-1)_$C($A(ZLAST)+25)
+		}
+	
+	quit
+	
+	
+EBC(IM,OM,ZER,ZRM)
+	/*
+	Convert from Converted EBCDIC to ASCII
+	*/
+	
+	type Number ZSIGN=0
+	type String ZLAST=""
+	
+	//Get last string to compare
+	set ZLAST=IM.extract(IM.length())
+	
+	//Positive Number
+	if (ZLAST="{")!(ZLAST="A")!(ZLAST="B")!(ZLAST="C")!(ZLAST="D")!(ZLAST="E")!(ZLAST="F")!(ZLAST="G")!(ZLAST="H")!(ZLAST="I") do { quit
+		set ZSIGN=1
+		//replace last string which is { with 0
+		if ZLAST="{" set OM=ZSIGN*(+IM.replace(ZLAST,"0"))
+		//replace last string which is A-I with 1-9
+		else  set OM=ZSIGN*(+IM.replace(ZLAST,$C($A(ZLAST)-16)))
+	}
+	//Negative Number
+	if (ZLAST="}")!(ZLAST="J")!(ZLAST="K")!(ZLAST="L")!(ZLAST="M")!(ZLAST="N")!(ZLAST="O")!(ZLAST="P")!(ZLAST="Q")!(ZLAST="R") do { quit
+		set ZSIGN=-1
+		//replace last string which is } with 0
+		if ZLAST="}" set OM=ZSIGN*(+IM.replace(ZLAST,"0"))
+		//replace last string which is J-R with 1-9
+		else  set OM=ZSIGN*(+IM.replace(ZLAST,$C($A(ZLAST)-25)))
+	}
+	else  set ZER=1, ZRM="Error: Input Format" quit
+	
+	quit
+	
+	
+	
+	
+	//---------------------------------------------------------------------
+NSMLOG(msgintr,msgkey,msgdt,msgtyp,status)	//Public/Log non-standard message
+	//---------------------------------------------------------------------
+	/*
+	ARGUMENTS:
+	     . msgintr	Message interface		/TYP=T/REQ/MECH=VAL
+	     . msgkey	Message key			/TYP=T/REQ/MECH=VAL
+	     . msgdt	Message detail			/TYP=T/REQ/MECH=VAL
+	     . msgtyp	Message	type (1:in, 2:out)	/TYP=N/REQ/MECH=VAL
+	     . status	Status (error)			/TYP=T/NOREQ/MECH=VAL
+	*/
+	//---------------------------------------------------------------------
+	
+	do SYSVAR^SCADRV0()
+	type public Number vztprest, vzstart
+	type Number vztime
+
+	if $G(msgintr)="" quit
+	if $G(msgkey)="" quit
+	if $G(msgdt)="" quit
+	if $G(msgtyp)="" quit
+	
+	
+	type RecordNSMLOG nsmlog=Db.getRecord("NSMLOG",":msgintr,:msgkey",1)
+
+	set nsmlog.pid=%ProcessID
+	if msgtyp=1 do {		//input message log 
+		set nsmlog.cdat=%CurrentDate
+		set nsmlog.ctim=%CurrentTime	
+		set nsmlog.tpd=%SystemDate
+	}		
+	if msgtyp=2 do {
+		if vzstart.get().isNull() set vzstart = $$GETTIM^%ZFUNC
+		set vztime = (($$GETTIM^%ZFUNC - vzstart) / 1000000).roundDec(3)
+		set nsmlog.elapsed = vztime
+	}
+	set nsmlog.status=$G(status)
+	set nsmlog.tprest = vztprest.get()
+
+	do nsmlog.bypassSave()
+
+	do log(msgdt,msgtyp)
+
+	quit
+
+
+	//---------------------------------------------------------------------
+log(msg,typ)	//Private/Log messag,e in 400 byte segments, to NSMLOG
+	//---------------------------------------------------------------------
+
+	type public String msgkey, msgintr
+
+	type Number i,seq
+
+	type RecordNSMLOGD rec()
+
+	for i=1:400:$L(msg) do {
+		set seq = (i \ 400) + 1
+
+		set rec(seq)=Class.new("RecordNSMLOGD")
+		set rec(seq).msgtyp=msgintr
+		set rec(seq).msgid=msgkey
+		set rec(seq).typ=typ
+		set rec(seq).seq=seq
+
+		set rec(seq).dtl=$e(msg,i,i+399)
+
+		do rec(seq).bypassSave()
+	}
+
+	quit
+	
+	
+CHKMAN(ZINPUT,ZLIM,ZMANFLG,ZSET)
+	
+	/*
+	
+		This Function will Limit the length of  ZINPUT by ZLIM   
+		
+		and 
+	
+		This Function will check mandatory flag(ZMANFLG). if mandatory flag is on and ZINPUT is Null Function will return ZSET
+		
+		
+		Input>>  ZINPUT : Input
+			 ZLIM   : length to limit
+			 ZMANFLG :  mandatory flag  1= is mandatory flag  (Optional)
+			 ZSET : The Anwser of Function if ZINPUT is NULL   (Optional)
+			 
+			 Ex.  $$CHKMAN(zbrcd.desc,4,1," ")
+	
+	
+	*/
+	
+	set ZMANFLG=ZMANFLG.get()
+	set ZSET=ZSET.get()
+	//if ZSET.isNull() set ZSET=ZSET.blank(1)    // 27 Jan 2014 Mandatory Field can be null Pheraphat Nu.
+	
+	if 'ZLIM.isInteger() quit "ER"
+	if ZSET.length()>ZLIM quit "ER"    // length of ZSET cannot more than limit 
+	
+	
+	
+	type String ZRETURN
+	set ZRETURN=""
+	
+	
+	
+	if (ZINPUT.length()>ZLIM) do { if 1
+	
+		set ZRETURN=ZINPUT.blank(ZLIM)
+	
+	
+	}
+	else  if '(ZINPUT.length()>ZLIM) set ZRETURN=ZINPUT
+	
+	
+	
+	if ZMANFLG do {
+	
+		if ZRETURN.isNull() set ZRETURN=ZSET
+
+	
+	}
+	
+
+	quit ZRETURN
+	
+public FMTAMT(Number AMT, Number LEN, Number DEC, Number OPT)
+	/*
+	Format amount to Cobol fixed length field (decimal implied).
+	Note that the sign is dropped for negative amounts.
+
+	ARGUMENTS:
+	     . AMT	Amount			/REQ/MECH=VAL
+	     . LEN	Field length		/REQ/MECH=VAL
+	     . DEC	Decimal precision	/NOREQ/MECH=VAL/DFT=2
+	     . OPT	Format option		/NOREQ/MECH=VAL/DFT=0
+
+	     		0 = Signed, decimal point
+	     		1 = Unsigned, decimal point
+	     		2 = Unsigned, decimal point implied
+
+	RETURNS:
+	     . $$	Formatted amount
+
+	EXAMPLE:
+			write $$FMTAMT^ZEXTUTL(1234.56,15,2,0)
+			+00000001234.56
+
+			write $$FMTAMT^ZEXTUTL(1234.56,15,2,1)
+			000000001234.56
+
+			write $$FMTAMT^ZEXTUTL(1234.56,15,2,2)
+			000000000123456
+	*/
+
+	type String FMTAMT
+
+	if DEC.get().isNull() set DEC = 2
+	if OPT.get().isNull() set OPT = 0
+
+	set FMTAMT = AMT.roundDec(DEC)
+	if FMTAMT < 0 set FMTAMT = -FMTAMT
+
+	if OPT = 0 do {
+		set FMTAMT = FMTAMT.zero(LEN-1, DEC)
+		set FMTAMT = $S(AMT < 0:"-", 1:"+")_FMTAMT
+	}
+
+	if OPT = 1 set FMTAMT = FMTAMT.zero(LEN, DEC)
+
+	if OPT = 2 do {
+		set FMTAMT = FMTAMT * (10**DEC)
+		set FMTAMT = FMTAMT.zero(LEN)
+	}
+
+	quit FMTAMT
+	
+	
+
+CONDATE(ZDATE,ZMASK)	
+
+	//if not valid in system return -1
+	
+	type Number ZVALID,ZPOS,ZMONTH
+	set ZVALID=1
+	
+	set ZPOS=ZMASK.find("MM")
+	set ZMONTH=+ZDATE.extract(ZPOS-2,ZPOS-1)
+	
+	if ZMONTH>12 set ZVALID=-1 quit ZVALID
+	
+	set ZVALID=$$FDAT^%ZM(ZDATE,ZMASK)
+	
+	quit ZVALID
+	
+	
+	
+	
+	
+CFTPPATH(ZSTR)
+	type Number Y
+	type String ZTMPSTR,ZTMPSTR1,ZPATH
+	
+	for Y=2:2 set ZTMPSTR = ZSTR.piece("$",Y,Y) quit:ZTMPSTR.isNull()  do {
+		if ZTMPSTR["/" set ZTMPSTR = ZTMPSTR.piece("/",1)
+		
+		set ZTMPSTR1 = ZTMPSTR.replace("{","")
+		set ZTMPSTR1 = ZTMPSTR1.replace("}","")
+		set ZTMPSTR1 = $$TRNLNM^%ZFUNC(ZTMPSTR1)
+		set ZSTR = ZSTR.replace(ZTMPSTR,ZTMPSTR1)
+	}
+	set ZSTR = ZSTR.replace("$","")
+	
+	set ZPATH = $$CFTPFUNC^ZITFUTL(ZSTR)
+	
+	quit ZPATH
+	
+	
+	
+CFTPFUNC(String ZSTR)
+	/*
+	Note: Sorting the most frequent used formats to the top to reduce to many if block
+	*/
+
+	type Number X
+	type String ZTMPS,ZREP
+	type Date ZDATE
+	
+	do SYSVAR^SCADRV0(.sysvar)
+	
+	for X=2:2 set ZTMPS = ZSTR.piece("`",X,X) quit:ZTMPS.isNull()  do {
+		//Example System Date = 13/01/2014
+		
+		//Current System Date with format "YEARMMDD" - 20140113
+		if ZTMPS="CBS_YEARMMDD" do { quit
+			set ZREP = $$DAT^%ZM(%SystemDate,"YEARMMDD")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+		//1 Prior System Date with format "YEARMMDD" - 20140112
+		if ZTMPS="CBS_YEARMMDD_1" do { quit
+			set ZREP = $$DAT^%ZM(%SystemDate-1,"YEARMMDD")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+		//Current System Date with format "YYMMDD" - 140113
+		if ZTMPS="CBS_YYMMDD" do { quit
+			set ZREP = $$DAT^%ZM(%SystemDate,"YYMMDD")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+		//Current System Date with format "DDMMYY" - 130114
+		if ZTMPS="CBS_DDMMYY" do { quit
+			set ZREP = $$DAT^%ZM(%SystemDate,"DDMMYY")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+		//Current System Date with format "YEARMM" - 201401
+		if ZTMPS="CBS_YEARMM" do { quit
+			set ZREP = $$DAT^%ZM(%SystemDate,"YEARMM")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+		//1 Prior Business Date with format "YEARMMDD" - 20140110
+		//28/05/2014 - Anchalee Ch.
+		//Replaced 'CBS_YEARMMDD_B-1' with 'CBS_YEARMMDD_B_1'
+		if ZTMPS="CBS_YEARMMDD_B_1" do { quit
+		//End of 28/05/2014
+			set ZDATE = %SystemDate
+			set ZDATE = ZDATE.prevBusDate(1)
+			set ZREP = ZDATE.toString("YEARMMDD")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+		//1 Prior Month with format "MMMYY" - DEC13
+		//28/05/2014 - Anchalee Ch.
+		//Replaced 'CBS_MMMYY_M-1' with 'CBS_MMMYY_M_1'
+		if ZTMPS="CBS_MMMYY_M_1" do { quit
+		//End of 28/05/2014
+			set ZDATE = %SystemDate
+			set ZYY = ZDATE.year()
+			set ZMM = ZDATE.month()
+			if ZMM="01" set ZYY=ZYY-1,ZMM=12
+			set ZDATE = ("01"_ZMM_ZYY).toDate("DDMMYEAR")
+			set ZREP = $$DAT^%ZM(ZDATE,"MONYY")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+		//Current System Date with format "MMMYY" - JAN14
+		if ZTMPS="CBS_MMMYY" do { quit
+			set ZREP = $$DAT^%ZM(%SystemDate,"MONYY")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+		
+		
+		if ZTMPS="CBS_YEARMMDD_N1" do { quit
+			set ZREP = $$DAT^%ZM(%SystemDate+1,"YEARMMDD")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+		
+		if ZTMPS="CBS_YEARMMDD_2" do { quit
+			set ZREP = $$DAT^%ZM(%SystemDate-2,"YEARMMDD")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+		
+		if ZTMPS="CBS_YYMMDD_1" do { quit
+			set ZREP = $$DAT^%ZM(%SystemDate-1,"YYMMDD")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+		
+		if ZTMPS="CBS_DDMMYY_1" do { quit
+			set ZREP = $$DAT^%ZM(%SystemDate-1,"DDMMYY")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+		if ZTMPS="CBS_MMDD" do { quit
+			set ZREP = $$DAT^%ZM(%SystemDate,"MMDD")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+		if ZTMPS="CBS_MMDD_1" do { quit
+			set ZREP = $$DAT^%ZM(%SystemDate-1,"MMDD")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+		if ZTMPS="CBS_MMDDYEAR_1" do { quit
+			set ZREP = $$DAT^%ZM(%SystemDate-1,"MMDDYEAR")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+		if ZTMPS="CBS_MMDDYEAR" do { quit
+			set ZREP = $$DAT^%ZM(%SystemDate,"MMDDYEAR")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+		if ZTMPS="CBS_DDMMYEAR" do { quit
+			set ZREP = $$DAT^%ZM(%SystemDate,"DDMMYEAR")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+		if ZTMPS="CBS_DDMMYEAR_1" do { quit
+			set ZREP = $$DAT^%ZM(%SystemDate-1,"DDMMYEAR")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+		if ZTMPS="CBS_DDMM" do { quit
+			set ZREP = $$DAT^%ZM(%SystemDate,"DDMM")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+		if ZTMPS="CBS_DDMM1" do { quit
+			set ZREP = $$DAT^%ZM(%SystemDate+1,"DDMM")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+		if ZTMPS="CBS_DDMM_1" do { quit
+			set ZREP = $$DAT^%ZM($$NBD^UNBD(%SystemDate+1,1,0),"DDMM")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+		if ZTMPS="CBS_DDMM_2" do { quit
+			set ZREP = $$DAT^%ZM($$NBD^UNBD(%SystemDate+1,2,0),"DDMM")
+			set ZSTR = ZSTR.replace(ZTMPS,ZREP)
+		}
+	}
+	
+	set ZSTR = ZSTR.replace("`","")
+	
+	quit ZSTR
+	
+KBPRODCD(Number ZBAL, String GRP, String ZTYPE, String ZGLSC, String ZTRM, String ZPRODCD, String ZPRODCDNEG)
+
+	type String KBPRODCD
+	
+	set KBPRODCD=ZPRODCD.get()
+	set ZPRODCDNEG=ZPRODCDNEG.get()
+	set ZTRM=ZTRM.get()
+	
+	if ((+ZBAL)<0),('ZPRODCDNEG.isNull()) set KBPRODCD=ZPRODCDNEG
+	
+	if 'KBPRODCD.isNull() quit KBPRODCD
+	
+	if ZTYPE="" quit $$DFPRODCD(GRP,ZTYPE)
+	if ZGLSC="" quit $$DFPRODCD(GRP,ZTYPE)
+
+	if ZTRM="" set ZTRM=99
+	
+	type RecordZUTBLPRDCD zprdcd = Db.getRecord("ZUTBLPRDCD","TYPE=:ZTYPE,GLSC=:ZGLSC,TRM=:ZTRM",1)
+	set KBPRODCD=zprdcd.prodcd
+	
+	if KBPRODCD.isNull() set KBPRODCD=$$DFPRODCD(GRP,ZTYPE)
+
+	quit KBPRODCD
+	
+DFPRODCD(String GRP, String ZTYPE)
+	
+	type String DFPRODCD
+	
+	set DFPRODCD=""
+	
+	type ResultSet rs=Db.select("PRODCD","ZUTBLPRDCD","TYPE=:ZTYPE")
+	if rs.next() set DFPRODCD=rs.getCol("PRODCD")
+	
+	if DFPRODCD="" do {
+		if GRP="DDA" set ZTYPE=1001
+		if GRP="SAV" set ZTYPE=2001
+		if GRP="CD" set ZTYPE=3001
+		
+		type ResultSet rs=Db.select("PRODCD","ZUTBLPRDCD","TYPE=:ZTYPE")
+		if rs.next() set DFPRODCD=rs.getCol("PRODCD")
+	}
+	
+	quit DFPRODCD
+	

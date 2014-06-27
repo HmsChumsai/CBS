@@ -303,7 +303,7 @@ PROC
 			//1.If inquirers are not HR or not customers and input account is a salary account
 			//2.If inquirers are HR and input account is not a salary account
 			//***
-			type Number IsSal,IsHr,IsCa
+			type Number IsSal,IsHr,IsCa,ZPRODCD
 			set (IsSal,IsHr,IsCa)=0
 
 
@@ -342,32 +342,42 @@ PROC
 			set ZARROUT("Curcode")=DEP.CRCD
 			set ZARROUT("DomBranchId")=DEP.BOO
 			//set ZARROUT("KBankProductCode")=DEP.ZPRODCD
-			set ZPRODCD=""
+			//set ZPRODCD=""
 			/*
 			if (DEP.BAL<0),(DEP.ZPRODCDNEG'="") set ZPRODCD=DEP.ZPRODCDNEG
 			else set ZPRODCD = DEP.ZPRODCD
 			*/
 			//2014/05/30
-			set ZPRODCD=DEP.ZPRODCD
+			//set ZPRODCD=DEP.ZPRODCD
+			//2014/06/13	Hard code for app CMAS
+			if +ZARRIN("RqAppId")=363 {
+				set ZPRODCD=$$KBPRODCD^ZITFUTL(DEP.ZBAL,DEP.GRP,DEP.TYPE,DEP.GLSC,DEP.TRM,DEP.ZPRODCD,DEP.ZPRODCDNEG)
+			}
+			else set ZPRODCD=DEP.ZPRODCD
+			//if ($G(ZARRIN("RqAppId"))
 			set ZARROUT("KBankProductCode")=ZPRODCD
 	
 			type String BranchName,KBankPRDESC
 			set BranchName=""
 			set KBankPRDESC=""
 			//p'new
+			type RecordZUTBLKBDES ZUTBLKBDES 
+			if ZPRODCD'="" do {
+				set ZUTBLKBDES = Db.getRecord("ZUTBLKBDES","CD=:ZPRODCD",1)
+			}
 			if isTh do {
 				type RecordUTBLBRCD ZUTBLBRCD = Db.getRecord("UTBLBRCD","BRCD=:DEP.BOO",1)
 				set ZARROUT("BranchName")=ZUTBLBRCD.DESC
-
-				type RecordZUTBLKBDES ZUTBLKBDES = Db.getRecord("ZUTBLKBDES","CD=:ZPRODCD",1)
-				set ZARROUT("KBankProductCodeDesc") = ZUTBLKBDES.des
+				
+				//type RecordZUTBLKBDES ZUTBLKBDES = Db.getRecord("ZUTBLKBDES","CD=:ZPRODCD",1)
+				if ZPRODCD'="" set ZARROUT("KBankProductCodeDesc") = ZUTBLKBDES.des
 			}
 			else do {
 				type RecordZUTBLBRCD ZUTBLBRCD = Db.getRecord("ZUTBLBRCD","BRCD=:DEP.BOO",1)
 				set ZARROUT("BranchName")=ZUTBLBRCD.engnam
 
-				type RecordZUTBLKBDES ZUTBLKBDES = Db.getRecord("ZUTBLKBDES","CD=:ZPRODCD",1)
-				set ZARROUT("KBankProductCodeDesc") = ZUTBLKBDES.edes
+				//type RecordZUTBLKBDES ZUTBLKBDES = Db.getRecord("ZUTBLKBDES","CD=:ZPRODCD",1)
+				if ZPRODCD'="" set ZARROUT("KBankProductCodeDesc") = ZUTBLKBDES.edes
 			}
 
 
